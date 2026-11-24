@@ -135,3 +135,6 @@ web-build/
 **/generated/
 
 !docs-site/.vscode/
+
+# Python
+__pycache__/

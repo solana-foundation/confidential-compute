@@ -42,14 +42,7 @@ pub fn encode_cert(
     subject_rdns: &[u8],
     extensions: &[u8],
 ) -> Vec<u8> {
-    encode_cert_until(
-        subject_xy,
-        issuer,
-        issuer_rdns,
-        subject_rdns,
-        extensions,
-        b"350101000000Z",
-    )
+    encode_cert_until(subject_xy, issuer, issuer_rdns, subject_rdns, extensions, b"350101000000Z")
 }
 
 /// `encode_cert` with an explicit notAfter, for tests that need a credential
@@ -79,10 +72,7 @@ pub fn encode_cert_until(
     let spki = tlv(0x30, &spki_body);
 
     let serial = tlv(0x02, &[0x01]);
-    let sigalg = tlv(
-        0x30,
-        &tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03]),
-    );
+    let sigalg = tlv(0x30, &tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03]));
     let issuer_name = tlv(0x30, issuer_rdns);
     let mut validity_body = Vec::new();
     validity_body.extend(tlv(0x17, b"250101000000Z"));
@@ -126,10 +116,7 @@ pub fn encode_cert_until(
 }
 
 pub fn name(label: &[u8]) -> Vec<u8> {
-    tlv(
-        0x31,
-        &tlv(0x30, &[tlv(6, &[0x55, 4, 3]), tlv(0x0c, label)].concat()),
-    )
+    tlv(0x31, &tlv(0x30, &[tlv(6, &[0x55, 4, 3]), tlv(0x0c, label)].concat()))
 }
 pub fn extension(oid: &[u8], critical: bool, value: &[u8]) -> Vec<u8> {
     let mut b = tlv(6, oid);
@@ -145,11 +132,7 @@ pub fn constraints(ca: bool, path: Option<u8>, usage: u8) -> Vec<u8> {
         bc.extend(tlv(2, &[n]));
     }
     let mut out = extension(&[0x55, 0x1d, 0x13], true, &tlv(0x30, &bc));
-    out.extend(extension(
-        &[0x55, 0x1d, 0x0f],
-        ca,
-        &tlv(3, &[usage.trailing_zeros() as u8, usage]),
-    ));
+    out.extend(extension(&[0x55, 0x1d, 0x0f], ca, &tlv(3, &[usage.trailing_zeros() as u8, usage])));
     out
 }
 pub fn standard_cert(
@@ -159,14 +142,7 @@ pub fn standard_cert(
     subject_label: &[u8],
     ca: bool,
 ) -> Vec<u8> {
-    standard_cert_until(
-        xy,
-        issuer,
-        issuer_label,
-        subject_label,
-        ca,
-        b"350101000000Z",
-    )
+    standard_cert_until(xy, issuer, issuer_label, subject_label, ca, b"350101000000Z")
 }
 
 /// `standard_cert` with an explicit notAfter.

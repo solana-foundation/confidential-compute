@@ -70,10 +70,7 @@ impl Default for GcpOidcProvider {
 /// @spec SCC-SIDECAR-003 SCC-JWT-005
 pub fn mode_a_eat_nonces(workload_signer: &Pubkey, slot_hash: &[u8; 32]) -> (String, String) {
     let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    (
-        engine.encode(workload_signer.as_ref()),
-        engine.encode(slot_hash),
-    )
+    (engine.encode(workload_signer.as_ref()), engine.encode(slot_hash))
 }
 
 /// Unauthenticated claims preflight before submitting a Mode A registration.
@@ -90,13 +87,7 @@ pub fn validate_gcp_token(
     slot_hash: &[u8; 32],
     expected_image_digest: Option<[u8; 32]>,
 ) -> Result<(), SidecarError> {
-    validate_gcp_token_for_audience(
-        jwt,
-        workload_signer,
-        slot_hash,
-        expected_image_digest,
-        DEFAULT_AUDIENCE,
-    )
+    validate_gcp_token_for_audience(jwt, workload_signer, slot_hash, expected_image_digest, DEFAULT_AUDIENCE)
 }
 
 fn validate_gcp_token_for_audience(
@@ -106,25 +97,21 @@ fn validate_gcp_token_for_audience(
     expected_image_digest: Option<[u8; 32]>,
     audience: &str,
 ) -> Result<(), SidecarError> {
-    let view = solana_confidential_compute_crypto::jwt::JwtView::parse(jwt).map_err(|e| {
-        SidecarError::AttestationError(format!("Invalid JWT returned by launcher: {e:?}"))
-    })?;
+    let view = solana_confidential_compute_crypto::jwt::JwtView::parse(jwt)
+        .map_err(|e| SidecarError::AttestationError(format!("Invalid JWT returned by launcher: {e:?}")))?;
     let claims = solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64)
-        .map_err(|e| {
-            SidecarError::AttestationError(format!("Invalid Google claims in JWT: {e:?}"))
-        })?;
-    solana_confidential_compute_crypto::jwt::enforce_google_policy(&claims, None).map_err(|e| {
-        SidecarError::AttestationError(format!("Invalid Confidential Space claims: {e:?}"))
-    })?;
+        .map_err(|e| SidecarError::AttestationError(format!("Invalid Google claims in JWT: {e:?}")))?;
+    solana_confidential_compute_crypto::jwt::enforce_google_policy(&claims, None)
+        .map_err(|e| SidecarError::AttestationError(format!("Invalid Confidential Space claims: {e:?}")))?;
     if claims.aud() != audience.as_bytes() {
         return Err(SidecarError::AttestationError(
             "Launcher token audience does not match requested audience".to_string(),
         ));
     }
     enforce_image_digest(&claims.image_digest, expected_image_digest)?;
-    let raw = claims.decode_mode_a_binding().map_err(|_| {
-        SidecarError::AttestationError("Launcher token eat_nonce is not a Mode A pair".to_string())
-    })?;
+    let raw = claims
+        .decode_mode_a_binding()
+        .map_err(|_| SidecarError::AttestationError("Launcher token eat_nonce is not a Mode A pair".to_string()))?;
     if raw[..32] != workload_signer.to_bytes() || raw[32..] != *slot_hash {
         return Err(SidecarError::AttestationError(
             "Launcher token eat_nonce does not bind this key and slot hash".to_string(),
@@ -135,10 +122,7 @@ fn validate_gcp_token_for_audience(
 
 /// When `expected` is set, the token `image_digest` must match or attest fails closed.
 /// @spec SCC-SIDECAR-003
-fn enforce_image_digest(
-    token_digest: &[u8; 32],
-    expected: Option<[u8; 32]>,
-) -> Result<(), SidecarError> {
+fn enforce_image_digest(token_digest: &[u8; 32], expected: Option<[u8; 32]>) -> Result<(), SidecarError> {
     let Some(expected) = expected else {
         return Ok(());
     };
@@ -153,14 +137,12 @@ fn enforce_image_digest(
 fn parse_image_digest_config(raw: &str) -> Result<[u8; 32], SidecarError> {
     let Some(hex) = raw.strip_prefix("sha256:") else {
         return Err(SidecarError::InvalidConfig(
-            "SOLANA_CC_CONTAINER_IMAGE_DIGEST must be sha256: followed by 64 hex characters"
-                .to_string(),
+            "SOLANA_CC_CONTAINER_IMAGE_DIGEST must be sha256: followed by 64 hex characters".to_string(),
         ));
     };
     if hex.len() != 64 {
         return Err(SidecarError::InvalidConfig(
-            "SOLANA_CC_CONTAINER_IMAGE_DIGEST must be sha256: followed by 64 hex characters"
-                .to_string(),
+            "SOLANA_CC_CONTAINER_IMAGE_DIGEST must be sha256: followed by 64 hex characters".to_string(),
         ));
     }
     let mut out = [0u8; 32];
@@ -179,8 +161,7 @@ fn hex_nibble(c: u8) -> Result<u8, SidecarError> {
         b'a'..=b'f' => Ok(c - b'a' + 10),
         b'A'..=b'F' => Ok(c - b'A' + 10),
         _ => Err(SidecarError::InvalidConfig(
-            "SOLANA_CC_CONTAINER_IMAGE_DIGEST must be sha256: followed by 64 hex characters"
-                .to_string(),
+            "SOLANA_CC_CONTAINER_IMAGE_DIGEST must be sha256: followed by 64 hex characters".to_string(),
         )),
     }
 }
@@ -217,9 +198,7 @@ fn launcher_client(socket_path: &str) -> Result<Client, SidecarError> {
 
 #[cfg(not(unix))]
 fn launcher_client(_socket_path: &str) -> Result<Client, SidecarError> {
-    Err(SidecarError::InvalidConfig(
-        "Confidential Space attestation requires a Unix launcher socket".to_string(),
-    ))
+    Err(SidecarError::InvalidConfig("Confidential Space attestation requires a Unix launcher socket".to_string()))
 }
 
 impl AttestationProvider for GcpOidcProvider {
@@ -236,9 +215,10 @@ impl AttestationProvider for GcpOidcProvider {
             let (nonce0, nonce1) = mode_a_eat_nonces(workload_signer, slot_hash);
             let client = launcher_client(&self.socket_path)?;
             let request = token_request(&client, &self.audience, &nonce0, &nonce1)?;
-            let response = client.execute(request).await.map_err(|e| {
-                SidecarError::MetadataError(format!("Launcher request failed: {e}"))
-            })?;
+            let response = client
+                .execute(request)
+                .await
+                .map_err(|e| SidecarError::MetadataError(format!("Launcher request failed: {e}")))?;
 
             if !response.status().is_success() {
                 let status = response.status();
@@ -248,9 +228,10 @@ impl AttestationProvider for GcpOidcProvider {
                 )));
             }
 
-            let jwt = response.text().await.map_err(|e| {
-                SidecarError::MetadataError(format!("Failed to read launcher JWT response: {e}"))
-            })?;
+            let jwt = response
+                .text()
+                .await
+                .map_err(|e| SidecarError::MetadataError(format!("Failed to read launcher JWT response: {e}")))?;
 
             validate_gcp_token_for_audience(
                 &jwt,
@@ -272,10 +253,7 @@ mod tests {
     #[test]
     fn default_provider_uses_confidential_space_launcher() {
         let provider = GcpOidcProvider::default();
-        assert_eq!(
-            provider.socket_path,
-            "/run/container_launcher/teeserver.sock"
-        );
+        assert_eq!(provider.socket_path, "/run/container_launcher/teeserver.sock");
         assert_eq!(provider.audience, "solana-confidential-compute-verifier");
     }
 
@@ -290,18 +268,11 @@ mod tests {
         assert!(!n1.contains('='));
         assert!(!n0.contains('+') && !n0.contains('/'));
 
-        let request = token_request(
-            &Client::new(),
-            "solana-confidential-compute-verifier",
-            &n0,
-            &n1,
-        )
-        .expect("build");
+        let request = token_request(&Client::new(), "solana-confidential-compute-verifier", &n0, &n1).expect("build");
         assert_eq!(request.method(), reqwest::Method::POST);
         assert_eq!(request.url().as_str(), TOKEN_URL);
         assert_eq!(request.headers()["content-type"], "application/json");
-        let body: serde_json::Value =
-            serde_json::from_slice(request.body().unwrap().as_bytes().unwrap()).unwrap();
+        let body: serde_json::Value = serde_json::from_slice(request.body().unwrap().as_bytes().unwrap()).unwrap();
         assert_eq!(
             body,
             serde_json::json!({
@@ -339,8 +310,7 @@ mod tests {
         let expected = parse_image_digest_config(&format!("sha256:{digest}")).expect("parse");
         validate_gcp_token(&jwt, &signer, &slot_hash, Some(expected)).expect("match");
 
-        let other =
-            parse_image_digest_config(&format!("sha256:{}", "11".repeat(32))).expect("parse");
+        let other = parse_image_digest_config(&format!("sha256:{}", "11".repeat(32))).expect("parse");
         let err = validate_gcp_token(&jwt, &signer, &slot_hash, Some(other)).unwrap_err();
         assert!(err.to_string().contains("image_digest"));
     }

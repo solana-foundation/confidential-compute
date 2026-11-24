@@ -85,12 +85,7 @@ mod tests {
 
     #[test]
     fn pcr0_zero_detects_debug_enclave() {
-        let mut pcrs = NitroPcrs {
-            pcr0: [0u8; 48],
-            pcr1: [1u8; 48],
-            pcr2: [2u8; 48],
-            pcr8: [8u8; 48],
-        };
+        let mut pcrs = NitroPcrs { pcr0: [0u8; 48], pcr1: [1u8; 48], pcr2: [2u8; 48], pcr8: [8u8; 48] };
         assert!(pcrs.pcr0_is_zero());
         pcrs.pcr0[0] = 1;
         assert!(!pcrs.pcr0_is_zero());

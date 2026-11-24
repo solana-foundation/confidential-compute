@@ -20,6 +20,5 @@ pub use heartbeat::{reattest_current_key, HeartbeatDaemon};
 pub use keys::EphemeralKeyManager;
 pub use onchain::{MockCluster, OnchainAttestor};
 pub use server::{
-    attest_current_key, create_router, rotate_zeroize_and_attest, validate_loopback_addr,
-    SidecarAppState,
+    attest_current_key, create_router, rotate_zeroize_and_attest, validate_loopback_addr, SidecarAppState,
 };

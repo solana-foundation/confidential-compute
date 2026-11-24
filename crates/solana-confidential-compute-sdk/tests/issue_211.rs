@@ -42,13 +42,10 @@ use sha2::Sha256;
 use solana_confidential_compute_cpi::AttestationPlatform;
 use solana_confidential_compute_verifier::{
     payload::{
-        REGISTER_JWKS_KEY_DISCRIMINATOR, REVOKE_ATTESTED_SIGNER_DISCRIMINATOR,
-        REVOKE_JWKS_KEY_DISCRIMINATOR, VERIFY_GOOGLE_JWT_DISCRIMINATOR,
+        REGISTER_JWKS_KEY_DISCRIMINATOR, REVOKE_ATTESTED_SIGNER_DISCRIMINATOR, REVOKE_JWKS_KEY_DISCRIMINATOR,
+        VERIFY_GOOGLE_JWT_DISCRIMINATOR,
     },
-    state::{
-        BackendPolicy, GcpTenantPolicy, PolicyRegistry, UsedNonceAccount,
-        POLICY_REGISTRY_DISCRIMINATOR,
-    },
+    state::{BackendPolicy, GcpTenantPolicy, PolicyRegistry, UsedNonceAccount, POLICY_REGISTRY_DISCRIMINATOR},
 };
 use solana_program::account_info::AccountInfo;
 use solana_sdk::{
@@ -78,11 +75,7 @@ fn b64url(bytes: &[u8]) -> String {
     const SET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut out = String::new();
     for chunk in bytes.chunks(3) {
-        let b = [
-            chunk[0],
-            *chunk.get(1).unwrap_or(&0),
-            *chunk.get(2).unwrap_or(&0),
-        ];
+        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
         let n = (b[0] as u32) << 16 | (b[1] as u32) << 8 | b[2] as u32;
         for i in 0..chunk.len() + 1 {
             out.push(SET[(n >> (18 - 6 * i) & 0x3f) as usize] as char);
@@ -115,22 +108,11 @@ fn mint_jwt(key: &RsaPrivateKey, workload: &Pubkey, slot_hash: &[u8; 32], iat: i
 }
 
 fn funded(owner: Pubkey, data: Vec<u8>) -> Account {
-    Account {
-        lamports: 100_000_000,
-        data,
-        owner,
-        executable: false,
-        rent_epoch: 0,
-    }
+    Account { lamports: 100_000_000, data, owner, executable: false, rent_epoch: 0 }
 }
 
 /// An `AccountInfo` over the exact bytes the bank holds for `key`.
-fn as_account_info(
-    key: Pubkey,
-    owner: Pubkey,
-    signer: bool,
-    data: Vec<u8>,
-) -> AccountInfo<'static> {
+fn as_account_info(key: Pubkey, owner: Pubkey, signer: bool, data: Vec<u8>) -> AccountInfo<'static> {
     AccountInfo::new(
         Box::leak(Box::new(key)),
         signer,
@@ -161,8 +143,7 @@ async fn issued_session_stops_at_credential_expiry_and_governed_revocation() {
     let (registry, rb) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let kid_hash = solana_confidential_compute_crypto_kid_hash(KID);
     let (jwks, _) = Pubkey::find_program_address(&[b"jwks", &kid_hash], &pid);
-    let (record, _) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", workload.pubkey().as_ref()], &pid);
+    let (record, _) = Pubkey::find_program_address(&[b"attested_signer_v2", workload.pubkey().as_ref()], &pid);
 
     let mut policy = vec![0; PolicyRegistry::SIZE];
     policy[..8].copy_from_slice(&POLICY_REGISTRY_DISCRIMINATOR);
@@ -192,33 +173,17 @@ async fn issued_session_stops_at_credential_expiry_and_governed_revocation() {
     backend_policy.push(backend_bump);
 
     let mut pt = sbf::verifier_program_test(pid);
-    pt.add_account(
-        authority.pubkey(),
-        funded(solana_sdk_ids::system_program::ID, vec![]),
-    );
-    pt.add_account(
-        workload.pubkey(),
-        funded(solana_sdk_ids::system_program::ID, vec![]),
-    );
-    pt.add_account(
-        fee_payer.pubkey(),
-        funded(solana_sdk_ids::system_program::ID, vec![]),
-    );
+    pt.add_account(authority.pubkey(), funded(solana_sdk_ids::system_program::ID, vec![]));
+    pt.add_account(workload.pubkey(), funded(solana_sdk_ids::system_program::ID, vec![]));
+    pt.add_account(fee_payer.pubkey(), funded(solana_sdk_ids::system_program::ID, vec![]));
     pt.add_account(registry, funded(pid, policy));
     pt.add_account(tenant, funded(pid, tenant_policy));
     pt.add_account(backend, funded(pid, backend_policy));
     let mut ctx = pt.start_with_context().await;
     // Pin the clock one second before the credential deadline, so the token's
     // own `exp` -- not the rolling session TTL -- is what bounds the session.
-    ctx.set_sysvar(&Clock {
-        slot: SLOT,
-        unix_timestamp: TOKEN_EXP - 1,
-        ..Clock::default()
-    });
-    ctx.set_sysvar(&SlotHashes::new(&[(
-        NONCE_SLOT,
-        Hash::new_from_array(slot_hash),
-    )]));
+    ctx.set_sysvar(&Clock { slot: SLOT, unix_timestamp: TOKEN_EXP - 1, ..Clock::default() });
+    ctx.set_sysvar(&SlotHashes::new(&[(NONCE_SLOT, Hash::new_from_array(slot_hash))]));
 
     // Register the generated RSA key through the actual governance handler,
     // including its Montgomery precomputation, instead of inventing a
@@ -294,21 +259,13 @@ async fn issued_session_stops_at_credential_expiry_and_governed_revocation() {
     assert_eq!(issued.data.len(), 154);
     let deadline = i64::from_le_bytes(issued.data[146..154].try_into().unwrap());
     assert_eq!(deadline, TOKEN_EXP);
-    assert_eq!(
-        u64::from_le_bytes(issued.data[137..145].try_into().unwrap()),
-        SLOT_EXP
-    );
+    assert_eq!(u64::from_le_bytes(issued.data[137..145].try_into().unwrap()), SLOT_EXP);
     let used = ctx.banks_client.get_account(nonce).await.unwrap().unwrap();
     assert_eq!(used.data.len(), UsedNonceAccount::SIZE);
 
     let consume = |data: Vec<u8>, unix: i64| {
         let record_acc = as_account_info(record, pid, false, data);
-        let workload_acc = as_account_info(
-            workload.pubkey(),
-            solana_sdk_ids::system_program::ID,
-            true,
-            vec![],
-        );
+        let workload_acc = as_account_info(workload.pubkey(), solana_sdk_ids::system_program::ID, true, vec![]);
         solana_confidential_compute_cpi::assert_attestation_signer_at_slot(
             &record_acc,
             &workload_acc,
@@ -350,10 +307,7 @@ async fn issued_session_stops_at_credential_expiry_and_governed_revocation() {
     .unwrap();
     let after_issuer = ctx.banks_client.get_account(record).await.unwrap().unwrap();
     assert_eq!(after_issuer.data, issued.data);
-    assert_eq!(
-        consume(after_issuer.data.clone(), TOKEN_EXP - 1),
-        Ok(SLOT_EXP)
-    );
+    assert_eq!(consume(after_issuer.data.clone(), TOKEN_EXP - 1), Ok(SLOT_EXP));
 
     let mut revoke = REVOKE_ATTESTED_SIGNER_DISCRIMINATOR.to_vec();
     revoke.extend_from_slice(workload.pubkey().as_ref());
@@ -369,45 +323,16 @@ async fn issued_session_stops_at_credential_expiry_and_governed_revocation() {
 
     // A stranger cannot revoke, and the record is untouched.
     let stranger = Keypair::new();
-    assert!(send(
-        &mut ctx,
-        &fee_payer,
-        revoke_ix(stranger.pubkey(), true),
-        &[&fee_payer, &stranger]
-    )
-    .await
-    .is_err());
-    assert_eq!(
-        ctx.banks_client
-            .get_account(record)
-            .await
-            .unwrap()
-            .unwrap()
-            .data,
-        issued.data
-    );
+    assert!(send(&mut ctx, &fee_payer, revoke_ix(stranger.pubkey(), true), &[&fee_payer, &stranger]).await.is_err());
+    assert_eq!(ctx.banks_client.get_account(record).await.unwrap().unwrap().data, issued.data);
 
     // Nor can an unsigned authority.
-    assert!(send(
-        &mut ctx,
-        &fee_payer,
-        revoke_ix(authority.pubkey(), false),
-        &[&fee_payer]
-    )
-    .await
-    .is_err());
+    assert!(send(&mut ctx, &fee_payer, revoke_ix(authority.pubkey(), false), &[&fee_payer]).await.is_err());
     let still = ctx.banks_client.get_account(record).await.unwrap().unwrap();
     assert_eq!(still.data, issued.data);
     assert_eq!(consume(still.data, TOKEN_EXP - 1), Ok(SLOT_EXP));
 
-    send(
-        &mut ctx,
-        &fee_payer,
-        revoke_ix(authority.pubkey(), true),
-        &[&fee_payer, &authority],
-    )
-    .await
-    .unwrap();
+    send(&mut ctx, &fee_payer, revoke_ix(authority.pubkey(), true), &[&fee_payer, &authority]).await.unwrap();
     let revoked = ctx.banks_client.get_account(record).await.unwrap().unwrap();
     assert_eq!(
         consume(revoked.data.clone(), TOKEN_EXP - 1),
@@ -430,12 +355,7 @@ async fn send(
     ctx.last_blockhash = ctx.get_new_latest_blockhash().await.unwrap();
     // RS256 with on-chain Montgomery reduction does not fit the 200k default.
     let tx = Transaction::new_signed_with_payer(
-        &[
-            solana_compute_budget_interface::ComputeBudgetInstruction::set_compute_unit_limit(
-                1_400_000,
-            ),
-            ix,
-        ],
+        &[solana_compute_budget_interface::ComputeBudgetInstruction::set_compute_unit_limit(1_400_000), ix],
         Some(&payer.pubkey()),
         signers,
         ctx.last_blockhash,

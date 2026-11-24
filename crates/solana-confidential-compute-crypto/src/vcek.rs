@@ -238,8 +238,7 @@ pub fn parse_vcek_identity(vcek_cert_der: &[u8]) -> Result<VcekIdentity, CryptoE
                 return Err(CryptoError::MalformedCertificate);
             }
             let component = parse_integer_u64(value)?;
-            let component =
-                u8::try_from(component).map_err(|_| CryptoError::MalformedCertificate)?;
+            let component = u8::try_from(component).map_err(|_| CryptoError::MalformedCertificate)?;
             spl[index] = Some(component);
         }
     }
@@ -264,11 +263,7 @@ pub fn parse_vcek_identity(vcek_cert_der: &[u8]) -> Result<VcekIdentity, CryptoE
     } else {
         direct_tcb.ok_or(CryptoError::VcekExtensionMissing)?
     };
-    Ok(VcekIdentity {
-        chip_id,
-        tcb_version,
-        subject_is_vlek,
-    })
+    Ok(VcekIdentity { chip_id, tcb_version, subject_is_vlek })
 }
 
 /// Report-byte index for an SPL OID under `1.3.6.1.4.1.3704.1.3`.
@@ -457,19 +452,11 @@ pub(crate) fn parse_certificate(der: &[u8]) -> Result<ParsedCert<'_>, CryptoErro
     }
 
     let signature = match signature_algorithm(alg_body)? {
-        SignatureAlgorithm::EcdsaSha384 => {
-            CertificateSignature::Ecdsa(parse_ecdsa_sig_bitstring(sig_val)?)
-        }
-        SignatureAlgorithm::RsaPssSha384 => {
-            CertificateSignature::RsaPssSha384(parse_rsa_pss_sig_bitstring(sig_val)?)
-        }
+        SignatureAlgorithm::EcdsaSha384 => CertificateSignature::Ecdsa(parse_ecdsa_sig_bitstring(sig_val)?),
+        SignatureAlgorithm::RsaPssSha384 => CertificateSignature::RsaPssSha384(parse_rsa_pss_sig_bitstring(sig_val)?),
     };
 
-    Ok(ParsedCert {
-        tbs_der: tbs_full,
-        public_key: extract_spki(tbs_body)?,
-        signature,
-    })
+    Ok(ParsedCert { tbs_der: tbs_full, public_key: extract_spki(tbs_body)?, signature })
 }
 
 enum SignatureAlgorithm {
@@ -539,12 +526,7 @@ fn require_sha384_algid(body: &[u8]) -> Result<(), CryptoError> {
     let mut alg = DerCursor::new(seq);
     let (oid_tag, oid) = alg.read_tlv()?;
     let (null_tag, null_val) = alg.read_tlv()?;
-    if oid_tag != TAG_OID
-        || oid != OID_SHA384
-        || null_tag != TAG_NULL
-        || !null_val.is_empty()
-        || !alg.is_empty()
-    {
+    if oid_tag != TAG_OID || oid != OID_SHA384 || null_tag != TAG_NULL || !null_val.is_empty() || !alg.is_empty() {
         return Err(CryptoError::MalformedCertificate);
     }
     Ok(())
@@ -685,9 +667,7 @@ fn subject_contains_vlek(subject: &[u8]) -> Result<bool, CryptoError> {
 
 fn directory_string_has_vlek(tag: u8, value: &[u8]) -> Result<bool, CryptoError> {
     match tag {
-        TAG_UTF8_STRING | TAG_PRINTABLE_STRING | TAG_TELETEX_STRING | TAG_IA5_STRING => {
-            Ok(value == VLEK_MARKER)
-        }
+        TAG_UTF8_STRING | TAG_PRINTABLE_STRING | TAG_TELETEX_STRING | TAG_IA5_STRING => Ok(value == VLEK_MARKER),
         TAG_BMP_STRING => Ok(contains_be_coded_vlek(value, 2)),
         TAG_UNIVERSAL_STRING => Ok(contains_be_coded_vlek(value, 4)),
         _ => Err(CryptoError::MalformedCertificate),
@@ -732,16 +712,13 @@ fn parse_spki(spki: &[u8]) -> Result<SubjectPublicKey, CryptoError> {
         {
             return Err(CryptoError::InvalidP384PublicKey);
         }
-        p384::PublicKey::from_sec1_bytes(key_bytes)
-            .map_err(|_| CryptoError::InvalidP384PublicKey)?;
+        p384::PublicKey::from_sec1_bytes(key_bytes).map_err(|_| CryptoError::InvalidP384PublicKey)?;
         let mut xy = [0u8; 96];
         xy.copy_from_slice(&key_bytes[1..]);
         return Ok(SubjectPublicKey::P384(xy));
     }
     if spki_oid(alg)? == OID_RSA_ENCRYPTION {
-        return Ok(SubjectPublicKey::Rsa4096(Box::new(
-            parse_rsa4096_public_key(key_bytes)?,
-        )));
+        return Ok(SubjectPublicKey::Rsa4096(Box::new(parse_rsa4096_public_key(key_bytes)?)));
     }
     Err(CryptoError::InvalidP384PublicKey)
 }
@@ -893,10 +870,7 @@ impl<'a> DerCursor<'a> {
             }
             parsed
         };
-        let end = self
-            .pos
-            .checked_add(len)
-            .ok_or(CryptoError::MalformedCertificate)?;
+        let end = self.pos.checked_add(len).ok_or(CryptoError::MalformedCertificate)?;
         if end > self.buf.len() {
             return Err(CryptoError::MalformedCertificate);
         }
@@ -1009,10 +983,7 @@ pub(crate) mod tests {
         let spki = tlv(TAG_SEQUENCE, &spki_body);
 
         let serial = tlv(TAG_INTEGER, &[0x01]);
-        let sigalg = tlv(
-            TAG_SEQUENCE,
-            &tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03]),
-        );
+        let sigalg = tlv(TAG_SEQUENCE, &tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03]));
         let issuer_name = tlv(TAG_SEQUENCE, issuer_rdns);
         let mut validity_body = Vec::new();
         validity_body.extend(tlv(0x17, b"250101000000Z"));
@@ -1107,10 +1078,7 @@ pub(crate) mod tests {
     #[test]
     fn test_rejects_malformed_der() {
         let xy = [1u8; 96];
-        assert_eq!(
-            validate_vcek_signatures_only(&xy, &[], &[0x30, 0x00], &xy),
-            Err(CryptoError::MalformedCertificate)
-        );
+        assert_eq!(validate_vcek_signatures_only(&xy, &[], &[0x30, 0x00], &xy), Err(CryptoError::MalformedCertificate));
         assert_eq!(
             validate_vcek_signatures_only(&xy, &[0xff, 0x00], &[0x30, 0x00], &xy),
             Err(CryptoError::MalformedCertificate)
@@ -1143,10 +1111,7 @@ pub(crate) mod tests {
     fn hwid_and_tcb_extensions(chip_id: &[u8; 64], tcb_version: u64) -> Vec<u8> {
         let mut extensions = Vec::new();
         extensions.extend(x509_extension(OID_HWID, &tlv(TAG_OCTET_STRING, chip_id)));
-        extensions.extend(x509_extension(
-            OID_TCB_VERSION,
-            &encode_integer(&tcb_version.to_be_bytes()),
-        ));
+        extensions.extend(x509_extension(OID_TCB_VERSION, &encode_integer(&tcb_version.to_be_bytes())));
         extensions
     }
 
@@ -1159,19 +1124,8 @@ pub(crate) mod tests {
         let (_leaf, leaf_xy) = keypair(0x22);
         let chip_id = [0xA5u8; 64];
         let tcb_version = 0x0102_0304_0506_0708u64;
-        let cert = encode_p384_cert_with_extensions(
-            &leaf_xy,
-            &issuer,
-            &hwid_and_tcb_extensions(&chip_id, tcb_version),
-        );
-        assert_eq!(
-            parse_vcek_identity(&cert),
-            Ok(VcekIdentity {
-                chip_id,
-                tcb_version,
-                subject_is_vlek: false,
-            })
-        );
+        let cert = encode_p384_cert_with_extensions(&leaf_xy, &issuer, &hwid_and_tcb_extensions(&chip_id, tcb_version));
+        assert_eq!(parse_vcek_identity(&cert), Ok(VcekIdentity { chip_id, tcb_version, subject_is_vlek: false }));
     }
 
     /// AMD 57230 places structVersion at OID 1.1 and the TCB in SPL extensions.
@@ -1213,11 +1167,7 @@ pub(crate) mod tests {
         expected[7] = 9;
         assert_eq!(
             parse_vcek_identity(&cert),
-            Ok(VcekIdentity {
-                chip_id,
-                tcb_version: u64::from_le_bytes(expected),
-                subject_is_vlek: false,
-            })
+            Ok(VcekIdentity { chip_id, tcb_version: u64::from_le_bytes(expected), subject_is_vlek: false })
         );
     }
 
@@ -1226,18 +1176,12 @@ pub(crate) mod tests {
         let (issuer, _xy) = keypair(0x41);
         let (_leaf, leaf_xy) = keypair(0x42);
         let cert = encode_minimal_p384_cert(&leaf_xy, &issuer);
-        assert_eq!(
-            parse_vcek_identity(&cert),
-            Err(CryptoError::VcekExtensionMissing)
-        );
+        assert_eq!(parse_vcek_identity(&cert), Err(CryptoError::VcekExtensionMissing));
 
         let mut hwid_only = Vec::new();
         hwid_only.extend(x509_extension(OID_HWID, &tlv(TAG_OCTET_STRING, &[0u8; 64])));
         let cert = encode_p384_cert_with_extensions(&leaf_xy, &issuer, &hwid_only);
-        assert_eq!(
-            parse_vcek_identity(&cert),
-            Err(CryptoError::VcekExtensionMissing)
-        );
+        assert_eq!(parse_vcek_identity(&cert), Err(CryptoError::VcekExtensionMissing));
     }
 
     #[test]
@@ -1271,13 +1215,7 @@ pub(crate) mod tests {
         let chip_id = [0xABu8; 64];
         let extensions = hwid_and_tcb_extensions(&chip_id, 7);
 
-        let vlek = encode_named_p384_cert(
-            &leaf_xy,
-            &issuer_key,
-            &[],
-            &common_name_rdn(b"SEV-VLEK"),
-            &extensions,
-        );
+        let vlek = encode_named_p384_cert(&leaf_xy, &issuer_key, &[], &common_name_rdn(b"SEV-VLEK"), &extensions);
         let identity = parse_vcek_identity(&vlek).unwrap();
         assert!(identity.subject_is_vlek);
         assert_eq!(identity.chip_id, chip_id);
@@ -1301,16 +1239,9 @@ pub(crate) mod tests {
         assert!(!parse_vcek_identity(&vcek).unwrap().subject_is_vlek);
 
         let mut marked_ext = extensions.clone();
-        marked_ext.extend(x509_extension(
-            &[0x2B, 0x06, 0x01, 0x04, 0x01, 0x9C, 0x78, 0x01, 0x05],
-            b"VLEK",
-        ));
+        marked_ext.extend(x509_extension(&[0x2B, 0x06, 0x01, 0x04, 0x01, 0x9C, 0x78, 0x01, 0x05], b"VLEK"));
         let extension_only = encode_named_p384_cert(&leaf_xy, &issuer_key, &[], &[], &marked_ext);
-        assert!(
-            !parse_vcek_identity(&extension_only)
-                .unwrap()
-                .subject_is_vlek
-        );
+        assert!(!parse_vcek_identity(&extension_only).unwrap().subject_is_vlek);
     }
 
     /// Synthetic parser fixture only: its ECDSA issuer is NOT an AMD trust root.
@@ -1327,38 +1258,20 @@ pub(crate) mod tests {
         assert!(validate_vcek_signatures_only(&issuer_xy, &cert, &cert, &xy).is_err());
         for name in [b"SEV-VCEK".as_slice(), b"NOT-SEV-VLEK"] {
             let cert = encode_named_p384_cert(&xy, &issuer, &[], &common_name_rdn(name), &tcb);
-            assert_eq!(
-                parse_vcek_identity(&cert),
-                Err(CryptoError::VcekExtensionMissing)
-            );
+            assert_eq!(parse_vcek_identity(&cert), Err(CryptoError::VcekExtensionMissing));
         }
         // A different directory attribute containing the marker is not CN.
         let mut ou = tlv(TAG_OID, &[0x55, 0x04, 0x0b]);
         ou.extend(tlv(TAG_UTF8_STRING, b"SEV-VLEK"));
         let subject = tlv(TAG_SET, &tlv(TAG_SEQUENCE, &ou));
         let cert = encode_named_p384_cert(&xy, &issuer, &[], &subject, &tcb);
-        assert_eq!(
-            parse_vcek_identity(&cert),
-            Err(CryptoError::VcekExtensionMissing)
-        );
+        assert_eq!(parse_vcek_identity(&cert), Err(CryptoError::VcekExtensionMissing));
         let duplicate = [common_name_rdn(b"SEV-VLEK"), common_name_rdn(b"SEV-VLEK")].concat();
         let cert = encode_named_p384_cert(&xy, &issuer, &[], &duplicate, &tcb);
-        assert_eq!(
-            parse_vcek_identity(&cert),
-            Err(CryptoError::MalformedCertificate)
-        );
+        assert_eq!(parse_vcek_identity(&cert), Err(CryptoError::MalformedCertificate));
         let missing_tcb = x509_extension(&[0x55, 0x1d, 0x13], &tlv(TAG_SEQUENCE, &[]));
-        let cert = encode_named_p384_cert(
-            &xy,
-            &issuer,
-            &[],
-            &common_name_rdn(b"SEV-VLEK"),
-            &missing_tcb,
-        );
-        assert_eq!(
-            parse_vcek_identity(&cert),
-            Err(CryptoError::VcekExtensionMissing)
-        );
+        let cert = encode_named_p384_cert(&xy, &issuer, &[], &common_name_rdn(b"SEV-VLEK"), &missing_tcb);
+        assert_eq!(parse_vcek_identity(&cert), Err(CryptoError::VcekExtensionMissing));
     }
 
     #[test]
@@ -1382,10 +1295,7 @@ pub(crate) mod tests {
         let (_leaf, leaf_xy) = keypair(0x62);
         let mut cert = encode_minimal_p384_cert(&leaf_xy, &issuer);
         cert.push(0xFF);
-        assert_eq!(
-            parse_certificate(&cert).err(),
-            Some(CryptoError::MalformedCertificate)
-        );
+        assert_eq!(parse_certificate(&cert).err(), Some(CryptoError::MalformedCertificate));
     }
 
     #[test]
@@ -1399,10 +1309,7 @@ pub(crate) mod tests {
         seq_body.push(0x00);
         let mut bitstr = vec![0x00];
         bitstr.extend(tlv(TAG_SEQUENCE, &seq_body));
-        assert_eq!(
-            parse_ecdsa_sig_bitstring(&bitstr),
-            Err(CryptoError::MalformedCertificate)
-        );
+        assert_eq!(parse_ecdsa_sig_bitstring(&bitstr), Err(CryptoError::MalformedCertificate));
 
         let mut seq_body = Vec::new();
         seq_body.extend_from_slice(&r);
@@ -1410,19 +1317,10 @@ pub(crate) mod tests {
         let mut bitstr = vec![0x00];
         bitstr.extend(tlv(TAG_SEQUENCE, &seq_body));
         bitstr.push(0xff);
-        assert_eq!(
-            parse_ecdsa_sig_bitstring(&bitstr),
-            Err(CryptoError::MalformedCertificate)
-        );
+        assert_eq!(parse_ecdsa_sig_bitstring(&bitstr), Err(CryptoError::MalformedCertificate));
 
-        assert_eq!(
-            i2osp_48(&[0x00, 0x10]),
-            Err(CryptoError::InvalidP384Signature)
-        );
-        assert_eq!(
-            i2osp_48(&[0x00, 0x00, 0x80]),
-            Err(CryptoError::InvalidP384Signature)
-        );
+        assert_eq!(i2osp_48(&[0x00, 0x10]), Err(CryptoError::InvalidP384Signature));
+        assert_eq!(i2osp_48(&[0x00, 0x00, 0x80]), Err(CryptoError::InvalidP384Signature));
         assert_eq!(i2osp_48(&[0x80]), Err(CryptoError::InvalidP384Signature));
 
         let mut expected = [0u8; 48];

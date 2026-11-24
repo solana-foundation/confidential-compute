@@ -7,8 +7,7 @@
 
 use solana_sdk::{pubkey::Pubkey, transaction::VersionedTransaction};
 
-const COMPUTE_BUDGET_PROGRAM_ID: Pubkey =
-    Pubkey::from_str_const("ComputeBudget111111111111111111111111111111");
+const COMPUTE_BUDGET_PROGRAM_ID: Pubkey = Pubkey::from_str_const("ComputeBudget111111111111111111111111111111");
 
 /// Accept supported Compute Budget instructions within protocol resource bounds.
 /// Deprecated `RequestUnits` and unknown tags are rejected. A zero priority
@@ -37,9 +36,7 @@ pub fn validate_compute_budget(tx: &VersionedTransaction) -> Result<(), String> 
             continue;
         }
         if !ix.accounts.is_empty() || !compute_budget_allowed(&ix.data) {
-            return Err(
-                "compute budget instruction is not allowlisted by resource/fee policy".into(),
-            );
+            return Err("compute budget instruction is not allowlisted by resource/fee policy".into());
         }
         let tag = ix.data[0] as usize;
         if std::mem::replace(&mut seen[tag], true) {
@@ -85,23 +82,15 @@ mod tests {
 
     #[test]
     fn fee_bounds_and_guaranteed_failure_tags() {
-        assert!(compute_budget_allowed(
-            &Budget::set_compute_unit_price(0).data
-        ));
+        assert!(compute_budget_allowed(&Budget::set_compute_unit_price(0).data));
         for price in [1, 1_000_000, u64::MAX] {
-            assert!(!compute_budget_allowed(
-                &Budget::set_compute_unit_price(price).data
-            ));
+            assert!(!compute_budget_allowed(&Budget::set_compute_unit_price(price).data));
         }
         assert!(!compute_budget_allowed(&[0; 9]));
         assert!(!compute_budget_allowed(&[5, 0, 0, 0, 0]));
         assert!(!compute_budget_allowed(&[]));
         for tag in 1..=4 {
-            let valid = if tag == 3 {
-                Budget::set_compute_unit_price(0).data
-            } else {
-                encoded(tag, 32 * 1024)
-            };
+            let valid = if tag == 3 { Budget::set_compute_unit_price(0).data } else { encoded(tag, 32 * 1024) };
             let mut trailing = valid.clone();
             trailing.push(0);
             assert!(!compute_budget_allowed(&trailing));
@@ -116,10 +105,7 @@ mod tests {
         let check = |instructions: &[solana_sdk::instruction::Instruction]| {
             let tx = VersionedTransaction {
                 signatures: vec![],
-                message: solana_sdk::message::VersionedMessage::Legacy(Message::new(
-                    instructions,
-                    Some(&payer),
-                )),
+                message: solana_sdk::message::VersionedMessage::Legacy(Message::new(instructions, Some(&payer))),
             };
             validate_compute_budget(&tx)
         };
@@ -132,11 +118,7 @@ mod tests {
         .is_ok());
         assert!(check(&[limit.clone(), limit.clone()]).is_err());
         let mut extra = limit;
-        extra
-            .accounts
-            .push(solana_sdk::instruction::AccountMeta::new_readonly(
-                payer, true,
-            ));
+        extra.accounts.push(solana_sdk::instruction::AccountMeta::new_readonly(payer, true));
         assert!(check(&[extra]).is_err());
     }
 }

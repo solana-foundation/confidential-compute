@@ -27,8 +27,8 @@ use crate::{
     error::SidecarError,
     keys::EphemeralKeyManager,
     tdx_enrolment::{
-        decode_challenge_account, dry_run_quote_parts, split_tdx_quote,
-        validate_challenge_readback, ChallengeRecord, TdxQuoteParts,
+        decode_challenge_account, dry_run_quote_parts, split_tdx_quote, validate_challenge_readback, ChallengeRecord,
+        TdxQuoteParts,
     },
 };
 
@@ -94,9 +94,7 @@ impl SessionDeadlines {
     pub fn needs_renewal(&self, slots: u64, seconds: u64) -> bool {
         !self.is_valid()
             || self.expires_slot.saturating_sub(self.current_slot) <= slots
-            || self
-                .expires_unix_timestamp
-                .saturating_sub(self.current_unix_timestamp)
+            || self.expires_unix_timestamp.saturating_sub(self.current_unix_timestamp)
                 <= i64::try_from(seconds).unwrap_or(i64::MAX)
     }
 }
@@ -151,9 +149,7 @@ impl MockCluster {
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, MockClusterInner> {
-        self.inner
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        self.inner.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     fn slot_hashes_account(&self) -> Vec<u8> {
@@ -177,16 +173,8 @@ impl MockCluster {
 }
 
 impl OnchainAttestor {
-    pub fn new(
-        rpc_url: &str,
-        verifier_program_id: Option<Pubkey>,
-        payer: Option<Keypair>,
-        dry_run: bool,
-    ) -> Self {
-        let rpc = Arc::new(RpcClient::new_with_commitment(
-            rpc_url.to_string(),
-            CommitmentConfig::confirmed(),
-        ));
+    pub fn new(rpc_url: &str, verifier_program_id: Option<Pubkey>, payer: Option<Keypair>, dry_run: bool) -> Self {
+        let rpc = Arc::new(RpcClient::new_with_commitment(rpc_url.to_string(), CommitmentConfig::confirmed()));
         Self {
             cluster: Cluster::Rpc(rpc),
             verifier_program_id: verifier_program_id.unwrap_or(solana_confidential_compute_cpi::ID),
@@ -196,11 +184,7 @@ impl OnchainAttestor {
     }
 
     /// Test constructor. `dry_run` is forced on so this client cannot submit.
-    pub fn mock(
-        cluster: MockCluster,
-        verifier_program_id: Option<Pubkey>,
-        payer: Option<Keypair>,
-    ) -> Self {
+    pub fn mock(cluster: MockCluster, verifier_program_id: Option<Pubkey>, payer: Option<Keypair>) -> Self {
         Self {
             cluster: Cluster::Mock(cluster),
             verifier_program_id: verifier_program_id.unwrap_or(solana_confidential_compute_cpi::ID),
@@ -246,9 +230,9 @@ impl OnchainAttestor {
     /// Fetches the current cluster slot.
     pub async fn get_current_slot(&self) -> Result<u64, SidecarError> {
         match &self.cluster {
-            Cluster::Rpc(rpc) => rpc.get_slot().await.map_err(|e| {
-                SidecarError::OnchainError(format!("Failed to get current slot: {e}"))
-            }),
+            Cluster::Rpc(rpc) => {
+                rpc.get_slot().await.map_err(|e| SidecarError::OnchainError(format!("Failed to get current slot: {e}")))
+            }
             Cluster::Mock(cluster) => Ok(cluster.lock().slot),
         }
     }
@@ -259,9 +243,7 @@ impl OnchainAttestor {
         let target_slot = current_slot.saturating_sub(5);
         let data = self.account_data(&slot_hashes::ID).await?;
         let slot_hash = parse_slot_hash_from_sysvar(&data, target_slot).ok_or_else(|| {
-            SidecarError::OnchainError(format!(
-                "Slot {target_slot} not found in cluster SlotHashes sysvar"
-            ))
+            SidecarError::OnchainError(format!("Slot {target_slot} not found in cluster SlotHashes sysvar"))
         })?;
         Ok((target_slot, slot_hash))
     }
@@ -275,9 +257,10 @@ impl OnchainAttestor {
         nonce_slot: u64,
         report: &AttestationReport,
     ) -> Result<u64, SidecarError> {
-        let payer = self.payer.as_ref().ok_or_else(|| {
-            SidecarError::OnchainError("No transaction payer keypair configured".to_string())
-        })?;
+        let payer = self
+            .payer
+            .as_ref()
+            .ok_or_else(|| SidecarError::OnchainError("No transaction payer keypair configured".to_string()))?;
         let workload_signer = workload.pubkey();
 
         let submitted_staged = if !self.dry_run {
@@ -286,8 +269,8 @@ impl OnchainAttestor {
                 .checked_add(solana_confidential_compute_sdk::staged::MAX_LIFETIME_SLOTS)
                 .ok_or_else(|| SidecarError::OnchainError("staging deadline overflow".into()))?;
             let plan = match report {
-                AttestationReport::SevSnp { report, .. } => Some(
-                    solana_confidential_compute_sdk::staged::build_staged_snp_registration(
+                AttestationReport::SevSnp { report, .. } => {
+                    Some(solana_confidential_compute_sdk::staged::build_staged_snp_registration(
                         self.verifier_program_id,
                         payer.pubkey(),
                         workload_signer,
@@ -295,8 +278,8 @@ impl OnchainAttestor {
                         report,
                         now,
                         expiry,
-                    ),
-                ),
+                    ))
+                }
                 AttestationReport::AwsNitro { document } => {
                     // Parse and check workload binding before uploading any bytes.
                     build_verify_nitro_mode_a_ix(
@@ -306,23 +289,18 @@ impl OnchainAttestor {
                         nonce_slot,
                         document,
                     )?;
-                    let (_, view) =
-                        solana_confidential_compute_crypto::parse_nitro_attestation(document)
-                            .map_err(|e| {
-                                SidecarError::AttestationError(format!("Nitro parse: {e:?}"))
-                            })?;
-                    Some(
-                        solana_confidential_compute_sdk::staged::build_staged_nitro_registration(
-                            self.verifier_program_id,
-                            payer.pubkey(),
-                            workload_signer,
-                            nonce_slot,
-                            document,
-                            view.nonce,
-                            now,
-                            expiry,
-                        ),
-                    )
+                    let (_, view) = solana_confidential_compute_crypto::parse_nitro_attestation(document)
+                        .map_err(|e| SidecarError::AttestationError(format!("Nitro parse: {e:?}")))?;
+                    Some(solana_confidential_compute_sdk::staged::build_staged_nitro_registration(
+                        self.verifier_program_id,
+                        payer.pubkey(),
+                        workload_signer,
+                        nonce_slot,
+                        document,
+                        view.nonce,
+                        now,
+                        expiry,
+                    ))
                 }
                 // Intel TDX uploads the raw quote through the DCAP verify
                 // instruction, not the staged SNP/Nitro registration plans.
@@ -331,8 +309,7 @@ impl OnchainAttestor {
                 | AttestationReport::IntelTdx { .. } => None,
             };
             if let Some(plan) = plan {
-                let plan = plan
-                    .map_err(|e| SidecarError::OnchainError(format!("staged enrollment: {e}")))?;
+                let plan = plan.map_err(|e| SidecarError::OnchainError(format!("staged enrollment: {e}")))?;
                 self.submit_stage(workload, &plan).await?;
                 true
             } else {
@@ -355,9 +332,7 @@ impl OnchainAttestor {
                         0,
                         nonce_slot,
                     )
-                    .map_err(|e| {
-                        SidecarError::OnchainError(format!("Failed to build SEV-SNP ix: {e}"))
-                    })?;
+                    .map_err(|e| SidecarError::OnchainError(format!("Failed to build SEV-SNP ix: {e}")))?;
                     (ix, true)
                 }
                 AttestationReport::GcpJwt { jwt } => {
@@ -380,25 +355,16 @@ impl OnchainAttestor {
                     )?;
                     (ix, true)
                 }
-                AttestationReport::NvidiaH100 {
-                    gpu_measurement,
-                    spdm_report,
-                    ..
-                } => {
+                AttestationReport::NvidiaH100 { gpu_measurement, spdm_report, .. } => {
                     // The dry-run provider fabricates this prefix. Live mode must
                     // not broadcast that measurement as hardware evidence.
-                    if !self.dry_run
-                        && crate::attestation::nvidia_h100::synthetic_spdm_evidence(spdm_report)
-                    {
+                    if !self.dry_run && crate::attestation::nvidia_h100::synthetic_spdm_evidence(spdm_report) {
                         return Err(SidecarError::GpuAttestationFailed);
                     }
                     let slot_hash_data = self.account_data(&slot_hashes::ID).await?;
-                    let slot_hash = parse_slot_hash_from_sysvar(&slot_hash_data, nonce_slot)
-                        .ok_or_else(|| {
-                            SidecarError::OnchainError(format!(
-                                "Slot {nonce_slot} not found in cluster SlotHashes sysvar"
-                            ))
-                        })?;
+                    let slot_hash = parse_slot_hash_from_sysvar(&slot_hash_data, nonce_slot).ok_or_else(|| {
+                        SidecarError::OnchainError(format!("Slot {nonce_slot} not found in cluster SlotHashes sysvar"))
+                    })?;
                     let ix = build_verify_nvidia_mode_a_ix(
                         &self.verifier_program_id,
                         &payer.pubkey(),
@@ -461,11 +427,9 @@ impl OnchainAttestor {
 
             match &self.cluster {
                 Cluster::Rpc(rpc) => {
-                    rpc.send_and_confirm_transaction(&tx).await.map_err(|e| {
-                        SidecarError::OnchainError(format!(
-                            "Attestation tx confirmation failed: {e}"
-                        ))
-                    })?;
+                    rpc.send_and_confirm_transaction(&tx)
+                        .await
+                        .map_err(|e| SidecarError::OnchainError(format!("Attestation tx confirmation failed: {e}")))?;
                 }
                 Cluster::Mock(cluster) => {
                     cluster.record(tx);
@@ -477,9 +441,7 @@ impl OnchainAttestor {
         // slot TTL, so the returned deadline is the one the chain will enforce.
         let session = self.confirmed_session(&workload_signer).await?;
         if !session.is_valid() {
-            return Err(SidecarError::OnchainError(
-                "confirmed enrollment is expired".into(),
-            ));
+            return Err(SidecarError::OnchainError("confirmed enrollment is expired".into()));
         }
         Ok(session.expires_slot)
     }
@@ -492,37 +454,23 @@ impl OnchainAttestor {
         workload: &EphemeralKeyManager,
         plan: &solana_confidential_compute_sdk::staged::StagePlan,
     ) -> Result<(), SidecarError> {
-        if let Err(error) = self
-            .submit_packet(workload, std::slice::from_ref(&plan.begin))
-            .await
-        {
-            let cleanup = self
-                .submit_packet(workload, std::slice::from_ref(&plan.close))
-                .await;
-            return Err(SidecarError::OnchainError(format!(
-                "stage begin failed: {error}; cleanup: {cleanup:?}"
-            )));
+        if let Err(error) = self.submit_packet(workload, std::slice::from_ref(&plan.begin)).await {
+            let cleanup = self.submit_packet(workload, std::slice::from_ref(&plan.close)).await;
+            return Err(SidecarError::OnchainError(format!("stage begin failed: {error}; cleanup: {cleanup:?}")));
         }
         let result = async {
             for upload in &plan.uploads {
-                self.submit_packet(workload, std::slice::from_ref(upload))
-                    .await?;
+                self.submit_packet(workload, std::slice::from_ref(upload)).await?;
             }
-            self.submit_packet(workload, std::slice::from_ref(&plan.seal))
-                .await?;
+            self.submit_packet(workload, std::slice::from_ref(&plan.seal)).await?;
             self.submit_packet(
                 workload,
-                &[
-                    ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
-                    plan.consume.clone(),
-                ],
+                &[ComputeBudgetInstruction::set_compute_unit_limit(1_400_000), plan.consume.clone()],
             )
             .await
         }
         .await;
-        let cleanup = self
-            .submit_packet(workload, std::slice::from_ref(&plan.close))
-            .await;
+        let cleanup = self.submit_packet(workload, std::slice::from_ref(&plan.close)).await;
         match (result, cleanup) {
             (Ok(()), Ok(())) => Ok(()),
             (Err(error), cleanup) => Err(SidecarError::OnchainError(format!(
@@ -541,31 +489,24 @@ impl OnchainAttestor {
         workload: &EphemeralKeyManager,
         instructions: &[Instruction],
     ) -> Result<(), SidecarError> {
-        let payer = self
-            .payer
-            .as_ref()
-            .ok_or_else(|| SidecarError::OnchainError("missing payer".into()))?;
+        let payer = self.payer.as_ref().ok_or_else(|| SidecarError::OnchainError("missing payer".into()))?;
         let blockhash = self.latest_blockhash().await?;
         let mut tx = Transaction::new_with_payer(instructions, Some(&payer.pubkey()));
         tx.try_partial_sign(&[payer.as_ref()], blockhash)
             .map_err(|e| SidecarError::OnchainError(format!("payer sign failed: {e}")))?;
-        if tx.message.account_keys[..tx.message.header.num_required_signatures as usize]
-            .contains(&workload.pubkey())
-        {
+        if tx.message.account_keys[..tx.message.header.num_required_signatures as usize].contains(&workload.pubkey()) {
             workload.partial_sign(&mut tx, blockhash)?;
         }
         let size = bincode::serialized_size(&tx)
             .map_err(|e| SidecarError::OnchainError(format!("packet serialization: {e}")))?;
         if size > solana_confidential_compute_sdk::PACKET_DATA_SIZE as u64 {
-            return Err(SidecarError::OnchainError(format!(
-                "packet exceeds limit: {size}"
-            )));
+            return Err(SidecarError::OnchainError(format!("packet exceeds limit: {size}")));
         }
         match &self.cluster {
             Cluster::Rpc(rpc) => {
-                rpc.send_and_confirm_transaction(&tx).await.map_err(|e| {
-                    SidecarError::OnchainError(format!("staged packet confirmation failed: {e}"))
-                })?;
+                rpc.send_and_confirm_transaction(&tx)
+                    .await
+                    .map_err(|e| SidecarError::OnchainError(format!("staged packet confirmation failed: {e}")))?;
             }
             Cluster::Mock(cluster) => cluster.record(tx),
         }
@@ -635,9 +576,9 @@ impl OnchainAttestor {
         }
         match &self.cluster {
             Cluster::Rpc(rpc) => {
-                rpc.send_and_confirm_transaction(&tx).await.map_err(|e| {
-                    SidecarError::OnchainError(format!("issue_tdx_challenge failed: {e}"))
-                })?;
+                rpc.send_and_confirm_transaction(&tx)
+                    .await
+                    .map_err(|e| SidecarError::OnchainError(format!("issue_tdx_challenge failed: {e}")))?;
             }
             Cluster::Mock(cluster) => cluster.record(tx),
         }
@@ -647,10 +588,8 @@ impl OnchainAttestor {
     /// Read the `ChallengeAccount` the program wrote.
     /// @spec SCC-TDX-005
     async fn read_tdx_challenge(&self, nonce: &[u8; 32]) -> Result<ChallengeRecord, SidecarError> {
-        let (challenge, _) = solana_confidential_compute_sdk::tdx::derive_tdx_challenge_pda(
-            &self.verifier_program_id,
-            nonce,
-        );
+        let (challenge, _) =
+            solana_confidential_compute_sdk::tdx::derive_tdx_challenge_pda(&self.verifier_program_id, nonce);
         let data = self.account_data(&challenge).await?;
         decode_challenge_account(&data)
     }
@@ -678,9 +617,10 @@ impl OnchainAttestor {
         workload: &EphemeralKeyManager,
         provider: &IntelTdxProvider,
     ) -> Result<TdxEnrolmentOutcome, SidecarError> {
-        let payer = self.payer.as_ref().ok_or_else(|| {
-            SidecarError::OnchainError("No transaction payer keypair configured".to_string())
-        })?;
+        let payer = self
+            .payer
+            .as_ref()
+            .ok_or_else(|| SidecarError::OnchainError("No transaction payer keypair configured".to_string()))?;
         // Fail closed before a single byte is broadcast: a provider that
         // fabricates its evidence may not run against a live cluster.
         provider.reject_simulated_live(self.dry_run)?;
@@ -690,8 +630,7 @@ impl OnchainAttestor {
         let challenge_nonce = Self::new_challenge_nonce();
 
         // 1. The challenge, on its own.
-        self.send_issue_tdx_challenge(payer, &challenge_nonce, nonce_slot)
-            .await?;
+        self.send_issue_tdx_challenge(payer, &challenge_nonce, nonce_slot).await?;
 
         // 2. Read back what the program recorded.
         let challenge = if self.dry_run {
@@ -720,19 +659,10 @@ impl OnchainAttestor {
 
         // 3. A quote that answers this challenge, and only this challenge.
         let report = provider
-            .request_attestation_for_challenge(
-                &workload_signer,
-                &challenge.slot_hash,
-                &challenge.nonce,
-            )
+            .request_attestation_for_challenge(&workload_signer, &challenge.slot_hash, &challenge.nonce)
             .await?;
-        let AttestationReport::IntelTdx {
-            quote, report_data, ..
-        } = &report
-        else {
-            return Err(SidecarError::OnchainError(
-                "Intel TDX provider returned a report of another kind".to_string(),
-            ));
+        let AttestationReport::IntelTdx { quote, report_data, .. } = &report else {
+            return Err(SidecarError::OnchainError("Intel TDX provider returned a report of another kind".to_string()));
         };
         let simulated = synthetic_tdx_evidence(quote);
         if simulated && !self.dry_run {
@@ -740,11 +670,7 @@ impl OnchainAttestor {
             // the provider was configured, this checks what it produced.
             return Err(SidecarError::TdxAttestationFailed);
         }
-        let parts: TdxQuoteParts = if simulated {
-            dry_run_quote_parts(report_data)
-        } else {
-            split_tdx_quote(quote)?
-        };
+        let parts: TdxQuoteParts = if simulated { dry_run_quote_parts(report_data) } else { split_tdx_quote(quote)? };
         let (gpu_rim_digest, model_digest) = provider.binding_digests()?;
 
         // 4. One v1 transaction for both halves.
@@ -799,9 +725,9 @@ impl OnchainAttestor {
 
         match &self.cluster {
             Cluster::Rpc(rpc) => {
-                rpc.send_and_confirm_transaction(&tx).await.map_err(|e| {
-                    SidecarError::OnchainError(format!("TDX enrolment confirmation failed: {e}"))
-                })?;
+                rpc.send_and_confirm_transaction(&tx)
+                    .await
+                    .map_err(|e| SidecarError::OnchainError(format!("TDX enrolment confirmation failed: {e}")))?;
             }
             Cluster::Mock(cluster) => cluster.record_versioned(tx),
         }
@@ -809,9 +735,7 @@ impl OnchainAttestor {
         // 5. The confirmed record is the answer, not the TTL estimate.
         let session = self.confirmed_session(&workload_signer).await?;
         if !session.is_valid() {
-            return Err(SidecarError::OnchainError(
-                "confirmed TDX enrollment is expired".into(),
-            ));
+            return Err(SidecarError::OnchainError("confirmed TDX enrollment is expired".into()));
         }
         Ok(TdxEnrolmentOutcome {
             attested_signer,
@@ -828,41 +752,25 @@ impl OnchainAttestor {
         if self.confirmed_session(workload).await?.is_valid() {
             Ok(())
         } else {
-            Err(SidecarError::OnchainError(
-                "confirmed V2 session or Clock is invalid or expired".into(),
-            ))
+            Err(SidecarError::OnchainError("confirmed V2 session or Clock is invalid or expired".into()))
         }
     }
 
-    pub async fn confirmed_session(
-        &self,
-        workload: &Pubkey,
-    ) -> Result<SessionDeadlines, SidecarError> {
+    pub async fn confirmed_session(&self, workload: &Pubkey) -> Result<SessionDeadlines, SidecarError> {
         let Cluster::Rpc(rpc) = &self.cluster else {
-            return Err(SidecarError::OnchainError(
-                "simulated sessions cannot authorize signing".into(),
-            ));
+            return Err(SidecarError::OnchainError("simulated sessions cannot authorize signing".into()));
         };
         let address = Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-                workload.as_ref(),
-            ],
+            &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload.as_ref()],
             &self.verifier_program_id,
         )
         .0;
         let accounts = rpc
             .get_multiple_accounts(&[address, clock::ID])
             .await
-            .map_err(|e| {
-                SidecarError::OnchainError(format!(
-                    "failed to load confirmed session and Clock: {e}"
-                ))
-            })?;
+            .map_err(|e| SidecarError::OnchainError(format!("failed to load confirmed session and Clock: {e}")))?;
         let Some(Some(record)) = accounts.first() else {
-            return Err(SidecarError::OnchainError(
-                "confirmed V2 session missing".into(),
-            ));
+            return Err(SidecarError::OnchainError("confirmed V2 session missing".into()));
         };
         let Some(Some(clock_account)) = accounts.get(1) else {
             return Err(SidecarError::OnchainError("trusted Clock missing".into()));
@@ -879,30 +787,19 @@ impl OnchainAttestor {
         workload: &Pubkey,
     ) -> Result<solana_confidential_compute_cpi::AttestedSignerAccount, SidecarError> {
         let Cluster::Rpc(rpc) = &self.cluster else {
-            return Err(SidecarError::OnchainError(
-                "simulated sessions cannot authorize signing".into(),
-            ));
+            return Err(SidecarError::OnchainError("simulated sessions cannot authorize signing".into()));
         };
         let address = Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-                workload.as_ref(),
-            ],
+            &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload.as_ref()],
             &self.verifier_program_id,
         )
         .0;
         let accounts = rpc
             .get_multiple_accounts(&[address, clock::ID])
             .await
-            .map_err(|e| {
-                SidecarError::OnchainError(format!(
-                    "failed to load confirmed session and Clock: {e}"
-                ))
-            })?;
+            .map_err(|e| SidecarError::OnchainError(format!("failed to load confirmed session and Clock: {e}")))?;
         let Some(Some(record)) = accounts.first() else {
-            return Err(SidecarError::OnchainError(
-                "confirmed V2 session missing".into(),
-            ));
+            return Err(SidecarError::OnchainError("confirmed V2 session missing".into()));
         };
         let Some(Some(clock_account)) = accounts.get(1) else {
             return Err(SidecarError::OnchainError("trusted Clock missing".into()));
@@ -911,28 +808,22 @@ impl OnchainAttestor {
         // drift apart. `read_session_accounts` only reports the deadlines; the
         // expiry decision is `is_valid()`, exactly as `validate_registered_session`
         // does. Omitting it would let an expired session authorize signing.
-        let invalid = || {
-            SidecarError::OnchainError("confirmed V2 session or Clock is invalid or expired".into())
-        };
-        if !read_session_accounts(&self.verifier_program_id, workload, record, clock_account)?
-            .is_valid()
-        {
+        let invalid = || SidecarError::OnchainError("confirmed V2 session or Clock is invalid or expired".into());
+        if !read_session_accounts(&self.verifier_program_id, workload, record, clock_account)?.is_valid() {
             return Err(invalid());
         }
-        solana_confidential_compute_cpi::AttestedSignerAccount::try_from_slice(&record.data)
-            .map_err(|_| invalid())
+        solana_confidential_compute_cpi::AttestedSignerAccount::try_from_slice(&record.data).map_err(|_| invalid())
     }
 
     async fn account_data(&self, key: &Pubkey) -> Result<Vec<u8>, SidecarError> {
         match &self.cluster {
-            Cluster::Rpc(rpc) => rpc.get_account_data(key).await.map_err(|e| {
-                SidecarError::OnchainError(format!("Failed to read account {key}: {e}"))
-            }),
+            Cluster::Rpc(rpc) => rpc
+                .get_account_data(key)
+                .await
+                .map_err(|e| SidecarError::OnchainError(format!("Failed to read account {key}: {e}"))),
             Cluster::Mock(cluster) => {
                 if key != &slot_hashes::ID {
-                    return Err(SidecarError::OnchainError(
-                        "mock cluster does not serve that account".to_string(),
-                    ));
+                    return Err(SidecarError::OnchainError("mock cluster does not serve that account".to_string()));
                 }
                 Ok(cluster.slot_hashes_account())
             }
@@ -941,9 +832,10 @@ impl OnchainAttestor {
 
     async fn latest_blockhash(&self) -> Result<Hash, SidecarError> {
         match &self.cluster {
-            Cluster::Rpc(rpc) => rpc.get_latest_blockhash().await.map_err(|e| {
-                SidecarError::OnchainError(format!("Failed to get latest blockhash: {e}"))
-            }),
+            Cluster::Rpc(rpc) => rpc
+                .get_latest_blockhash()
+                .await
+                .map_err(|e| SidecarError::OnchainError(format!("Failed to get latest blockhash: {e}"))),
             Cluster::Mock(cluster) => Ok(cluster.lock().blockhash),
         }
     }
@@ -970,28 +862,19 @@ fn read_session_accounts(
     record: &solana_sdk::account::Account,
     clock_account: &solana_sdk::account::Account,
 ) -> Result<SessionDeadlines, SidecarError> {
-    let invalid =
-        || SidecarError::OnchainError("confirmed V2 session or Clock is invalid or expired".into());
+    let invalid = || SidecarError::OnchainError("confirmed V2 session or Clock is invalid or expired".into());
     if record.owner != *program_id || clock_account.owner != solana_sdk::sysvar::ID {
         return Err(invalid());
     }
     let state =
-        solana_confidential_compute_cpi::AttestedSignerAccount::try_from_slice(&record.data)
-            .map_err(|_| invalid())?;
-    let clock: solana_sdk::clock::Clock =
-        bincode::deserialize(&clock_account.data).map_err(|_| invalid())?;
+        solana_confidential_compute_cpi::AttestedSignerAccount::try_from_slice(&record.data).map_err(|_| invalid())?;
+    let clock: solana_sdk::clock::Clock = bincode::deserialize(&clock_account.data).map_err(|_| invalid())?;
     let bump = Pubkey::find_program_address(
-        &[
-            solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-            workload.as_ref(),
-        ],
+        &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload.as_ref()],
         program_id,
     )
     .1;
-    if state.signer_pubkey != workload.to_bytes()
-        || state.bump != bump
-        || !accepted_enclave_type(state.enclave_type)
-    {
+    if state.signer_pubkey != workload.to_bytes() || state.bump != bump || !accepted_enclave_type(state.enclave_type) {
         return Err(invalid());
     }
     Ok(SessionDeadlines {
@@ -1024,19 +907,14 @@ fn accepted_enclave_type(enclave_type: u8) -> bool {
 /// `Transaction::try_partial_sign` has no `VersionedTransaction` counterpart,
 /// and the workload path (`EphemeralKeyManager::sign_transaction`) deliberately
 /// refuses to sign as account zero, so the payer needs its own helper.
-fn sign_versioned_with_payer(
-    tx: &mut VersionedTransaction,
-    payer: &Keypair,
-) -> Result<(), SidecarError> {
+fn sign_versioned_with_payer(tx: &mut VersionedTransaction, payer: &Keypair) -> Result<(), SidecarError> {
     let required = tx.message.header().num_required_signatures as usize;
     let index = tx
         .message
         .static_account_keys()
         .iter()
         .position(|key| key == &payer.pubkey())
-        .ok_or_else(|| {
-            SidecarError::OnchainError("payer is not an account of the transaction".to_string())
-        })?;
+        .ok_or_else(|| SidecarError::OnchainError("payer is not an account of the transaction".to_string()))?;
     if index >= required {
         return Err(SidecarError::OnchainError(format!(
             "payer is at index {index} but only {required} signatures are required"
@@ -1066,12 +944,12 @@ fn versioned_v1_size(tx: &VersionedTransaction) -> Result<usize, SidecarError> {
             }
             Ok(len)
         }
-        solana_sdk::message::VersionedMessage::V0(_) => Err(SidecarError::OnchainError(
-            "TDX enrolment must be a v1 transaction, got v0".to_string(),
-        )),
-        solana_sdk::message::VersionedMessage::Legacy(_) => Err(SidecarError::OnchainError(
-            "TDX enrolment must be a v1 transaction, got legacy".to_string(),
-        )),
+        solana_sdk::message::VersionedMessage::V0(_) => {
+            Err(SidecarError::OnchainError("TDX enrolment must be a v1 transaction, got v0".to_string()))
+        }
+        solana_sdk::message::VersionedMessage::Legacy(_) => {
+            Err(SidecarError::OnchainError("TDX enrolment must be a v1 transaction, got legacy".to_string()))
+        }
     }
 }
 
@@ -1103,54 +981,38 @@ fn build_verify_google_jwt_mode_a_ix(
     nonce_slot: u64,
     jwt: &str,
 ) -> Result<Instruction, SidecarError> {
-    let view = solana_confidential_compute_crypto::jwt::JwtView::parse(jwt).map_err(|e| {
-        SidecarError::AttestationError(format!(
-            "Failed to parse JWT for instruction building: {e:?}"
-        ))
-    })?;
+    let view = solana_confidential_compute_crypto::jwt::JwtView::parse(jwt)
+        .map_err(|e| SidecarError::AttestationError(format!("Failed to parse JWT for instruction building: {e:?}")))?;
     let kid_padded = solana_confidential_compute_crypto::jwt::parse_header_kid_b64(view.header_b64)
-        .map_err(|e| {
-            SidecarError::AttestationError(format!("Failed to parse header kid: {e:?}"))
-        })?;
+        .map_err(|e| SidecarError::AttestationError(format!("Failed to parse header kid: {e:?}")))?;
     let kid_len = kid_padded.iter().take_while(|b| **b != 0).count();
     if kid_len == 0 {
-        return Err(SidecarError::AttestationError(
-            "JWT header is missing kid".to_string(),
-        ));
+        return Err(SidecarError::AttestationError("JWT header is missing kid".to_string()));
     }
     let kh = solana_confidential_compute_crypto::jwt::kid_hash(&kid_padded[..kid_len]);
 
     let claims = solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64)
         .map_err(|e| SidecarError::AttestationError(format!("Failed to parse claims: {e:?}")))?;
-    let raw = claims.decode_mode_a_binding().map_err(|_| {
-        SidecarError::AttestationError("JWT eat_nonce is not the Mode A base64url pair".to_string())
-    })?;
+    let raw = claims
+        .decode_mode_a_binding()
+        .map_err(|_| SidecarError::AttestationError("JWT eat_nonce is not the Mode A base64url pair".to_string()))?;
     if raw[..32] != workload_signer.to_bytes() {
-        return Err(SidecarError::AttestationError(
-            "JWT eat_nonce does not bind the workload pubkey".to_string(),
-        ));
+        return Err(SidecarError::AttestationError("JWT eat_nonce does not bind the workload pubkey".to_string()));
     }
     // SHA256 exactly once over the decoded 64-byte binding, matching the verifier.
 
     let (registry_pda, _) = Pubkey::find_program_address(&[b"policy_registry"], program_id);
-    let (jwks_pda, _) = Pubkey::find_program_address(
-        &[solana_confidential_compute_crypto::jwt::JWKS_SEED, &kh],
-        program_id,
-    );
+    let (jwks_pda, _) =
+        Pubkey::find_program_address(&[solana_confidential_compute_crypto::jwt::JWKS_SEED, &kh], program_id);
     let (signer_pda, _) = Pubkey::find_program_address(
-        &[
-            solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-            workload_signer.as_ref(),
-        ],
+        &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload_signer.as_ref()],
         program_id,
     );
-    let (nonce_pda, _) =
-        solana_confidential_compute_sdk::derive_google_used_nonce_pda(program_id, &raw)
-            .expect("decoded Google ModeA binding");
-    let legacy =
-        solana_confidential_compute_sdk::derive_legacy_google_used_nonce_pda(program_id, &raw)
-            .expect("decoded Google ModeA binding")
-            .0;
+    let (nonce_pda, _) = solana_confidential_compute_sdk::derive_google_used_nonce_pda(program_id, &raw)
+        .expect("decoded Google ModeA binding");
+    let legacy = solana_confidential_compute_sdk::derive_legacy_google_used_nonce_pda(program_id, &raw)
+        .expect("decoded Google ModeA binding")
+        .0;
 
     let mut accounts = vec![
         AccountMeta::new(signer_pda, false),
@@ -1162,16 +1024,11 @@ fn build_verify_google_jwt_mode_a_ix(
         AccountMeta::new_readonly(clock::ID, false),
         AccountMeta::new_readonly(slot_hashes::ID, false),
         AccountMeta::new_readonly(*workload_signer, true),
-        AccountMeta::new_readonly(
-            Pubkey::find_program_address(&[b"gcp_tenant_policy"], program_id).0,
-            false,
-        ),
+        AccountMeta::new_readonly(Pubkey::find_program_address(&[b"gcp_tenant_policy"], program_id).0, false),
     ];
 
     accounts.push(AccountMeta::new_readonly(
-        solana_confidential_compute_sdk::derive_backend_policy_pda(program_id, 3)
-            .expect("fixed GCP backend")
-            .0,
+        solana_confidential_compute_sdk::derive_backend_policy_pda(program_id, 3).expect("fixed GCP backend").0,
         false,
     ));
     accounts.push(AccountMeta::new_readonly(legacy, false));
@@ -1179,17 +1036,12 @@ fn build_verify_google_jwt_mode_a_ix(
     data.push(0);
     data.extend_from_slice(&nonce_slot.to_le_bytes());
     data.extend_from_slice(&[0u8; 32]);
-    let jwt_len = u32::try_from(jwt.len()).map_err(|_| {
-        SidecarError::AttestationError("JWT is too long for the instruction".to_string())
-    })?;
+    let jwt_len = u32::try_from(jwt.len())
+        .map_err(|_| SidecarError::AttestationError("JWT is too long for the instruction".to_string()))?;
     data.extend_from_slice(&jwt_len.to_le_bytes());
     data.extend_from_slice(jwt.as_bytes());
 
-    Ok(Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    })
+    Ok(Instruction { program_id: *program_id, accounts, data })
 }
 
 /// Builds the VerifyNitroAttestation Mode A instruction.
@@ -1203,9 +1055,7 @@ fn build_verify_nitro_mode_a_ix(
     nonce_slot: u64,
     document: &[u8],
 ) -> Result<Instruction, SidecarError> {
-    if document.is_empty()
-        || document.len() > solana_confidential_compute_core::MAX_NITRO_DOCUMENT_LEN
-    {
+    if document.is_empty() || document.len() > solana_confidential_compute_core::MAX_NITRO_DOCUMENT_LEN {
         return Err(SidecarError::AttestationError(format!(
             "Nitro document length {} is outside 1..={}",
             document.len(),
@@ -1213,9 +1063,7 @@ fn build_verify_nitro_mode_a_ix(
         )));
     }
     let (_cose, view) = solana_confidential_compute_crypto::parse_nitro_attestation(document)
-        .map_err(|e| {
-            SidecarError::AttestationError(format!("Failed to parse Nitro document: {e:?}"))
-        })?;
+        .map_err(|e| SidecarError::AttestationError(format!("Failed to parse Nitro document: {e:?}")))?;
     if view.user_data != workload_signer.to_bytes() {
         return Err(SidecarError::AttestationError(
             "Nitro document user_data does not bind the workload pubkey".to_string(),
@@ -1224,10 +1072,7 @@ fn build_verify_nitro_mode_a_ix(
 
     let (registry_pda, _) = Pubkey::find_program_address(&[b"policy_registry"], program_id);
     let (signer_pda, _) = Pubkey::find_program_address(
-        &[
-            solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-            workload_signer.as_ref(),
-        ],
+        &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload_signer.as_ref()],
         program_id,
     );
     let (nonce_pda, _) = solana_confidential_compute_sdk::derive_used_nonce_pda_for_source(
@@ -1256,9 +1101,7 @@ fn build_verify_nitro_mode_a_ix(
     ];
 
     accounts.push(AccountMeta::new_readonly(
-        solana_confidential_compute_sdk::derive_backend_policy_pda(program_id, 2)
-            .expect("fixed Nitro backend")
-            .0,
+        solana_confidential_compute_sdk::derive_backend_policy_pda(program_id, 2).expect("fixed Nitro backend").0,
         false,
     ));
     accounts.push(AccountMeta::new_readonly(legacy, false));
@@ -1267,17 +1110,12 @@ fn build_verify_nitro_mode_a_ix(
     data.push(VERIFY_NITRO_MODE_A);
     data.extend_from_slice(&nonce_slot.to_le_bytes());
     data.extend_from_slice(&[0u8; 32]);
-    let doc_len = u32::try_from(document.len()).map_err(|_| {
-        SidecarError::AttestationError("Nitro document is too long for the instruction".to_string())
-    })?;
+    let doc_len = u32::try_from(document.len())
+        .map_err(|_| SidecarError::AttestationError("Nitro document is too long for the instruction".to_string()))?;
     data.extend_from_slice(&doc_len.to_le_bytes());
     data.extend_from_slice(document);
 
-    Ok(Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    })
+    Ok(Instruction { program_id: *program_id, accounts, data })
 }
 
 fn build_verify_nvidia_mode_a_ix(
@@ -1289,15 +1127,10 @@ fn build_verify_nvidia_mode_a_ix(
     gpu_measurement: &[u8; 32],
 ) -> Result<Instruction, SidecarError> {
     let (registry_pda, _) = Pubkey::find_program_address(&[b"policy_registry"], program_id);
-    let (signer_pda, _) = Pubkey::find_program_address(
-        &[b"attested_signer_v2", workload_signer.as_ref()],
-        program_id,
-    );
-    let (backend_policy_pda, _) =
-        Pubkey::find_program_address(&[b"backend_policy", &[4]], program_id);
+    let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", workload_signer.as_ref()], program_id);
+    let (backend_policy_pda, _) = Pubkey::find_program_address(&[b"backend_policy", &[4]], program_id);
     // @spec SCC-NVIDIA-002 SCC-NVIDIA-004
-    let nonce_seed =
-        solana_sdk::hash::hashv(&[workload_signer.as_ref(), gpu_measurement, slot_hash]).to_bytes();
+    let nonce_seed = solana_sdk::hash::hashv(&[workload_signer.as_ref(), gpu_measurement, slot_hash]).to_bytes();
     let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[4], &nonce_seed], program_id);
 
     let mut data = Vec::with_capacity(VERIFY_NVIDIA_IX_LEN);
@@ -1355,27 +1188,17 @@ mod tests {
         let workload = Pubkey::new_unique();
         let slot_hash = [0x5au8; 32];
         let gpu_measurement = [0x11u8; 32];
-        let ix = build_verify_nvidia_mode_a_ix(
-            &program_id,
-            &payer,
-            &workload,
-            105,
-            &slot_hash,
-            &gpu_measurement,
-        )
-        .expect("ix");
+        let ix = build_verify_nvidia_mode_a_ix(&program_id, &payer, &workload, 105, &slot_hash, &gpu_measurement)
+            .expect("ix");
         assert_eq!(ix.data[..8], VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR);
         assert_eq!(ix.data[8], 0);
         assert_eq!(&ix.data[9..17], &105u64.to_le_bytes());
         assert_eq!(&ix.data[49..81], &gpu_measurement);
-        let seed =
-            solana_sdk::hash::hashv(&[workload.as_ref(), &gpu_measurement, &slot_hash]).to_bytes();
+        let seed = solana_sdk::hash::hashv(&[workload.as_ref(), &gpu_measurement, &slot_hash]).to_bytes();
         let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[4], &seed], &program_id);
         assert_eq!(ix.accounts[2].pubkey, nonce_pda);
-        let zero_seed =
-            solana_sdk::hash::hashv(&[workload.as_ref(), &gpu_measurement, &[0u8; 32]]).to_bytes();
-        let (zero_pda, _) =
-            Pubkey::find_program_address(&[b"nonce", &[4], &zero_seed], &program_id);
+        let zero_seed = solana_sdk::hash::hashv(&[workload.as_ref(), &gpu_measurement, &[0u8; 32]]).to_bytes();
+        let (zero_pda, _) = Pubkey::find_program_address(&[b"nonce", &[4], &zero_seed], &program_id);
         assert_ne!(nonce_pda, zero_pda);
     }
 
@@ -1397,13 +1220,9 @@ mod tests {
             engine.encode(payload.as_bytes()),
             engine.encode([0u8; 8])
         );
-        let ix = build_verify_google_jwt_mode_a_ix(&program_id, &payer, &workload, 95, &jwt)
-            .expect("ix");
+        let ix = build_verify_google_jwt_mode_a_ix(&program_id, &payer, &workload, 95, &jwt).expect("ix");
         // Canonical verifier dispatch and complete Mode A wire contract.
-        assert_eq!(
-            &ix.data[..8],
-            &solana_confidential_compute_cpi::VERIFY_GOOGLE_JWT_DISCRIMINATOR
-        );
+        assert_eq!(&ix.data[..8], &solana_confidential_compute_cpi::VERIFY_GOOGLE_JWT_DISCRIMINATOR);
         assert_eq!(&ix.data[..8], &[104, 38, 12, 199, 131, 240, 78, 165]);
         assert_eq!(ix.data[8], 0);
         assert_eq!(&ix.data[9..17], &95u64.to_le_bytes());
@@ -1423,23 +1242,13 @@ mod tests {
             ix.accounts,
             vec![
                 AccountMeta::new(
-                    Pubkey::find_program_address(
-                        &[b"attested_signer_v2", workload.as_ref()],
-                        &program_id
-                    )
-                    .0,
+                    Pubkey::find_program_address(&[b"attested_signer_v2", workload.as_ref()], &program_id).0,
                     false
                 ),
-                AccountMeta::new_readonly(
-                    Pubkey::find_program_address(&[b"policy_registry"], &program_id).0,
-                    false
-                ),
+                AccountMeta::new_readonly(Pubkey::find_program_address(&[b"policy_registry"], &program_id).0, false),
                 AccountMeta::new_readonly(
                     Pubkey::find_program_address(
-                        &[
-                            b"jwks",
-                            &solana_confidential_compute_crypto::jwt::kid_hash(b"solana-cc-test")
-                        ],
+                        &[b"jwks", &solana_confidential_compute_crypto::jwt::kid_hash(b"solana-cc-test")],
                         &program_id
                     )
                     .0,
@@ -1451,29 +1260,18 @@ mod tests {
                 AccountMeta::new_readonly(clock::ID, false),
                 AccountMeta::new_readonly(slot_hashes::ID, false),
                 AccountMeta::new_readonly(workload, true),
+                AccountMeta::new_readonly(Pubkey::find_program_address(&[b"gcp_tenant_policy"], &program_id).0, false),
                 AccountMeta::new_readonly(
-                    Pubkey::find_program_address(&[b"gcp_tenant_policy"], &program_id).0,
+                    solana_confidential_compute_sdk::derive_backend_policy_pda(&program_id, 3).unwrap().0,
                     false
                 ),
-                AccountMeta::new_readonly(
-                    solana_confidential_compute_sdk::derive_backend_policy_pda(&program_id, 3)
-                        .unwrap()
-                        .0,
-                    false
-                ),
-                AccountMeta::new_readonly(
-                    Pubkey::find_program_address(&[b"nonce", &seed], &program_id).0,
-                    false
-                ),
+                AccountMeta::new_readonly(Pubkey::find_program_address(&[b"nonce", &seed], &program_id).0, false),
             ]
         );
         assert_eq!(ix.accounts[3].pubkey, nonce_pda);
         assert_eq!(
             ix.accounts.last(),
-            Some(&AccountMeta::new_readonly(
-                Pubkey::find_program_address(&[b"nonce", &seed], &program_id).0,
-                false
-            ))
+            Some(&AccountMeta::new_readonly(Pubkey::find_program_address(&[b"nonce", &seed], &program_id).0, false))
         );
         assert_eq!(ix.accounts[4].pubkey, payer);
         assert!(ix.accounts[4].is_signer);
@@ -1481,17 +1279,12 @@ mod tests {
         assert!(ix.accounts[8].is_signer);
         assert!(!ix.accounts[8].is_writable);
         assert_eq!(ix.accounts.len(), 12);
-        assert_eq!(
-            ix.accounts[9].pubkey,
-            Pubkey::find_program_address(&[b"gcp_tenant_policy"], &program_id).0
-        );
+        assert_eq!(ix.accounts[9].pubkey, Pubkey::find_program_address(&[b"gcp_tenant_policy"], &program_id).0);
         assert!(!ix.accounts[9].is_writable && !ix.accounts[9].is_signer);
         assert_eq!(
             ix.accounts.get(ix.accounts.len() - 2),
             Some(&AccountMeta::new_readonly(
-                solana_confidential_compute_sdk::derive_backend_policy_pda(&program_id, 3)
-                    .unwrap()
-                    .0,
+                solana_confidential_compute_sdk::derive_backend_policy_pda(&program_id, 3).unwrap().0,
                 false
             ))
         );
@@ -1503,12 +1296,9 @@ mod tests {
         let payer = Pubkey::new_unique();
         let workload = Pubkey::new_from_array([0x80; 32]);
         let slot_hash = [0x11u8; 32];
-        let document =
-            crate::attestation::nitro::synthetic_cose_sign1(&workload.to_bytes(), &slot_hash);
+        let document = crate::attestation::nitro::synthetic_cose_sign1(&workload.to_bytes(), &slot_hash);
         let nonce_slot = 95u64;
-        let ix =
-            build_verify_nitro_mode_a_ix(&program_id, &payer, &workload, nonce_slot, &document)
-                .expect("ix");
+        let ix = build_verify_nitro_mode_a_ix(&program_id, &payer, &workload, nonce_slot, &document).expect("ix");
 
         assert_eq!(ix.program_id, program_id);
         assert_eq!(&ix.data[0..8], &VERIFY_NITRO_ATTESTATION_DISCRIMINATOR);
@@ -1528,28 +1318,19 @@ mod tests {
         assert_eq!(ix.accounts[1].pubkey, registry_pda);
         assert!(!ix.accounts[1].is_writable);
         let (signer_pda, _) = Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-                workload.as_ref(),
-            ],
+            &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload.as_ref()],
             &program_id,
         );
         assert_eq!(ix.accounts[2].pubkey, signer_pda);
         assert!(ix.accounts[2].is_writable);
-        let (nonce_pda, _) = Pubkey::find_program_address(
-            &[b"nonce", &[2], workload.as_ref(), &slot_hash],
-            &program_id,
-        );
+        let (nonce_pda, _) =
+            Pubkey::find_program_address(&[b"nonce", &[2], workload.as_ref(), &slot_hash], &program_id);
         assert_eq!(ix.accounts[3].pubkey, nonce_pda);
         assert!(ix.accounts[3].is_writable);
         assert_eq!(
             ix.accounts.last(),
             Some(&AccountMeta::new_readonly(
-                Pubkey::find_program_address(
-                    &[b"nonce", workload.as_ref(), &slot_hash],
-                    &program_id
-                )
-                .0,
+                Pubkey::find_program_address(&[b"nonce", workload.as_ref(), &slot_hash], &program_id).0,
                 false
             ))
         );
@@ -1560,9 +1341,7 @@ mod tests {
         assert_eq!(
             ix.accounts.get(ix.accounts.len() - 2),
             Some(&AccountMeta::new_readonly(
-                solana_confidential_compute_sdk::derive_backend_policy_pda(&program_id, 2)
-                    .unwrap()
-                    .0,
+                solana_confidential_compute_sdk::derive_backend_policy_pda(&program_id, 2).unwrap().0,
                 false
             ))
         );
@@ -1572,35 +1351,25 @@ mod tests {
     async fn submit_attestation_records_nitro_mode_a_tx() {
         let keys = crate::keys::EphemeralKeyManager::new();
         let slot_hash = [0x11u8; 32];
-        let document =
-            crate::attestation::nitro::synthetic_cose_sign1(&keys.pubkey().to_bytes(), &slot_hash);
+        let document = crate::attestation::nitro::synthetic_cose_sign1(&keys.pubkey().to_bytes(), &slot_hash);
         let payer = Keypair::new();
         let cluster = MockCluster::new(100, vec![(95, slot_hash)]);
         let onchain = OnchainAttestor::mock(cluster, None, Some(payer));
-        let expires = onchain
-            .submit_attestation(&keys, 95, &AttestationReport::AwsNitro { document })
-            .await
-            .expect("submit");
+        let expires =
+            onchain.submit_attestation(&keys, 95, &AttestationReport::AwsNitro { document }).await.expect("submit");
         assert_eq!(expires, 100 + DEFAULT_ATTESTATION_TTL_SLOTS);
         let submitted = onchain.mock_cluster().expect("mock").submitted();
         assert_eq!(submitted.len(), 1);
         assert!(submitted[0].verify().is_ok());
-        assert_eq!(
-            submitted[0].message.instructions[0].data[0..8],
-            VERIFY_NITRO_ATTESTATION_DISCRIMINATOR
-        );
-        assert_eq!(
-            submitted[0].message.instructions[0].data[8],
-            VERIFY_NITRO_MODE_A
-        );
+        assert_eq!(submitted[0].message.instructions[0].data[0..8], VERIFY_NITRO_ATTESTATION_DISCRIMINATOR);
+        assert_eq!(submitted[0].message.instructions[0].data[8], VERIFY_NITRO_MODE_A);
     }
     #[tokio::test]
     async fn gcp_submission_requests_explicit_budget_before_verifier() {
         let program_id = Pubkey::new_unique();
         let workload = EphemeralKeyManager::new();
         let cluster = MockCluster::new(100, vec![(95, [0x11; 32])]);
-        let attestor =
-            OnchainAttestor::mock(cluster.clone(), Some(program_id), Some(Keypair::new()));
+        let attestor = OnchainAttestor::mock(cluster.clone(), Some(program_id), Some(Keypair::new()));
         let (n0, n1) = mode_a_eat_nonces(&workload.pubkey(), &[0x11; 32]);
         let payload = format!(
             r#"{{"aud":"a","sub":"s","iss":"https://confidentialcomputing.googleapis.com","exp":4102444800,"iat":1700000000,"secboot":true,"dbgstat":"disabled-since-boot","eat_nonce":["{n0}","{n1}"],"image_digest":"sha256:abababababababababababababababababababababababababababababababab"}}"#
@@ -1612,42 +1381,21 @@ mod tests {
             engine.encode(payload),
             engine.encode([0; 256])
         );
-        attestor
-            .submit_attestation(
-                &workload,
-                95,
-                &AttestationReport::GcpJwt { jwt: jwt.clone() },
-            )
-            .await
-            .unwrap();
+        attestor.submit_attestation(&workload, 95, &AttestationReport::GcpJwt { jwt: jwt.clone() }).await.unwrap();
         let tx = cluster.submitted().pop().unwrap();
         assert!(tx.verify().is_ok());
         assert_eq!(tx.message.instructions.len(), 2);
         let budget = &tx.message.instructions[0];
         let expected = ComputeBudgetInstruction::set_compute_unit_limit(400_000);
-        assert_eq!(
-            tx.message.account_keys[budget.program_id_index as usize],
-            expected.program_id
-        );
+        assert_eq!(tx.message.account_keys[budget.program_id_index as usize], expected.program_id);
         assert_eq!(budget.data, expected.data);
         assert!(budget.accounts.is_empty());
         let verifier = &tx.message.instructions[1];
-        let raw = build_verify_google_jwt_mode_a_ix(
-            &program_id,
-            &tx.message.account_keys[0],
-            &workload.pubkey(),
-            95,
-            &jwt,
-        )
-        .unwrap();
-        assert_eq!(
-            tx.message.account_keys[verifier.program_id_index as usize],
-            program_id
-        );
-        assert_eq!(
-            &verifier.data[..8],
-            &solana_confidential_compute_cpi::VERIFY_GOOGLE_JWT_DISCRIMINATOR
-        );
+        let raw =
+            build_verify_google_jwt_mode_a_ix(&program_id, &tx.message.account_keys[0], &workload.pubkey(), 95, &jwt)
+                .unwrap();
+        assert_eq!(tx.message.account_keys[verifier.program_id_index as usize], program_id);
+        assert_eq!(&verifier.data[..8], &solana_confidential_compute_cpi::VERIFY_GOOGLE_JWT_DISCRIMINATOR);
         assert_eq!(verifier.data, raw.data);
         assert_eq!(verifier.accounts.len(), raw.accounts.len());
         for (index, meta) in verifier.accounts.iter().zip(raw.accounts.iter()) {
@@ -1666,14 +1414,7 @@ mod tests {
         report[0x50..0x70].copy_from_slice(workload.pubkey().as_ref());
         report[0x70..0x90].copy_from_slice(&[7; 32]);
         onchain
-            .submit_attestation(
-                &workload,
-                95,
-                &AttestationReport::SevSnp {
-                    report: report.to_vec(),
-                    vcek_cert: None,
-                },
-            )
+            .submit_attestation(&workload, 95, &AttestationReport::SevSnp { report: report.to_vec(), vcek_cert: None })
             .await
             .unwrap();
         let txs = cluster.submitted();
@@ -1691,46 +1432,25 @@ mod tests {
         data[40] = 1;
         data[137..145].copy_from_slice(&200u64.to_le_bytes());
         data[145] = Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-                workload.as_ref(),
-            ],
+            &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload.as_ref()],
             &program,
         )
         .1;
         data[146..154].copy_from_slice(&500i64.to_le_bytes());
-        let record = Account {
-            owner: program,
-            data,
-            ..Account::default()
-        };
-        let clock = Clock {
-            slot: 150,
-            unix_timestamp: 499,
-            ..Clock::default()
-        };
-        let clock_account = Account {
-            owner: solana_sdk::sysvar::ID,
-            data: bincode::serialize(&clock).unwrap(),
-            ..Account::default()
-        };
+        let record = Account { owner: program, data, ..Account::default() };
+        let clock = Clock { slot: 150, unix_timestamp: 499, ..Clock::default() };
+        let clock_account =
+            Account { owner: solana_sdk::sysvar::ID, data: bincode::serialize(&clock).unwrap(), ..Account::default() };
         assert!(validate_session_accounts(&program, &workload, &record, &clock_account).is_ok());
         let mut nvidia = record.clone();
         nvidia.data[40] = solana_confidential_compute_core::types::EnclaveType::NvidiaGpu as u8;
         assert!(validate_session_accounts(&program, &workload, &nvidia, &clock_account).is_ok());
         let mut mock_type = record.clone();
         mock_type.data[40] = solana_confidential_compute_core::types::EnclaveType::Mock as u8;
-        assert!(
-            validate_session_accounts(&program, &workload, &mock_type, &clock_account).is_err()
-        );
+        assert!(validate_session_accounts(&program, &workload, &mock_type, &clock_account).is_err());
         for (slot, unix) in [(201, 499), (150, 500), (150, -1)] {
             let bad = Account {
-                data: bincode::serialize(&Clock {
-                    slot,
-                    unix_timestamp: unix,
-                    ..clock
-                })
-                .unwrap(),
+                data: bincode::serialize(&Clock { slot, unix_timestamp: unix, ..clock }).unwrap(),
                 ..clock_account.clone()
             };
             assert!(validate_session_accounts(&program, &workload, &record, &bad).is_err());
@@ -1758,12 +1478,8 @@ mod tests {
 
         let program_id = Pubkey::new_unique();
         let cluster = MockCluster::new(100, vec![(95, [0x5a; 32])]);
-        let attestor = OnchainAttestor::mock_with_dry_run(
-            cluster.clone(),
-            Some(program_id),
-            Some(Keypair::new()),
-            false,
-        );
+        let attestor =
+            OnchainAttestor::mock_with_dry_run(cluster.clone(), Some(program_id), Some(Keypair::new()), false);
         let workload = EphemeralKeyManager::new();
         let report = NvidiaH100Provider::new(None, true)
             .request_attestation(&workload.pubkey(), &[0x5a; 32])
@@ -1777,9 +1493,7 @@ mod tests {
         assert!(cluster.submitted().is_empty());
 
         let dry = OnchainAttestor::mock(cluster.clone(), Some(program_id), Some(Keypair::new()));
-        dry.submit_attestation(&workload, 95, &report)
-            .await
-            .expect("dry-run records the synthetic registration");
+        dry.submit_attestation(&workload, 95, &report).await.expect("dry-run records the synthetic registration");
         assert_eq!(cluster.submitted().len(), 1);
     }
 }

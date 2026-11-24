@@ -40,11 +40,7 @@ fn legacy_size(ixs: &[Instruction], payer: &Pubkey) -> usize {
 }
 
 fn precompile_ix(program: Pubkey, message_len: usize) -> Instruction {
-    Instruction {
-        program_id: program,
-        accounts: vec![],
-        data: vec![0u8; PRECOMPILE_OVERHEAD + message_len],
-    }
+    Instruction { program_id: program, accounts: vec![], data: vec![0u8; PRECOMPILE_OVERHEAD + message_len] }
 }
 
 fn writable(n: usize) -> Vec<Pubkey> {
@@ -60,27 +56,17 @@ fn the_qe_report_transaction_fits_a_legacy_packet() {
     let program = Pubkey::new_unique();
 
     // session, policy, payer, system, clock, instructions.
-    let accounts: Vec<AccountMeta> = writable(6)
-        .into_iter()
-        .map(|k| AccountMeta::new(k, false))
-        .collect();
+    let accounts: Vec<AccountMeta> = writable(6).into_iter().map(|k| AccountMeta::new(k, false)).collect();
 
     let size = legacy_size(
         &[
             precompile_ix(secp, QE_REPORT_LEN),
-            Instruction {
-                program_id: program,
-                accounts,
-                data: vec![0u8; QE_IX_DATA_LEN],
-            },
+            Instruction { program_id: program, accounts, data: vec![0u8; QE_IX_DATA_LEN] },
         ],
         &payer,
     );
 
-    assert!(
-        size <= PACKET_DATA_SIZE,
-        "QE transaction is {size} bytes, over the {PACKET_DATA_SIZE}-byte packet",
-    );
+    assert!(size <= PACKET_DATA_SIZE, "QE transaction is {size} bytes, over the {PACKET_DATA_SIZE}-byte packet",);
     // Recorded so a regression is visible as a number, not just a pass/fail.
     assert_eq!(size, 1104, "QE transaction size changed");
 }
@@ -93,19 +79,12 @@ fn the_quote_transaction_requires_a_versioned_message() {
     let secp = Pubkey::new_unique();
     let program = Pubkey::new_unique();
 
-    let accounts: Vec<AccountMeta> = writable(10)
-        .into_iter()
-        .map(|k| AccountMeta::new(k, false))
-        .collect();
+    let accounts: Vec<AccountMeta> = writable(10).into_iter().map(|k| AccountMeta::new(k, false)).collect();
 
     let size = legacy_size(
         &[
             precompile_ix(secp, ISV_SIGNED_LEN),
-            Instruction {
-                program_id: program,
-                accounts,
-                data: vec![0u8; QUOTE_IX_DATA_LEN],
-            },
+            Instruction { program_id: program, accounts, data: vec![0u8; QUOTE_IX_DATA_LEN] },
         ],
         &payer,
     );
@@ -131,46 +110,26 @@ fn the_quote_transaction_fits_with_a_lookup_table() {
     // sysvar, workload signer, and one spare.
     let fixed = writable(6);
 
-    let mut accounts: Vec<AccountMeta> = dynamic
-        .iter()
-        .map(|k| AccountMeta::new(*k, false))
-        .collect();
+    let mut accounts: Vec<AccountMeta> = dynamic.iter().map(|k| AccountMeta::new(*k, false)).collect();
     accounts.extend(fixed.iter().map(|k| AccountMeta::new_readonly(*k, false)));
 
     let ixs = vec![
         precompile_ix(secp, ISV_SIGNED_LEN),
-        Instruction {
-            program_id: program,
-            accounts,
-            data: vec![0u8; QUOTE_IX_DATA_LEN],
-        },
+        Instruction { program_id: program, accounts, data: vec![0u8; QUOTE_IX_DATA_LEN] },
     ];
 
-    let table = AddressLookupTableAccount {
-        key: Pubkey::new_unique(),
-        addresses: fixed,
-    };
+    let table = AddressLookupTableAccount { key: Pubkey::new_unique(), addresses: fixed };
     let message = v0::Message::try_compile(&payer, &ixs, &[table], Hash::default())
         .expect("the lookup table resolves every fixed account");
-    let tx = VersionedTransaction {
-        signatures: vec![Default::default()],
-        message: VersionedMessage::V0(message),
-    };
+    let tx = VersionedTransaction { signatures: vec![Default::default()], message: VersionedMessage::V0(message) };
     let size = bincode::serialized_size(&tx).expect("serializable") as usize;
 
-    assert!(
-        size <= PACKET_DATA_SIZE,
-        "quote transaction is {size} bytes even with a lookup table",
-    );
+    assert!(size <= PACKET_DATA_SIZE, "quote transaction is {size} bytes even with a lookup table",);
     assert_eq!(size, 1147, "versioned quote transaction size changed");
 
     // Headroom worth naming: one more 32-byte account outside the table
     // would eat a third of it.
-    assert!(
-        PACKET_DATA_SIZE - size >= 64,
-        "only {} bytes of headroom left",
-        PACKET_DATA_SIZE - size
-    );
+    assert!(PACKET_DATA_SIZE - size >= 64, "only {} bytes of headroom left", PACKET_DATA_SIZE - size);
 }
 
 /// Why the two signatures cannot share a transaction, in one assertion.
@@ -180,10 +139,7 @@ fn both_precompile_messages_cannot_share_one_transaction() {
     let isv = PRECOMPILE_OVERHEAD + ISV_SIGNED_LEN;
     assert_eq!(qe, 497);
     assert_eq!(isv, 745);
-    assert!(
-        qe + isv > PACKET_DATA_SIZE,
-        "if these ever fit together the two instructions could be merged",
-    );
+    assert!(qe + isv > PACKET_DATA_SIZE, "if these ever fit together the two instructions could be merged",);
 }
 
 /// The same transaction with a sponsor paying the fee.
@@ -203,10 +159,7 @@ fn a_sponsored_quote_transaction_is_measured_not_assumed() {
     let dynamic = writable(4);
     let fixed = writable(6);
 
-    let mut accounts: Vec<AccountMeta> = dynamic
-        .iter()
-        .map(|k| AccountMeta::new(*k, false))
-        .collect();
+    let mut accounts: Vec<AccountMeta> = dynamic.iter().map(|k| AccountMeta::new(*k, false)).collect();
     accounts.extend(fixed.iter().map(|k| AccountMeta::new_readonly(*k, false)));
     // The workload signer signs and is not in the table: a signer cannot be
     // looked up, so it always costs a full 32 bytes plus a signature.
@@ -214,16 +167,9 @@ fn a_sponsored_quote_transaction_is_measured_not_assumed() {
 
     let ixs = vec![
         precompile_ix(secp, ISV_SIGNED_LEN),
-        Instruction {
-            program_id: program,
-            accounts,
-            data: vec![0u8; QUOTE_IX_DATA_LEN],
-        },
+        Instruction { program_id: program, accounts, data: vec![0u8; QUOTE_IX_DATA_LEN] },
     ];
-    let table = AddressLookupTableAccount {
-        key: Pubkey::new_unique(),
-        addresses: fixed,
-    };
+    let table = AddressLookupTableAccount { key: Pubkey::new_unique(), addresses: fixed };
     let message = v0::Message::try_compile(&payer, &ixs, &[table], Hash::default())
         .expect("the lookup table resolves every fixed account");
     let tx = VersionedTransaction {
@@ -251,37 +197,20 @@ fn a_self_paying_quote_transaction_fits() {
     let dynamic = writable(4);
     let fixed = writable(6);
 
-    let mut accounts: Vec<AccountMeta> = dynamic
-        .iter()
-        .map(|k| AccountMeta::new(*k, false))
-        .collect();
+    let mut accounts: Vec<AccountMeta> = dynamic.iter().map(|k| AccountMeta::new(*k, false)).collect();
     accounts.extend(fixed.iter().map(|k| AccountMeta::new_readonly(*k, false)));
     accounts.push(AccountMeta::new(workload, true));
 
     let ixs = vec![
         precompile_ix(secp, ISV_SIGNED_LEN),
-        Instruction {
-            program_id: program,
-            accounts,
-            data: vec![0u8; QUOTE_IX_DATA_LEN],
-        },
+        Instruction { program_id: program, accounts, data: vec![0u8; QUOTE_IX_DATA_LEN] },
     ];
-    let table = AddressLookupTableAccount {
-        key: Pubkey::new_unique(),
-        addresses: fixed,
-    };
-    let message =
-        v0::Message::try_compile(&workload, &ixs, &[table], Hash::default()).expect("compiles");
-    let tx = VersionedTransaction {
-        signatures: vec![Default::default()],
-        message: VersionedMessage::V0(message),
-    };
+    let table = AddressLookupTableAccount { key: Pubkey::new_unique(), addresses: fixed };
+    let message = v0::Message::try_compile(&workload, &ixs, &[table], Hash::default()).expect("compiles");
+    let tx = VersionedTransaction { signatures: vec![Default::default()], message: VersionedMessage::V0(message) };
     let size = bincode::serialized_size(&tx).expect("serializable") as usize;
     eprintln!("self-paying quote transaction: {size} bytes (limit {PACKET_DATA_SIZE})");
-    assert!(
-        size <= PACKET_DATA_SIZE,
-        "self-paying transaction is {size} bytes"
-    );
+    assert!(size <= PACKET_DATA_SIZE, "self-paying transaction is {size} bytes");
 }
 
 /// Sponsoring fits once the per-enclave accounts join the lookup table.
@@ -306,38 +235,24 @@ fn sponsoring_fits_when_the_per_enclave_pdas_are_in_the_table() {
     // Stable for the deployment.
     let fixed = writable(6);
 
-    let mut accounts: Vec<AccountMeta> = per_request
-        .iter()
-        .map(|k| AccountMeta::new(*k, false))
-        .collect();
+    let mut accounts: Vec<AccountMeta> = per_request.iter().map(|k| AccountMeta::new(*k, false)).collect();
     accounts.extend(per_enclave.iter().map(|k| AccountMeta::new(*k, false)));
     accounts.extend(fixed.iter().map(|k| AccountMeta::new_readonly(*k, false)));
     accounts.push(AccountMeta::new_readonly(workload, true));
 
     let ixs = vec![
         precompile_ix(secp, ISV_SIGNED_LEN),
-        Instruction {
-            program_id: program,
-            accounts,
-            data: vec![0u8; QUOTE_IX_DATA_LEN],
-        },
+        Instruction { program_id: program, accounts, data: vec![0u8; QUOTE_IX_DATA_LEN] },
     ];
     let mut addresses = fixed;
     addresses.extend(per_enclave);
-    let table = AddressLookupTableAccount {
-        key: Pubkey::new_unique(),
-        addresses,
-    };
-    let message =
-        v0::Message::try_compile(&payer, &ixs, &[table], Hash::default()).expect("compiles");
+    let table = AddressLookupTableAccount { key: Pubkey::new_unique(), addresses };
+    let message = v0::Message::try_compile(&payer, &ixs, &[table], Hash::default()).expect("compiles");
     let tx = VersionedTransaction {
         signatures: vec![Default::default(), Default::default()],
         message: VersionedMessage::V0(message),
     };
     let size = bincode::serialized_size(&tx).expect("serializable") as usize;
     eprintln!("sponsored with per-enclave table: {size} bytes (limit {PACKET_DATA_SIZE})");
-    assert!(
-        size <= PACKET_DATA_SIZE,
-        "sponsoring still does not fit at {size} bytes",
-    );
+    assert!(size <= PACKET_DATA_SIZE, "sponsoring still does not fit at {size} bytes",);
 }

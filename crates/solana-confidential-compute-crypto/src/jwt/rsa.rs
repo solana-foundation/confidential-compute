@@ -14,10 +14,8 @@ pub const RSA_EXPONENT: u32 = 65537;
 pub const RSA2048_LEN: usize = 256;
 
 /// SHA-256 DigestInfo prefix (RFC 8017 Appendix A.2.4).
-const DIGESTINFO_SHA256: [u8; 19] = [
-    0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05,
-    0x00, 0x04, 0x20,
-];
+const DIGESTINFO_SHA256: [u8; 19] =
+    [0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20];
 
 /// 2048-bit unsigned integer as 32 little-endian `u64` limbs (256 bytes).
 /// @spec SCC-JWT-003
@@ -73,9 +71,7 @@ impl U2048 {
 ///
 /// Intended for `JwksAccount` registration so on-chain verify skips `compute_r2`.
 /// @spec SCC-JWT-003 SCC-JWT-006
-pub fn compute_n0_and_r2(
-    modulus: &[u8; RSA2048_LEN],
-) -> Result<(u64, [u8; RSA2048_LEN]), CryptoError> {
+pub fn compute_n0_and_r2(modulus: &[u8; RSA2048_LEN]) -> Result<(u64, [u8; RSA2048_LEN]), CryptoError> {
     let n = U2048::from_be_bytes(modulus);
     if !n.is_odd() || !n.bit2047_set() {
         return Err(CryptoError::InvalidJwtSignature);
@@ -83,9 +79,7 @@ pub fn compute_n0_and_r2(
     let n0 = n0_from_n(&n);
     let r2 = solana_confidential_compute_core::big_mod_exp(&[2], &4096u32.to_be_bytes(), modulus)
         .ok_or(CryptoError::InvalidJwtSignature)?;
-    let r2: [u8; RSA2048_LEN] = r2
-        .try_into()
-        .map_err(|_| CryptoError::InvalidJwtSignature)?;
+    let r2: [u8; RSA2048_LEN] = r2.try_into().map_err(|_| CryptoError::InvalidJwtSignature)?;
     // For an odd modulus, 2^4096 is invertible; zero is a failed computation.
     if r2.iter().all(|b| *b == 0) || r2 >= *modulus {
         return Err(CryptoError::InvalidJwtSignature);
@@ -118,10 +112,7 @@ pub fn verify_rs256_pkcs1_with_montgomery(
     }
     let encoded = solana_confidential_compute_core::big_mod_exp(signature, &[1, 0, 1], modulus)
         .ok_or(CryptoError::InvalidJwtSignature)?;
-    let em: &[u8; RSA2048_LEN] = encoded
-        .as_slice()
-        .try_into()
-        .map_err(|_| CryptoError::InvalidJwtSignature)?;
+    let em: &[u8; RSA2048_LEN] = encoded.as_slice().try_into().map_err(|_| CryptoError::InvalidJwtSignature)?;
     verify_pkcs1_sha256(em, message_hash)
 }
 
@@ -136,14 +127,7 @@ pub fn verify_rs256_pkcs1(
     if exponent != RSA_EXPONENT {
         return Err(CryptoError::UnsupportedJwtAlgorithm);
     }
-    verify_rs256_pkcs1_with_montgomery(
-        modulus,
-        exponent,
-        0,
-        &[0; RSA2048_LEN],
-        message_hash,
-        signature,
-    )
+    verify_rs256_pkcs1_with_montgomery(modulus, exponent, 0, &[0; RSA2048_LEN], message_hash, signature)
 }
 
 /// $s^{65537} \pmod n$ via 16 Montgomery squarings and 1 Montgomery multiply.

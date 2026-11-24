@@ -54,13 +54,7 @@ async fn sbf_real_chain_allocate_upload_seal_consume_close() {
     let mut test = sbf::verifier_program_test(pid);
     test.add_account(
         registry_key,
-        Account {
-            lamports: 100000000,
-            data: registry_bytes(&registry),
-            owner: pid,
-            executable: false,
-            rent_epoch: 0,
-        },
+        Account { lamports: 100000000, data: registry_bytes(&registry), owner: pid, executable: false, rent_epoch: 0 },
     );
     let mut ctx = test.start_with_context().await;
     let mut clock: Clock = ctx.banks_client.get_sysvar().await.unwrap();
@@ -73,8 +67,7 @@ async fn sbf_real_chain_allocate_upload_seal_consume_close() {
     let identity = solana_confidential_compute_crypto_identity(leaf);
     let chip_hash = hash(&identity.0);
     let tcb = identity.1.to_le_bytes();
-    let (vcek, _) =
-        Pubkey::find_program_address(&[VcekAccount::SEED, chip_hash.as_ref(), &tcb], &pid);
+    let (vcek, _) = Pubkey::find_program_address(&[VcekAccount::SEED, chip_hash.as_ref(), &tcb], &pid);
     let mut data = REGISTER_VCEK_DISCRIMINATOR.to_vec();
     data.extend(identity.0);
     data.extend(tcb);
@@ -94,15 +87,10 @@ async fn sbf_real_chain_allocate_upload_seal_consume_close() {
         ],
         data,
     };
-    let plan =
-        stage_vcek_registration(source.clone(), payer, clock.slot, clock.slot + 100).unwrap();
-    for ix in std::iter::once(&plan.begin)
-        .chain(plan.uploads.iter())
-        .chain([&plan.seal, &plan.consume])
-    {
+    let plan = stage_vcek_registration(source.clone(), payer, clock.slot, clock.slot + 100).unwrap();
+    for ix in std::iter::once(&plan.begin).chain(plan.uploads.iter()).chain([&plan.seal, &plan.consume]) {
         let mut tx = if ix.data == CONSUME {
-            plan.consume_transaction(ctx.last_blockhash, 1_400_000)
-                .unwrap()
+            plan.consume_transaction(ctx.last_blockhash, 1_400_000).unwrap()
         } else {
             Transaction::new_unsigned(solana_sdk::message::Message::new_with_blockhash(
                 std::slice::from_ref(ix),
@@ -112,34 +100,18 @@ async fn sbf_real_chain_allocate_upload_seal_consume_close() {
         };
         tx.sign(&[&ctx.payer], ctx.last_blockhash);
         assert!(bincode::serialize(&tx).unwrap().len() <= 1232);
-        let result = ctx
-            .banks_client
-            .process_transaction_with_metadata(tx)
-            .await
-            .unwrap();
+        let result = ctx.banks_client.process_transaction_with_metadata(tx).await.unwrap();
         assert!(result.result.is_ok(), "{:?}", result);
         let meta = result.metadata.expect("metered SBF metadata");
         assert!(meta.compute_units_consumed > 0);
-        eprintln!(
-            "REAL_SBF transport tag={:?} CU={}",
-            &ix.data[..8],
-            meta.compute_units_consumed
-        );
+        eprintln!("REAL_SBF transport tag={:?} CU={}", &ix.data[..8], meta.compute_units_consumed);
     }
     let account = ctx.banks_client.get_account(vcek).await.unwrap().unwrap();
     assert_eq!(
         &account.data[VcekAccount::PUBLIC_KEY_OFFSET..VcekAccount::PUBLIC_KEY_OFFSET + 96],
         &leaf[key_at..key_at + 96]
     );
-    assert_eq!(
-        ctx.banks_client
-            .get_account(plan.address)
-            .await
-            .unwrap()
-            .unwrap()
-            .data[88],
-        2
-    );
+    assert_eq!(ctx.banks_client.get_account(plan.address).await.unwrap().unwrap().data[88], 2);
     ctx.last_blockhash = ctx.get_new_latest_blockhash().await.unwrap();
     let replay = Transaction::new_signed_with_payer(
         std::slice::from_ref(&plan.consume),
@@ -152,10 +124,7 @@ async fn sbf_real_chain_allocate_upload_seal_consume_close() {
     let mut bad_source = source;
     *bad_source.data.last_mut().unwrap() ^= 1;
     let bad = stage_vcek_registration(bad_source, payer, clock.slot, clock.slot + 100).unwrap();
-    for ix in std::iter::once(&bad.begin)
-        .chain(bad.uploads.iter())
-        .chain([&bad.seal])
-    {
+    for ix in std::iter::once(&bad.begin).chain(bad.uploads.iter()).chain([&bad.seal]) {
         let tx = Transaction::new_signed_with_payer(
             std::slice::from_ref(ix),
             Some(&payer),
@@ -165,15 +134,9 @@ async fn sbf_real_chain_allocate_upload_seal_consume_close() {
         assert!(bincode::serialize(&tx).unwrap().len() <= 1232);
         ctx.banks_client.process_transaction(tx).await.unwrap();
     }
-    let mut invalid = bad
-        .consume_transaction(ctx.last_blockhash, 1_400_000)
-        .unwrap();
+    let mut invalid = bad.consume_transaction(ctx.last_blockhash, 1_400_000).unwrap();
     invalid.sign(&[&ctx.payer], ctx.last_blockhash);
-    let invalid = ctx
-        .banks_client
-        .process_transaction_with_metadata(invalid)
-        .await
-        .unwrap();
+    let invalid = ctx.banks_client.process_transaction_with_metadata(invalid).await.unwrap();
     assert!(
         matches!(
             invalid.result,
@@ -186,36 +149,12 @@ async fn sbf_real_chain_allocate_upload_seal_consume_close() {
         "{:?}",
         invalid
     );
-    assert_eq!(
-        ctx.banks_client.get_account(vcek).await.unwrap().unwrap(),
-        saved_vcek
-    );
-    assert_eq!(
-        ctx.banks_client
-            .get_account(bad.address)
-            .await
-            .unwrap()
-            .unwrap()
-            .data[88],
-        1
-    );
-    eprintln!(
-        "REAL_SBF invalid_signature CU={}",
-        invalid.metadata.unwrap().compute_units_consumed
-    );
-    let close = Transaction::new_signed_with_payer(
-        &[plan.close],
-        Some(&payer),
-        &[&ctx.payer],
-        ctx.last_blockhash,
-    );
+    assert_eq!(ctx.banks_client.get_account(vcek).await.unwrap().unwrap(), saved_vcek);
+    assert_eq!(ctx.banks_client.get_account(bad.address).await.unwrap().unwrap().data[88], 1);
+    eprintln!("REAL_SBF invalid_signature CU={}", invalid.metadata.unwrap().compute_units_consumed);
+    let close = Transaction::new_signed_with_payer(&[plan.close], Some(&payer), &[&ctx.payer], ctx.last_blockhash);
     ctx.banks_client.process_transaction(close).await.unwrap();
-    assert!(ctx
-        .banks_client
-        .get_account(plan.address)
-        .await
-        .unwrap()
-        .is_none());
+    assert!(ctx.banks_client.get_account(plan.address).await.unwrap().is_none());
 }
 // Fixture identity is independently encoded in its AMD OID extensions. Avoid a
 // new production dependency in the SDK; this helper reads the known fixture via

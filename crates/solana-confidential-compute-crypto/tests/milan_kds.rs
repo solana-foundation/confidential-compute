@@ -9,9 +9,7 @@
 
 use ring::signature::{UnparsedPublicKey, RSA_PSS_2048_8192_SHA384};
 use solana_confidential_compute_core::{SnpReportView, SNP_REPORT_SIZE};
-use solana_confidential_compute_crypto::{
-    parse_vcek_identity, verify_snp_report_signature, CryptoError,
-};
+use solana_confidential_compute_crypto::{parse_vcek_identity, verify_snp_report_signature, CryptoError};
 
 const REPORT: &[u8] = include_bytes!("../../../fixtures/snp_hardware_report_milan.bin");
 const VCEK_DER: &[u8] = include_bytes!("../../../fixtures/vcek_milan.der");
@@ -86,12 +84,7 @@ fn read_tlv(input: &[u8]) -> Result<Tlv<'_>, &'static str> {
     if end > input.len() {
         return Err("value past end");
     }
-    Ok(Tlv {
-        tag,
-        full: &input[..end],
-        value: &input[header..end],
-        total: end,
-    })
+    Ok(Tlv { tag, full: &input[..end], value: &input[header..end], total: end })
 }
 
 fn parse_cert(der: &[u8]) -> Result<CertView<'_>, &'static str> {
@@ -117,12 +110,7 @@ fn parse_cert(der: &[u8]) -> Result<CertView<'_>, &'static str> {
         return Err("signature unused bits");
     }
     let (key, extensions) = parse_tbs(tbs.value)?;
-    Ok(CertView {
-        tbs: tbs.full,
-        signature: &sig.value[1..],
-        key,
-        extensions,
-    })
+    Ok(CertView { tbs: tbs.full, signature: &sig.value[1..], key, extensions })
 }
 
 fn parse_tbs(body: &[u8]) -> Result<(PublicKey<'_>, Vec<Extension<'_>>), &'static str> {
@@ -239,11 +227,7 @@ fn der_u64(value: &[u8]) -> Result<u64, &'static str> {
     if content.is_empty() || content.len() > 9 || content[0] & 0x80 != 0 {
         return Err("integer sign or width");
     }
-    let digits = if content.len() > 1 && content[0] == 0 {
-        &content[1..]
-    } else {
-        content
-    };
+    let digits = if content.len() > 1 && content[0] == 0 { &content[1..] } else { content };
     if digits.is_empty() || digits.len() > 8 {
         return Err("integer width");
     }
@@ -275,9 +259,7 @@ fn directory_string(value: &[u8]) -> Result<String, &'static str> {
     if tlv.total != value.len() {
         return Err("product trailing bytes");
     }
-    std::str::from_utf8(tlv.value)
-        .map(str::to_owned)
-        .map_err(|_| "product utf-8")
+    std::str::from_utf8(tlv.value).map(str::to_owned).map_err(|_| "product utf-8")
 }
 
 /// AMD 57230 little-endian TCB word from SPL OIDs under `1.3.6.1.4.1.3704.1.3`.
@@ -346,9 +328,7 @@ fn rsa_key<'a>(cert: &'a CertView<'a>) -> &'a [u8] {
 }
 
 fn verify_rsa_pss_sha384(public_key_der: &[u8], message: &[u8], signature: &[u8]) -> bool {
-    UnparsedPublicKey::new(&RSA_PSS_2048_8192_SHA384, public_key_der)
-        .verify(message, signature)
-        .is_ok()
+    UnparsedPublicKey::new(&RSA_PSS_2048_8192_SHA384, public_key_der).verify(message, signature).is_ok()
 }
 
 fn report_signature(view: &SnpReportView<'_>) -> [u8; 96] {
@@ -381,42 +361,23 @@ fn milan_fixture_chains_to_amd_kds_and_signs_report() {
         verify_rsa_pss_sha384(ark_key, ark.tbs, ark.signature),
         "ARK self-signature under the pinned AMD Milan root"
     );
-    assert!(
-        verify_rsa_pss_sha384(ark_key, ask.tbs, ask.signature),
-        "ASK signed by the AMD Milan ARK"
-    );
-    assert!(
-        !verify_rsa_pss_sha384(ask_key, ask.tbs, ask.signature),
-        "ASK must not verify under its own key"
-    );
-    assert!(
-        verify_rsa_pss_sha384(ask_key, vcek.tbs, vcek.signature),
-        "VCEK signed by the AMD Milan ASK"
-    );
+    assert!(verify_rsa_pss_sha384(ark_key, ask.tbs, ask.signature), "ASK signed by the AMD Milan ARK");
+    assert!(!verify_rsa_pss_sha384(ask_key, ask.tbs, ask.signature), "ASK must not verify under its own key");
+    assert!(verify_rsa_pss_sha384(ask_key, vcek.tbs, vcek.signature), "VCEK signed by the AMD Milan ASK");
 
     let fields = vcek_fields(&vcek.extensions).expect("VCEK extensions");
-    assert!(
-        fields.product.contains("Milan"),
-        "product {}",
-        fields.product
-    );
+    assert!(fields.product.contains("Milan"), "product {}", fields.product);
     assert_eq!(fields.chip_id, *view.chip_id());
     assert_eq!(fields.tcb_version, view.reported_tcb());
     assert_eq!(fields.tcb_version, view.current_tcb());
 
     let sig = report_signature(&view);
-    assert_eq!(
-        verify_snp_report_signature(&vcek_xy, view.signed_body(), &sig),
-        Ok(true)
-    );
+    assert_eq!(verify_snp_report_signature(&vcek_xy, view.signed_body(), &sig), Ok(true));
 
     // The 96-byte governance slot is not the Milan ARK. The chain still verifies
     // under the pinned RSA-4096 AMD root. @spec SCC-VERIFY-003 SCC-SEC-003
     let unrelated_p384_ark = [0x11u8; 96];
-    assert_eq!(
-        validate_vcek_chain(&unrelated_p384_ark, ASK_DER, VCEK_DER, &vcek_xy),
-        Ok(())
-    );
+    assert_eq!(validate_vcek_chain(&unrelated_p384_ark, ASK_DER, VCEK_DER, &vcek_xy), Ok(()));
     let identity = parse_vcek_identity(VCEK_DER).expect("Milan VCEK identity");
     assert_eq!(identity.chip_id, fields.chip_id);
     assert_eq!(identity.tcb_version, fields.tcb_version);
@@ -429,19 +390,12 @@ fn milan_vcek_rejects_a_tampered_ask_signature() {
     let last = der.len() - 1;
     der[last] ^= 0xff;
     let vcek = parse_cert(&der).expect("tampered cert still parses");
-    assert!(!verify_rsa_pss_sha384(
-        rsa_key(&ask),
-        vcek.tbs,
-        vcek.signature
-    ));
+    assert!(!verify_rsa_pss_sha384(rsa_key(&ask), vcek.tbs, vcek.signature));
     let vcek_key = parse_cert(VCEK_DER).expect("VCEK");
     let PublicKey::P384(vcek_xy) = vcek_key.key else {
         panic!("VCEK leaf key is P-384");
     };
-    assert_eq!(
-        validate_vcek_chain(&[0x22u8; 96], ASK_DER, &der, &vcek_xy),
-        Err(CryptoError::UntrustedRoot)
-    );
+    assert_eq!(validate_vcek_chain(&[0x22u8; 96], ASK_DER, &der, &vcek_xy), Err(CryptoError::UntrustedRoot));
 }
 
 #[test]
@@ -454,21 +408,14 @@ fn milan_report_rejects_a_tampered_signed_body() {
     raw[0x90] ^= 0x01;
     let view = SnpReportView::try_from_slice(&raw).expect("report");
     let sig = report_signature(&view);
-    assert_ne!(
-        verify_snp_report_signature(&vcek_xy, view.signed_body(), &sig),
-        Ok(true)
-    );
+    assert_ne!(verify_snp_report_signature(&vcek_xy, view.signed_body(), &sig), Ok(true));
 }
 
 #[test]
 fn timed_milan_validation_enforces_validity_and_returns_cache_deadline() {
     let cert = parse_cert(VCEK_DER).unwrap();
-    let PublicKey::P384(xy) = cert.key else {
-        panic!("P384")
-    };
-    use solana_confidential_compute_crypto::{
-        validate_vcek_chain as no_clock, validate_vcek_chain_at,
-    };
+    let PublicKey::P384(xy) = cert.key else { panic!("P384") };
+    use solana_confidential_compute_crypto::{validate_vcek_chain as no_clock, validate_vcek_chain_at};
     assert!(no_clock(&[0; 96], ASK_DER, VCEK_DER, &xy).is_err());
     let before = 1_790_287_995u64; // 2026-09-24T22:13:15Z
     let after = 2_011_212_795u64; // 2033-09-24T22:13:15Z
@@ -476,18 +423,9 @@ fn timed_milan_validation_enforces_validity_and_returns_cache_deadline() {
         validate_vcek_chain_at(&[0; 96], ASK_DER, VCEK_DER, &xy, before - 1),
         Err(CryptoError::CertificateExpired)
     );
-    assert_eq!(
-        validate_vcek_chain_at(&[0; 96], ASK_DER, VCEK_DER, &xy, before),
-        Ok(after)
-    );
-    assert_eq!(
-        validate_vcek_chain_at(&[0; 96], ASK_DER, VCEK_DER, &xy, after - 1),
-        Ok(after)
-    );
-    assert_eq!(
-        validate_vcek_chain_at(&[0; 96], ASK_DER, VCEK_DER, &xy, after),
-        Err(CryptoError::CertificateExpired)
-    );
+    assert_eq!(validate_vcek_chain_at(&[0; 96], ASK_DER, VCEK_DER, &xy, before), Ok(after));
+    assert_eq!(validate_vcek_chain_at(&[0; 96], ASK_DER, VCEK_DER, &xy, after - 1), Ok(after));
+    assert_eq!(validate_vcek_chain_at(&[0; 96], ASK_DER, VCEK_DER, &xy, after), Err(CryptoError::CertificateExpired));
     assert_eq!(
         validate_vcek_chain_at(&[0; 96], ASK_DER, VCEK_DER, &xy, 2_208_988_800),
         Err(CryptoError::CertificateExpired)
@@ -498,12 +436,6 @@ fn timed_milan_validation_enforces_validity_and_returns_cache_deadline() {
     assert!(validate_vcek_chain(&[0; 96], ASK_DER, &tampered, &xy).is_err());
 }
 
-fn validate_vcek_chain(
-    ark: &[u8; 96],
-    ask: &[u8],
-    leaf: &[u8],
-    xy: &[u8; 96],
-) -> Result<(), CryptoError> {
-    solana_confidential_compute_crypto::validate_vcek_chain_at(ark, ask, leaf, xy, 1_800_000_000)
-        .map(|_| ())
+fn validate_vcek_chain(ark: &[u8; 96], ask: &[u8], leaf: &[u8], xy: &[u8; 96]) -> Result<(), CryptoError> {
+    solana_confidential_compute_crypto::validate_vcek_chain_at(ark, ask, leaf, xy, 1_800_000_000).map(|_| ())
 }

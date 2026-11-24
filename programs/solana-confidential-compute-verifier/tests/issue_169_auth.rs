@@ -7,13 +7,7 @@ use solana_confidential_compute_verifier::{
 };
 use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 
-fn account(
-    key: Pubkey,
-    owner: Pubkey,
-    signer: bool,
-    writable: bool,
-    data: Vec<u8>,
-) -> AccountInfo<'static> {
+fn account(key: Pubkey, owner: Pubkey, signer: bool, writable: bool, data: Vec<u8>) -> AccountInfo<'static> {
     AccountInfo::new(
         Box::leak(Box::new(key)),
         signer,
@@ -76,22 +70,13 @@ fn ordinary_updates_cannot_lower_any_tcb_floor() {
         let before = a[1].data.borrow().to_vec();
         let mut floors = [10, 20, 30, 40];
         floors[component] -= 1;
-        assert_eq!(
-            Processor::process(&pid, &a, &update(floors, 1)),
-            Err(VerifierError::UnauthorizedPolicy.into())
-        );
+        assert_eq!(Processor::process(&pid, &a, &update(floors, 1)), Err(VerifierError::UnauthorizedPolicy.into()));
         assert_eq!(*a[1].data.borrow(), before.as_slice());
     }
     let a = vec![account(auth, pid, true, false, vec![]), registry(pid, auth)];
-    assert_eq!(
-        Processor::process(&pid, &a, &update([10, 20, 30, 40], 1)),
-        Ok(())
-    );
+    assert_eq!(Processor::process(&pid, &a, &update([10, 20, 30, 40], 1)), Ok(()));
     assert!(saved(&a[1]).is_measurement_allowed(&[77; 48]));
-    assert_eq!(
-        Processor::process(&pid, &a, &update([11, 21, 31, 41], 1)),
-        Ok(())
-    );
+    assert_eq!(Processor::process(&pid, &a, &update([11, 21, 31, 41], 1)), Ok(()));
     assert_eq!(saved(&a[1]).min_tcb_boot_loader, 11);
     let before = a[1].data.borrow().to_vec();
     assert_eq!(

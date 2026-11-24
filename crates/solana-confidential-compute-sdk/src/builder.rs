@@ -5,9 +5,7 @@
 use solana_confidential_compute_core::{
     compute_action_commitment, SnpReportView, MAX_NITRO_DOCUMENT_LEN, SNP_REPORT_SIZE,
 };
-use solana_confidential_compute_cpi::{
-    ATTESTED_SIGNER_SEED, ID as SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-};
+use solana_confidential_compute_cpi::{ATTESTED_SIGNER_SEED, ID as SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID};
 use solana_sdk::hash::{hash, Hash};
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
@@ -89,10 +87,7 @@ pub(crate) fn parse_report(report: &[u8]) -> Result<SnpReportView<'_>, SdkError>
     SnpReportView::try_from_slice(report).map_err(|_| SdkError::InvalidReportSize)
 }
 
-pub(crate) fn chip_id_hash(
-    view: &SnpReportView<'_>,
-    endorsement_xy: Option<&[u8; 96]>,
-) -> Result<[u8; 32], SdkError> {
+pub(crate) fn chip_id_hash(view: &SnpReportView<'_>, endorsement_xy: Option<&[u8; 96]>) -> Result<[u8; 32], SdkError> {
     if view.is_vlek() {
         Ok(hash(endorsement_xy.ok_or(SdkError::MissingEndorsementKey)?).to_bytes())
     } else {
@@ -108,26 +103,14 @@ pub(crate) fn derive_policy_registry_pda(program_id: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[b"policy_registry"], program_id).0
 }
 
-pub(crate) fn derive_vcek_pda(
-    program_id: &Pubkey,
-    chip_id_hash: &[u8; 32],
-    tcb_version: u64,
-) -> Pubkey {
-    Pubkey::find_program_address(
-        &[VCEK_SEED, chip_id_hash, &tcb_version.to_le_bytes()],
-        program_id,
-    )
-    .0
+pub(crate) fn derive_vcek_pda(program_id: &Pubkey, chip_id_hash: &[u8; 32], tcb_version: u64) -> Pubkey {
+    Pubkey::find_program_address(&[VCEK_SEED, chip_id_hash, &tcb_version.to_le_bytes()], program_id).0
 }
 
 /// SHA-256(`slot_hash || action_hash || consumer_program_id`).
 ///
 /// @spec SCC-VERIFY-012 SCC-SDK-001
-pub fn compute_commitment(
-    slot_hash: &[u8; 32],
-    action_hash: &[u8; 32],
-    consumer_program_id: &Pubkey,
-) -> [u8; 32] {
+pub fn compute_commitment(slot_hash: &[u8; 32], action_hash: &[u8; 32], consumer_program_id: &Pubkey) -> [u8; 32] {
     compute_action_commitment(slot_hash, action_hash, &consumer_program_id.to_bytes())
 }
 
@@ -216,8 +199,7 @@ pub fn build_session_action_tx(
         ix.accounts.push(AccountMeta::new_readonly(signer_pk, true));
     }
     let mut tx = Transaction::new_with_payer(&[ix], Some(payer));
-    tx.try_partial_sign(&[signer_keypair], recent_blockhash)
-        .map_err(|_| SdkError::SignError)?;
+    tx.try_partial_sign(&[signer_keypair], recent_blockhash).map_err(|_| SdkError::SignError)?;
     ensure_packet_fits(&tx)?;
     Ok(tx)
 }
@@ -379,19 +361,18 @@ pub fn build_atomic_attestation_tx_for_program_with_endorsement(
     nonce_slot: u64,
     endorsement_xy: &[u8; 96],
 ) -> Result<Transaction, SdkError> {
-    let result =
-        crate::internal::build_atomic_attestation_tx_for_program_oversized_with_endorsement(
-            program_id,
-            payer,
-            consumer_program_id,
-            action_hash,
-            measurement,
-            report,
-            consumer_ix,
-            recent_blockhash,
-            nonce_slot,
-            Some(endorsement_xy),
-        )?;
+    let result = crate::internal::build_atomic_attestation_tx_for_program_oversized_with_endorsement(
+        program_id,
+        payer,
+        consumer_program_id,
+        action_hash,
+        measurement,
+        report,
+        consumer_ix,
+        recent_blockhash,
+        nonce_slot,
+        Some(endorsement_xy),
+    )?;
     ensure_packet_fits(&result)?;
     Ok(result)
 }

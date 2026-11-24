@@ -24,10 +24,7 @@ impl ConfidentialComputeClient {
     /// Derives the PDA for an attested signer given its Ed25519 public key.
     pub fn derive_signer_pda(&self, signer_pubkey: &[u8; 32]) -> (Pubkey, u8) {
         Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-                signer_pubkey,
-            ],
+            &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, signer_pubkey],
             &self.program_id,
         )
     }
@@ -35,10 +32,7 @@ impl ConfidentialComputeClient {
     /// Derives the PDA for a cached VCEK chip key.
     pub fn derive_vcek_pda(&self, chip_id_hash: &[u8; 32], tcb_version: u64) -> (Pubkey, u8) {
         let tcb_bytes = tcb_version.to_le_bytes();
-        Pubkey::find_program_address(
-            &[builder::VCEK_SEED, chip_id_hash, &tcb_bytes],
-            &self.program_id,
-        )
+        Pubkey::find_program_address(&[builder::VCEK_SEED, chip_id_hash, &tcb_bytes], &self.program_id)
     }
 
     /// Derives the PolicyRegistry singleton PDA.
@@ -56,23 +50,13 @@ impl ConfidentialComputeClient {
         crate::nonce::derive_used_nonce_pda_for_source(&self.program_id, source, signer, nonce)
     }
     /// Legacy address required only as the readonly migration guard.
-    pub fn derive_legacy_used_nonce_pda(
-        &self,
-        signer: &[u8; 32],
-        nonce: &[u8; 32],
-    ) -> (Pubkey, u8) {
+    pub fn derive_legacy_used_nonce_pda(&self, signer: &[u8; 32], nonce: &[u8; 32]) -> (Pubkey, u8) {
         crate::nonce::derive_legacy_used_nonce_pda(&self.program_id, signer, nonce)
     }
-    pub fn derive_google_used_nonce_pda(
-        &self,
-        binding: &[u8],
-    ) -> Result<(Pubkey, u8), crate::NonceError> {
+    pub fn derive_google_used_nonce_pda(&self, binding: &[u8]) -> Result<(Pubkey, u8), crate::NonceError> {
         crate::nonce::derive_google_used_nonce_pda(&self.program_id, binding)
     }
-    pub fn derive_legacy_google_used_nonce_pda(
-        &self,
-        binding: &[u8],
-    ) -> Result<(Pubkey, u8), crate::NonceError> {
+    pub fn derive_legacy_google_used_nonce_pda(&self, binding: &[u8]) -> Result<(Pubkey, u8), crate::NonceError> {
         crate::nonce::derive_legacy_google_used_nonce_pda(&self.program_id, binding)
     }
 
@@ -121,14 +105,7 @@ impl ConfidentialComputeClient {
         report_data: &[u8],
         expires_slot: u64,
     ) -> Result<Instruction, SdkError> {
-        builder::build_register_signer_ix_for_program(
-            &self.program_id,
-            payer,
-            signer,
-            report_data,
-            expires_slot,
-            0,
-        )
+        builder::build_register_signer_ix_for_program(&self.program_id, payer, signer, report_data, expires_slot, 0)
     }
 
     /// Mode A execution: consumer instruction signed by the attested workload key.
@@ -204,13 +181,7 @@ mod tests {
     fn test_mode_b_defaults_to_nonce_bound() {
         assert!(ConfidentialComputeClient::mode_b_require_nonce(false));
         assert!(ConfidentialComputeClient::mode_b_require_nonce(true));
-        assert_eq!(
-            ConfidentialComputeClient::mode_b_discriminator(false),
-            VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-        );
-        assert_eq!(
-            ConfidentialComputeClient::mode_b_discriminator(true),
-            VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-        );
+        assert_eq!(ConfidentialComputeClient::mode_b_discriminator(false), VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
+        assert_eq!(ConfidentialComputeClient::mode_b_discriminator(true), VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
     }
 }

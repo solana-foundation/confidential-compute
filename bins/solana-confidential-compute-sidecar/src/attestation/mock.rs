@@ -18,17 +18,11 @@ pub struct MockAttestationProvider {
 
 impl MockAttestationProvider {
     pub fn new_sev_snp() -> Self {
-        Self {
-            enclave_type: EnclaveType::AmdSevSnp,
-            custom_jwt: None,
-        }
+        Self { enclave_type: EnclaveType::AmdSevSnp, custom_jwt: None }
     }
 
     pub fn new_gcp(custom_jwt: Option<&str>) -> Self {
-        Self {
-            enclave_type: EnclaveType::GcpConfidentialSpace,
-            custom_jwt: custom_jwt.map(|s| s.to_string()),
-        }
+        Self { enclave_type: EnclaveType::GcpConfidentialSpace, custom_jwt: custom_jwt.map(|s| s.to_string()) }
     }
 }
 
@@ -69,10 +63,7 @@ impl AttestationProvider for MockAttestationProvider {
                     // user_data[32..64] = slot_hash
                     report[0x70..0x90].copy_from_slice(slot_hash);
 
-                    Ok(AttestationReport::SevSnp {
-                        report,
-                        vcek_cert: None,
-                    })
+                    Ok(AttestationReport::SevSnp { report, vcek_cert: None })
                 }
                 EnclaveType::GcpConfidentialSpace => {
                     if let Some(jwt) = &self.custom_jwt {
@@ -90,10 +81,7 @@ impl AttestationProvider for MockAttestationProvider {
                         &base64::engine::general_purpose::URL_SAFE_NO_PAD,
                         payload_json.as_bytes(),
                     );
-                    let sig = base64::Engine::encode(
-                        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-                        [0u8; 256],
-                    );
+                    let sig = base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, [0u8; 256]);
                     let jwt = format!("{header}.{payload}.{sig}");
 
                     Ok(AttestationReport::GcpJwt { jwt })
@@ -117,16 +105,12 @@ mod tests {
         let provider = MockAttestationProvider::new_sev_snp();
         let signer = Pubkey::new_unique();
         let slot_hash = [0x55u8; 32];
-        let report = provider
-            .request_attestation(&signer, &slot_hash)
-            .await
-            .expect("attestation succeeds");
+        let report = provider.request_attestation(&signer, &slot_hash).await.expect("attestation succeeds");
 
         match report {
             AttestationReport::SevSnp { report, .. } => {
                 let view = SnpReportView::try_from_slice(&report).expect("valid snp report size");
-                view.validate_security_invariants()
-                    .expect("passes security invariants");
+                view.validate_security_invariants().expect("passes security invariants");
                 assert_eq!(view.version(), 2);
                 assert!(!view.is_vlek());
                 assert_eq!(view.policy(), 1 << 17);

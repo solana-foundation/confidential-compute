@@ -56,12 +56,7 @@ impl SignatureVerifier for MockVerifier {
         signature_rs: &[u8; 96],
         instructions_sysvar: Option<&AccountInfo>,
     ) -> Result<(), ProgramError> {
-        let _ = (
-            public_key_xy,
-            message_digest,
-            signature_rs,
-            instructions_sysvar,
-        );
+        let _ = (public_key_xy, message_digest, signature_rs, instructions_sysvar);
         if self.succeed {
             Ok(())
         } else {

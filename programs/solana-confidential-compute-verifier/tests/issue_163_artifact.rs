@@ -144,20 +144,10 @@ fn nitro_keys() -> NitroKeys {
 }
 
 fn encode_sig_structure(protected: &[u8], payload: &[u8]) -> Vec<u8> {
-    cbor_array(&[
-        cbor_tstr("Signature1"),
-        cbor_bstr(protected),
-        cbor_bstr(b""),
-        cbor_bstr(payload),
-    ])
+    cbor_array(&[cbor_tstr("Signature1"), cbor_bstr(protected), cbor_bstr(b""), cbor_bstr(payload)])
 }
 
-fn nitro_document(
-    keys: &NitroKeys,
-    pcr0: [u8; 48],
-    user_data: [u8; 32],
-    nonce: [u8; 32],
-) -> Vec<u8> {
+fn nitro_document(keys: &NitroKeys, pcr0: [u8; 48], user_data: [u8; 32], nonce: [u8; 32]) -> Vec<u8> {
     let pcrs = cbor_map_int(&[
         (0, cbor_bstr(&pcr0)),
         (1, cbor_bstr(&[1u8; 48])),
@@ -184,12 +174,7 @@ fn nitro_document(
     let mut sig = [0u8; 96];
     sig.copy_from_slice(signature.to_bytes().as_slice());
     let mut doc = vec![0xd2];
-    doc.extend_from_slice(&cbor_array(&[
-        cbor_bstr(&protected),
-        vec![0xa0],
-        cbor_bstr(&payload),
-        cbor_bstr(&sig),
-    ]));
+    doc.extend_from_slice(&cbor_array(&[cbor_bstr(&protected), vec![0xa0], cbor_bstr(&payload), cbor_bstr(&sig)]));
     // Make the COSE signature explicitly bogus as well as the synthetic chain.
     let signature_start = doc.len() - 96;
     doc[signature_start..].fill(0xEE);
@@ -199,14 +184,9 @@ fn nitro_document(
 fn verify_ix(mode: u8, nonce_slot: u64, action_hash: [u8; 32], document: &[u8]) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&VERIFY_NITRO_ATTESTATION_DISCRIMINATOR);
-    VerifyNitroAttestationArgs {
-        mode,
-        nonce_slot,
-        expected_action_hash: action_hash,
-        document: document.to_vec(),
-    }
-    .serialize(&mut data)
-    .unwrap();
+    VerifyNitroAttestationArgs { mode, nonce_slot, expected_action_hash: action_hash, document: document.to_vec() }
+        .serialize(&mut data)
+        .unwrap();
     data
 }
 
@@ -280,14 +260,8 @@ struct SyscallGuard {
 impl SyscallGuard {
     fn install(slot: u64, unix_timestamp: i64) -> Self {
         let lock = TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-        let prev = set_syscall_stubs(Box::new(ClockSyscallStub {
-            slot,
-            unix_timestamp,
-        }));
-        Self {
-            _lock: lock,
-            prev: Some(prev),
-        }
+        let prev = set_syscall_stubs(Box::new(ClockSyscallStub { slot, unix_timestamp }));
+        Self { _lock: lock, prev: Some(prev) }
     }
 }
 
@@ -299,11 +273,7 @@ impl Drop for SyscallGuard {
     }
 }
 
-fn system_program_account<'a>(
-    key: &'a Pubkey,
-    lamports: &'a mut u64,
-    data: &'a mut [u8],
-) -> AccountInfo<'a> {
+fn system_program_account<'a>(key: &'a Pubkey, lamports: &'a mut u64, data: &'a mut [u8]) -> AccountInfo<'a> {
     AccountInfo::new(key, false, false, lamports, data, key, false)
 }
 
@@ -323,15 +293,9 @@ fn forged_nitro_is_rejected_by_default_with_mock_acceptance_control() {
     let authority_key = Pubkey::new_unique();
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid);
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &slot_hash], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &slot_hash], &pid);
 
-    let mut registry_data = registry_bytes(
-        authority_key.to_bytes(),
-        UNRELATED_AMD_ARK,
-        registry_bump,
-        PCR0,
-    );
+    let mut registry_data = registry_bytes(authority_key.to_bytes(), UNRELATED_AMD_ARK, registry_bump, PCR0);
     let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
     let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
     let mut clock_data = clock_bytes(CURRENT_SLOT, UNIX_NOW);
@@ -349,51 +313,13 @@ fn forged_nitro_is_rejected_by_default_with_mock_acceptance_control() {
     let clock_key = clock::ID;
     let sh_key = slot_hashes::ID;
 
-    let payer_acc = AccountInfo::new(
-        &payer_key,
-        true,
-        true,
-        &mut payer_lamports,
-        &mut payer_data,
-        &pid,
-        false,
-    );
-    let registry_acc = AccountInfo::new(
-        &registry_pda,
-        false,
-        false,
-        &mut reg_lamports,
-        &mut registry_data,
-        &pid,
-        false,
-    );
-    let signer_acc = AccountInfo::new(
-        &signer_pda,
-        false,
-        true,
-        &mut signer_lamports,
-        &mut signer_data,
-        &pid,
-        false,
-    );
-    let nonce_acc = AccountInfo::new(
-        &nonce_pda,
-        false,
-        true,
-        &mut nonce_lamports,
-        &mut nonce_data,
-        &pid,
-        false,
-    );
-    let sh_acc = AccountInfo::new(
-        &sh_key,
-        false,
-        false,
-        &mut sh_lamports,
-        &mut sh_data,
-        &solana_program::sysvar::ID,
-        false,
-    );
+    let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
+    let registry_acc =
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false);
+    let signer_acc = AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false);
+    let nonce_acc = AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false);
+    let sh_acc =
+        AccountInfo::new(&sh_key, false, false, &mut sh_lamports, &mut sh_data, &solana_program::sysvar::ID, false);
     let clock_acc = AccountInfo::new(
         &clock_key,
         false,
@@ -408,49 +334,18 @@ fn forged_nitro_is_rejected_by_default_with_mock_acceptance_control() {
     let workload_key = Pubkey::new_from_array(USER_DATA);
     let mut workload_lamports = 1;
     let mut workload_data = [];
-    let workload_acc = AccountInfo::new(
-        &workload_key,
-        true,
-        false,
-        &mut workload_lamports,
-        &mut workload_data,
-        &pid,
-        false,
-    );
+    let workload_acc =
+        AccountInfo::new(&workload_key, true, false, &mut workload_lamports, &mut workload_data, &pid, false);
 
     let ix = verify_ix(VERIFY_NITRO_MODE_A, NONCE_SLOT, [0u8; 32], &doc);
-    let accounts = vec![
-        payer_acc,
-        registry_acc,
-        signer_acc,
-        nonce_acc,
-        sh_acc,
-        clock_acc,
-        sys_acc,
-        workload_acc,
-    ];
+    let accounts = vec![payer_acc, registry_acc, signer_acc, nonce_acc, sh_acc, clock_acc, sys_acc, workload_acc];
     let control = Processor::process_with(&DirectCryptoVerifier, &pid, &accounts, &ix);
-    assert!(
-        control.is_err(),
-        "real backend must reject synthetic AWS root signatures"
-    );
-    assert!(accounts[2]
-        .try_borrow_data()
-        .unwrap()
-        .iter()
-        .all(|b| *b == 0));
+    assert!(control.is_err(), "real backend must reject synthetic AWS root signatures");
+    assert!(accounts[2].try_borrow_data().unwrap().iter().all(|b| *b == 0));
     let default_result = Processor::process(&pid, &accounts, &ix);
     assert_eq!(default_result, Err(VerifierError::InvalidSignature.into()));
-    assert!(accounts[2]
-        .try_borrow_data()
-        .unwrap()
-        .iter()
-        .all(|b| *b == 0));
-    assert!(accounts[3]
-        .try_borrow_data()
-        .unwrap()
-        .iter()
-        .all(|b| *b == 0));
+    assert!(accounts[2].try_borrow_data().unwrap().iter().all(|b| *b == 0));
+    assert!(accounts[3].try_borrow_data().unwrap().iter().all(|b| *b == 0));
     // Same bytes/accounts reach writes when signature checking is explicitly bypassed.
     let res = Processor::process_with(
         &solana_confidential_compute_verifier::MockVerifier::succeeding(),
@@ -460,20 +355,15 @@ fn forged_nitro_is_rejected_by_default_with_mock_acceptance_control() {
     );
     assert!(res.is_ok(), "mock-verified Nitro dispatch must succeed");
 
-    let saved =
-        AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap();
+    let saved = AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap();
     assert_eq!(saved.discriminator, ATTESTED_SIGNER_DISCRIMINATOR);
     assert_eq!(saved.record.signer_pubkey, USER_DATA);
     assert_eq!(saved.record.enclave_type, EnclaveType::AwsNitro);
     assert_eq!(saved.record.measurement.0, PCR0);
     assert_eq!(saved.record.registered_slot, CURRENT_SLOT);
-    assert_eq!(
-        saved.record.expires_slot,
-        CURRENT_SLOT + ATTESTATION_TTL_SLOTS
-    );
+    assert_eq!(saved.record.expires_slot, CURRENT_SLOT + ATTESTATION_TTL_SLOTS);
 
-    let saved_nonce =
-        UsedNonceAccount::try_from_slice(&accounts[3].try_borrow_data().unwrap()).unwrap();
+    let saved_nonce = UsedNonceAccount::try_from_slice(&accounts[3].try_borrow_data().unwrap()).unwrap();
     assert_eq!(saved_nonce.discriminator, USED_NONCE_DISCRIMINATOR);
     assert_eq!(saved_nonce.slot, CURRENT_SLOT);
 

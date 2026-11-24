@@ -14,8 +14,8 @@ use thiserror::Error;
 use crate::hardware::fetch_snp_report;
 use crate::mock::mock_vcek_public_key_xy;
 use crate::tx::{
-    assemble_attestation_tx, encode_transaction_payload, mode_b_commitment, verify_report_locally,
-    AttestationMode, TxBuildParams,
+    assemble_attestation_tx, encode_transaction_payload, mode_b_commitment, verify_report_locally, AttestationMode,
+    TxBuildParams,
 };
 
 const DEFAULT_PROGRAM_ID: &str = "EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh";
@@ -183,9 +183,7 @@ fn run_prove(args: &ProveArgs) -> Result<(String, String), CliError> {
         ));
     }
     if !args.dry_run {
-        return Err(CliError::InvalidArgument(
-            "live broadcast is not enabled; pass --dry-run".into(),
-        ));
+        return Err(CliError::InvalidArgument("live broadcast is not enabled; pass --dry-run".into()));
     }
 
     let program_id = parse_pubkey(&args.program_id)?;
@@ -196,20 +194,23 @@ fn run_prove(args: &ProveArgs) -> Result<(String, String), CliError> {
 
     let (user_data, mode, default_payer) = match args.mode {
         ProveMode::Stateful => {
-            let pubkey_str = args.pubkey.as_ref().ok_or_else(|| {
-                CliError::InvalidArgument("--pubkey is required for --mode stateful".into())
-            })?;
+            let pubkey_str = args
+                .pubkey
+                .as_ref()
+                .ok_or_else(|| CliError::InvalidArgument("--pubkey is required for --mode stateful".into()))?;
             let workload = parse_pubkey(pubkey_str)?;
             let user_data = ReportData::new(&workload.to_bytes(), &slot_hash).raw;
             (user_data, AttestationMode::Stateful, workload)
         }
         ProveMode::Atomic => {
-            let action_hex = args.action_hash.as_ref().ok_or_else(|| {
-                CliError::InvalidArgument("--action-hash is required for --mode atomic".into())
-            })?;
-            let consumer_str = args.consumer_program.as_ref().ok_or_else(|| {
-                CliError::InvalidArgument("--consumer-program is required for --mode atomic".into())
-            })?;
+            let action_hex = args
+                .action_hash
+                .as_ref()
+                .ok_or_else(|| CliError::InvalidArgument("--action-hash is required for --mode atomic".into()))?;
+            let consumer_str = args
+                .consumer_program
+                .as_ref()
+                .ok_or_else(|| CliError::InvalidArgument("--consumer-program is required for --mode atomic".into()))?;
             let action_hash = parse_hex32(action_hex)?;
             let consumer = parse_pubkey(consumer_str)?;
             let commitment = mode_b_commitment(&slot_hash, &action_hash, &consumer.to_bytes());
@@ -221,9 +222,7 @@ fn run_prove(args: &ProveArgs) -> Result<(String, String), CliError> {
                 AttestationMode::Atomic {
                     action_hash,
                     consumer_program: consumer,
-                    require_nonce: ConfidentialComputeClient::mode_b_require_nonce(
-                        args.stateless_idempotent,
-                    ),
+                    require_nonce: ConfidentialComputeClient::mode_b_require_nonce(args.stateless_idempotent),
                 },
                 consumer,
             )
@@ -260,16 +259,15 @@ fn run_prove(args: &ProveArgs) -> Result<(String, String), CliError> {
 }
 
 fn parse_pubkey(s: &str) -> Result<Pubkey, CliError> {
-    s.parse::<Pubkey>()
-        .map_err(|_| CliError::InvalidArgument(format!("invalid pubkey: {s}")))
+    s.parse::<Pubkey>().map_err(|_| CliError::InvalidArgument(format!("invalid pubkey: {s}")))
 }
 
 fn parse_hex32(s: &str) -> Result<[u8; 32], CliError> {
     let s = s.strip_prefix("0x").unwrap_or(s);
     let raw = hex::decode(s).map_err(|err| CliError::InvalidArgument(err.to_string()))?;
-    let arr: [u8; 32] = raw.try_into().map_err(|_| {
-        CliError::InvalidArgument("expected 32-byte hex value (64 hex characters)".into())
-    })?;
+    let arr: [u8; 32] = raw
+        .try_into()
+        .map_err(|_| CliError::InvalidArgument("expected 32-byte hex value (64 hex characters)".into()))?;
     Ok(arr)
 }
 
@@ -307,14 +305,9 @@ mod tests {
 
     #[test]
     fn test_parse_prove_stateful_defaults() {
-        let cli = Cli::try_parse_from([
-            "solana-confidential-compute",
-            "prove",
-            "--pubkey",
-            &test_pubkey_str(),
-            "--mock",
-        ])
-        .expect("parse stateful prove");
+        let cli =
+            Cli::try_parse_from(["solana-confidential-compute", "prove", "--pubkey", &test_pubkey_str(), "--mock"])
+                .expect("parse stateful prove");
         match cli.command {
             Commands::Prove(args) => {
                 assert_eq!(args.mode, ProveMode::Stateful);
@@ -373,10 +366,7 @@ mod tests {
         assert!(!hx.is_empty());
         assert_eq!(hx.len() % 2, 0);
         let disc = hex::encode(VERIFY_AND_REGISTER_DISCRIMINATOR);
-        assert!(
-            hx.to_ascii_lowercase().contains(&disc),
-            "mode A discriminator missing from dry-run hex"
-        );
+        assert!(hx.to_ascii_lowercase().contains(&disc), "mode A discriminator missing from dry-run hex");
     }
 
     #[test]
@@ -414,10 +404,7 @@ mod tests {
         let (b64, hx) = run_prove(&args).expect("atomic prove");
         assert!(b64.is_ascii());
         let disc = hex::encode(VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
-        assert!(
-            hx.to_ascii_lowercase().contains(&disc),
-            "mode B nonce-bound discriminator missing from dry-run hex"
-        );
+        assert!(hx.to_ascii_lowercase().contains(&disc), "mode B nonce-bound discriminator missing from dry-run hex");
     }
 
     #[test]
@@ -434,10 +421,7 @@ mod tests {
                     msg.contains("Stateless Mode B is disabled on-chain to prevent replay attacks (finding H-01)"),
                     "unexpected error: {msg}"
                 );
-                assert!(
-                    msg.contains("All Mode B transactions require nonce consumption"),
-                    "unexpected error: {msg}"
-                );
+                assert!(msg.contains("All Mode B transactions require nonce consumption"), "unexpected error: {msg}");
             }
             other => panic!("expected InvalidArgument, got {other:?}"),
         }
@@ -496,10 +480,7 @@ mod tests {
         args.mock = true;
         args.vcek_pubkey = Some("11".repeat(96));
         let err = run_prove(&args).expect_err("mock report must not verify under a foreign VCEK");
-        assert!(
-            matches!(err, CliError::InvalidSignature),
-            "expected InvalidSignature, got {err:?}"
-        );
+        assert!(matches!(err, CliError::InvalidSignature), "expected InvalidSignature, got {err:?}");
     }
 
     #[test]

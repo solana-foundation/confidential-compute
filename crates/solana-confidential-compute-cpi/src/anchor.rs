@@ -4,13 +4,12 @@
 
 use bytemuck::{Pod, Zeroable};
 use solana_program::{
-    account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey, sysvar::clock::Clock,
-    sysvar::Sysvar,
+    account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey, sysvar::clock::Clock, sysvar::Sysvar,
 };
 
 use crate::{
-    assert_attestation_atomic, AtomicAttestationExpectation, AttestationClaims,
-    AttestationPlatform, CpiError, ATTESTED_SIGNER_ACCOUNT_SIZE, ATTESTED_SIGNER_DISCRIMINATOR,
+    assert_attestation_atomic, AtomicAttestationExpectation, AttestationClaims, AttestationPlatform, CpiError,
+    ATTESTED_SIGNER_ACCOUNT_SIZE, ATTESTED_SIGNER_DISCRIMINATOR,
 };
 
 /// Anchor consumer entry point binding the AccountInfo privileges received at
@@ -114,12 +113,7 @@ impl AttestedSignerAccount {
         expected_platform: AttestationPlatform,
     ) -> Result<(), ProgramError> {
         let clock = Clock::get()?;
-        self.validate_inner(
-            expected_measurement,
-            clock.slot,
-            expected_platform,
-            clock.unix_timestamp,
-        )
+        self.validate_inner(expected_measurement, clock.slot, expected_platform, clock.unix_timestamp)
     }
 
     /// Test helper that injects both slot and Unix timestamp from a simulated Clock.
@@ -133,12 +127,7 @@ impl AttestedSignerAccount {
         expected_platform: AttestationPlatform,
         clock_unix_timestamp: i64,
     ) -> Result<(), ProgramError> {
-        self.validate_inner(
-            expected_measurement,
-            clock_slot,
-            expected_platform,
-            clock_unix_timestamp,
-        )
+        self.validate_inner(expected_measurement, clock_slot, expected_platform, clock_unix_timestamp)
     }
 
     /// Mode A session bind: require `workload_signer.is_signer` and pubkey
@@ -200,12 +189,7 @@ impl AttestedSignerAccount {
         if self.signer_pubkey != workload_signer.key.to_bytes() {
             return Err(CpiError::SignerMismatch.into());
         }
-        self.validate_inner(
-            expected_measurement,
-            clock_slot,
-            expected_platform,
-            clock_unix_timestamp,
-        )
+        self.validate_inner(expected_measurement, clock_slot, expected_platform, clock_unix_timestamp)
     }
 
     fn validate_inner(
@@ -259,10 +243,6 @@ macro_rules! assert_attestation_atomic_ctx {
         )
     };
     ($instructions_sysvar:expr, $expectation:expr, $program_id:expr) => {
-        $crate::anchor::assert_attestation_atomic_ctx(
-            $instructions_sysvar,
-            $expectation,
-            $program_id,
-        )
+        $crate::anchor::assert_attestation_atomic_ctx($instructions_sysvar, $expectation, $program_id)
     };
 }

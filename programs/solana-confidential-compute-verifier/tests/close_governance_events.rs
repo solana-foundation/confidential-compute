@@ -2,13 +2,9 @@
 //! The new-state hash is SHA-256 of the closed account's empty data.
 use borsh::BorshDeserialize;
 use solana_confidential_compute_core::types::{AttestedSigner, EnclaveType, MeasurementDigest};
-use solana_confidential_compute_verifier::{
-    error::VerifierError, payload::*, processor::Processor, state::*,
-};
+use solana_confidential_compute_verifier::{error::VerifierError, payload::*, processor::Processor, state::*};
 use solana_program::program_stubs::{set_syscall_stubs, SyscallStubs};
-use solana_program::{
-    account_info::AccountInfo, hash::hashv, program_error::ProgramError, pubkey::Pubkey, sysvar,
-};
+use solana_program::{account_info::AccountInfo, hash::hashv, program_error::ProgramError, pubkey::Pubkey, sysvar};
 use std::sync::{Arc, Mutex};
 
 type Events = Vec<Vec<Vec<u8>>>;
@@ -16,10 +12,7 @@ static STUB_LOCK: Mutex<()> = Mutex::new(());
 struct Logs(Arc<Mutex<Events>>);
 impl SyscallStubs for Logs {
     fn sol_log_data(&self, fields: &[&[u8]]) {
-        self.0
-            .lock()
-            .unwrap()
-            .push(fields.iter().map(|x| x.to_vec()).collect());
+        self.0.lock().unwrap().push(fields.iter().map(|x| x.to_vec()).collect());
     }
 }
 struct Guard(Option<Box<dyn SyscallStubs>>);
@@ -44,17 +37,11 @@ struct Data<const N: usize> {
 }
 
 fn key(key: Pubkey, len: usize) -> Key {
-    Key {
-        original_len: len as u32,
-        key,
-    }
+    Key { original_len: len as u32, key }
 }
 
 fn data<const N: usize>(bytes: &[u8]) -> Data<N> {
-    Data {
-        len: N as u64,
-        bytes: bytes.try_into().unwrap(),
-    }
+    Data { len: N as u64, bytes: bytes.try_into().unwrap() }
 }
 
 fn clock_data(slot: u64) -> Vec<u8> {
@@ -94,33 +81,9 @@ fn close_at<const N: usize>(
     let (clock_owner, system) = (sysvar::ID, Pubkey::default());
     let record_owner = *record.2;
     let accounts = [
-        AccountInfo::new(
-            &record.0.key,
-            false,
-            true,
-            &mut rl,
-            &mut buf.bytes,
-            &record_owner,
-            false,
-        ),
-        AccountInfo::new(
-            &actor.0.key,
-            actor.1,
-            true,
-            &mut al,
-            &mut ad,
-            &system,
-            false,
-        ),
-        AccountInfo::new(
-            &sysvar::clock::ID,
-            false,
-            false,
-            &mut cl,
-            &mut cd,
-            &clock_owner,
-            false,
-        ),
+        AccountInfo::new(&record.0.key, false, true, &mut rl, &mut buf.bytes, &record_owner, false),
+        AccountInfo::new(&actor.0.key, actor.1, true, &mut al, &mut ad, &system, false),
+        AccountInfo::new(&sysvar::clock::ID, false, false, &mut cl, &mut cd, &clock_owner, false),
     ];
     let result = Processor::process(program, &accounts, &ix);
     let remaining = accounts[0].try_borrow_data().unwrap().to_vec();
@@ -155,23 +118,12 @@ fn close_stale_nonce_events(logs: &Arc<Mutex<Events>>) {
     let refund = key(Pubkey::new_unique(), 0);
     let wrong = key(Pubkey::new_unique(), 0);
     let nonce = key(Pubkey::new_unique(), N);
-    let tombstone =
-        borsh::to_vec(&UsedNonceAccount::new(500, 0).with_refund(refund.key.to_bytes())).unwrap();
+    let tombstone = borsh::to_vec(&UsedNonceAccount::new(500, 0).with_refund(refund.key.to_bytes())).unwrap();
     let foreign = Pubkey::new_unique();
     // Too fresh, wrong refund account, foreign owner: no close, no event.
     for (actor, slot, owner, error) in [
-        (
-            &refund,
-            650,
-            &program,
-            VerifierError::UnauthorizedPolicy.into(),
-        ),
-        (
-            &wrong,
-            651,
-            &program,
-            VerifierError::InvalidAccountAddress.into(),
-        ),
+        (&refund, 650, &program, VerifierError::UnauthorizedPolicy.into()),
+        (&wrong, 651, &program, VerifierError::InvalidAccountAddress.into()),
         (&refund, 651, &foreign, ProgramError::IllegalOwner),
     ] {
         let (result, remaining, rl, al, events) = close::<N>(
@@ -199,18 +151,14 @@ fn close_stale_nonce_events(logs: &Arc<Mutex<Events>>) {
     assert_eq!(result, Ok(()));
     assert!(remaining.is_empty());
     assert_eq!((rl, al), (0, 3_000_000));
-    assert_eq!(
-        events,
-        expected(b"close_stale_nonce", &refund.key, &nonce.key, &tombstone)
-    );
+    assert_eq!(events, expected(b"close_stale_nonce", &refund.key, &nonce.key, &tombstone));
 }
 
 fn close_attested_signer_events(logs: &Arc<Mutex<Events>>) {
     const N: usize = AttestedSignerAccount::SIZE;
     let program = Pubkey::new_unique();
     let signer = key(Pubkey::new_unique(), 0);
-    let (record_key, bump) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", signer.key.as_ref()], &program);
+    let (record_key, bump) = Pubkey::find_program_address(&[b"attested_signer_v2", signer.key.as_ref()], &program);
     let record = key(record_key, N);
     let mut account = AttestedSignerAccount::new(
         AttestedSigner {
@@ -227,10 +175,9 @@ fn close_attested_signer_events(logs: &Arc<Mutex<Events>>) {
     account.expires_unix_timestamp = i64::MAX;
     let value = borsh::to_vec(&account).unwrap();
     // Unsigned or unexpired: no close, no event.
-    for (signed, slot, error) in [
-        (false, 501, ProgramError::MissingRequiredSignature),
-        (true, 500, VerifierError::UnauthorizedPolicy.into()),
-    ] {
+    for (signed, slot, error) in
+        [(false, 501, ProgramError::MissingRequiredSignature), (true, 500, VerifierError::UnauthorizedPolicy.into())]
+    {
         let (result, remaining, rl, al, events) = close::<N>(
             logs,
             CLOSE_ATTESTED_SIGNER_DISCRIMINATOR,
@@ -247,20 +194,11 @@ fn close_attested_signer_events(logs: &Arc<Mutex<Events>>) {
 
     let mut revoked = AttestedSignerAccount::try_from_slice(&value).unwrap();
     revoked.record.expires_slot = 0;
-    for platform in [
-        EnclaveType::AmdSevSnp,
-        EnclaveType::AwsNitro,
-        EnclaveType::GcpConfidentialSpace,
-    ] {
+    for platform in [EnclaveType::AmdSevSnp, EnclaveType::AwsNitro, EnclaveType::GcpConfidentialSpace] {
         revoked.record.enclave_type = platform;
         // Tombstones survive both slot and Unix expiry, including legacy
         // records with a nonzero deadline and new zero-deadline revocations.
-        for (slot, unix, deadline) in [
-            (501, 0, i64::MAX),
-            (100, 100, 100),
-            (100, 100, 0),
-            (0, 0, 0),
-        ] {
+        for (slot, unix, deadline) in [(501, 0, i64::MAX), (100, 100, 100), (100, 100, 0), (0, 0, 0)] {
             revoked.expires_unix_timestamp = deadline;
             let bytes = borsh::to_vec(&revoked).unwrap();
             let (result, remaining, rl, al, events) = close_at::<N>(
@@ -290,10 +228,7 @@ fn close_attested_signer_events(logs: &Arc<Mutex<Events>>) {
     assert_eq!(result, Ok(()));
     assert!(remaining.is_empty());
     assert_eq!((rl, al), (0, 3_000_000));
-    assert_eq!(
-        events,
-        expected(b"close_attested_signer", &signer.key, &record_key, &value)
-    );
+    assert_eq!(events, expected(b"close_attested_signer", &signer.key, &record_key, &value));
 
     // Issue #288 / R1: a revoked signer (expires_slot = 0) can NEVER be closed.
     let mut revoked_account = account.clone();
@@ -320,8 +255,7 @@ fn unix_expiry_cleanup_boundaries() {
     let _guard = Guard(Some(set_syscall_stubs(Box::new(Logs(logs.clone())))));
     let program = Pubkey::new_unique();
     let signer = key(Pubkey::new_unique(), 0);
-    let (address, bump) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", signer.key.as_ref()], &program);
+    let (address, bump) = Pubkey::find_program_address(&[b"attested_signer_v2", signer.key.as_ref()], &program);
     let record = key(address, AttestedSignerAccount::SIZE);
     let mut value = AttestedSignerAccount::new(
         AttestedSigner {

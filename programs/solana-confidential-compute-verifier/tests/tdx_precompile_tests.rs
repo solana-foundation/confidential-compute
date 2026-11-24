@@ -73,10 +73,7 @@ fn serialize_instructions(ixs: &[(Pubkey, &[u8])], current_index: u16) -> Vec<u8
 }
 
 /// Run the binding check with `ixs` preceding our instruction.
-fn check_with(
-    ixs: &[(Pubkey, &[u8])],
-    message: &[u8],
-) -> Result<(), solana_program::program_error::ProgramError> {
+fn check_with(ixs: &[(Pubkey, &[u8])], message: &[u8]) -> Result<(), solana_program::program_error::ProgramError> {
     let current_index = ixs.len() as u16;
     let mut all: Vec<(Pubkey, &[u8])> = ixs.to_vec();
     all.push((Pubkey::new_unique(), &[]));
@@ -86,15 +83,8 @@ fn check_with(
     let owner = solana_program::sysvar::ID;
     let mut lamports = 0u64;
     let mut data = sysvar_data;
-    let account = solana_program::account_info::AccountInfo::new(
-        &key,
-        false,
-        false,
-        &mut lamports,
-        &mut data,
-        &owner,
-        false,
-    );
+    let account =
+        solana_program::account_info::AccountInfo::new(&key, false, false, &mut lamports, &mut data, &owner, false);
     assert_secp256r1_verified(&account, &PUBKEY, message, &SIGNATURE)
 }
 
@@ -114,11 +104,8 @@ fn the_precompile_may_sit_behind_other_instructions() {
     let message = message();
     let data = canonical(&message);
     let filler = Pubkey::new_unique();
-    check_with(
-        &[(filler, &[1, 2, 3]), (SECP256R1_PROGRAM_ID, &data)],
-        &message,
-    )
-    .expect("a prepended instruction must not break the scan");
+    check_with(&[(filler, &[1, 2, 3]), (SECP256R1_PROGRAM_ID, &data)], &message)
+        .expect("a prepended instruction must not break the scan");
 }
 
 /// THE test. `Secp256r1SignatureOffsets` carries three `*_instruction_index`
@@ -175,10 +162,7 @@ fn an_instruction_from_another_program_does_not_count() {
     let message = message();
     let data = canonical(&message);
     let impostor = Pubkey::new_unique();
-    assert_eq!(
-        check_with(&[(impostor, &data)], &message),
-        Err(VerifierError::InvalidSignature.into()),
-    );
+    assert_eq!(check_with(&[(impostor, &data)], &message), Err(VerifierError::InvalidSignature.into()),);
 }
 
 /// Byte-comparing the regions is only meaningful if they are the values the
@@ -282,11 +266,9 @@ fn more_than_one_declared_signature_is_rejected() {
 #[test]
 fn non_canonical_offsets_are_rejected() {
     let message = message();
-    for (name, at, value) in [
-        ("signature_offset", 2usize, 50u16),
-        ("public_key_offset", 6, 17),
-        ("message_data_offset", 10, 114),
-    ] {
+    for (name, at, value) in
+        [("signature_offset", 2usize, 50u16), ("public_key_offset", 6, 17), ("message_data_offset", 10, 114)]
+    {
         let mut data = canonical(&message);
         data[at..at + 2].copy_from_slice(&value.to_le_bytes());
         assert_eq!(
@@ -303,10 +285,7 @@ fn a_short_declared_message_size_is_rejected() {
     let message = message();
     let mut data = canonical(&message);
     data[12..14].copy_from_slice(&((message.len() - 1) as u16).to_le_bytes());
-    assert_eq!(
-        check_with(&[(SECP256R1_PROGRAM_ID, &data)], &message),
-        Err(VerifierError::InvalidSignature.into()),
-    );
+    assert_eq!(check_with(&[(SECP256R1_PROGRAM_ID, &data)], &message), Err(VerifierError::InvalidSignature.into()),);
 }
 
 #[test]
@@ -353,15 +332,8 @@ fn an_instruction_carrying_accounts_is_rejected() {
     let key = instructions::ID;
     let owner = solana_program::sysvar::ID;
     let mut lamports = 0u64;
-    let account = solana_program::account_info::AccountInfo::new(
-        &key,
-        false,
-        false,
-        &mut lamports,
-        &mut blob,
-        &owner,
-        false,
-    );
+    let account =
+        solana_program::account_info::AccountInfo::new(&key, false, false, &mut lamports, &mut blob, &owner, false);
     assert_eq!(
         assert_secp256r1_verified(&account, &PUBKEY, &message, &SIGNATURE),
         Err(VerifierError::InvalidSignature.into()),
@@ -373,24 +345,14 @@ fn an_instruction_carrying_accounts_is_rejected() {
 fn an_account_that_is_not_the_instructions_sysvar_is_rejected() {
     let message = message();
     let data = canonical(&message);
-    let blob = serialize_instructions(
-        &[(SECP256R1_PROGRAM_ID, &data), (Pubkey::new_unique(), &[])],
-        1,
-    );
+    let blob = serialize_instructions(&[(SECP256R1_PROGRAM_ID, &data), (Pubkey::new_unique(), &[])], 1);
 
     let key = Pubkey::new_unique();
     let owner = solana_program::sysvar::ID;
     let mut lamports = 0u64;
     let mut bytes = blob;
-    let account = solana_program::account_info::AccountInfo::new(
-        &key,
-        false,
-        false,
-        &mut lamports,
-        &mut bytes,
-        &owner,
-        false,
-    );
+    let account =
+        solana_program::account_info::AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, &owner, false);
     assert_eq!(
         assert_secp256r1_verified(&account, &PUBKEY, &message, &SIGNATURE),
         Err(solana_program::program_error::ProgramError::IncorrectProgramId),

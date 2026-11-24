@@ -45,12 +45,7 @@ impl AttestedSignerAccount {
     pub const SIZE: usize = 8 + (32 + 1 + 48 + 32 + 8 + 8 + 8) + 1 + 8; // 154 bytes
 
     pub fn new(record: AttestedSigner, bump: u8) -> Self {
-        Self {
-            discriminator: ATTESTED_SIGNER_DISCRIMINATOR,
-            record,
-            bump,
-            expires_unix_timestamp: 0,
-        }
+        Self { discriminator: ATTESTED_SIGNER_DISCRIMINATOR, record, bump, expires_unix_timestamp: 0 }
     }
 }
 
@@ -79,8 +74,8 @@ pub struct VcekAccount {
 impl VcekAccount {
     pub const SEED: &'static [u8] = b"vcek_v2";
     pub const MILAN_TRUST_PROFILE: [u8; 32] = [
-        133, 117, 150, 230, 106, 13, 196, 134, 214, 159, 68, 89, 85, 76, 86, 249, 108, 63, 131,
-        243, 54, 89, 132, 101, 13, 26, 171, 95, 123, 33, 91, 42,
+        133, 117, 150, 230, 106, 13, 196, 134, 214, 159, 68, 89, 85, 76, 86, 249, 108, 63, 131, 243, 54, 89, 132, 101,
+        13, 26, 171, 95, 123, 33, 91, 42,
     ];
     pub const TRUST_PROFILE_OFFSET: usize = 153;
     pub const VALID_UNTIL_OFFSET: usize = 185;
@@ -141,26 +136,20 @@ impl<'a> VcekAccountView<'a> {
             && self.data[VcekAccount::REVOKED_OFFSET] == 0
             && now
                 < u64::from_le_bytes(
-                    self.data[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::VALID_UNTIL_OFFSET + 8]
-                        .try_into()
-                        .unwrap(),
+                    self.data[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::VALID_UNTIL_OFFSET + 8].try_into().unwrap(),
                 )
     }
 
     /// Authenticated exclusive certificate-chain deadline stored at registration.
     pub fn valid_until_unix(&self) -> u64 {
         u64::from_le_bytes(
-            self.data[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::VALID_UNTIL_OFFSET + 8]
-                .try_into()
-                .unwrap(),
+            self.data[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::VALID_UNTIL_OFFSET + 8].try_into().unwrap(),
         )
     }
 
     #[inline]
     pub fn public_key_xy(&self) -> &[u8; 96] {
-        self.data[VcekAccount::PUBLIC_KEY_OFFSET..VcekAccount::PUBLIC_KEY_OFFSET + 96]
-            .try_into()
-            .unwrap()
+        self.data[VcekAccount::PUBLIC_KEY_OFFSET..VcekAccount::PUBLIC_KEY_OFFSET + 96].try_into().unwrap()
     }
 
     #[inline]
@@ -266,8 +255,8 @@ impl<'a> PolicyRegistryView<'a> {
         if measurement.iter().all(|&b| b == 0) {
             return false;
         }
-        let count_bytes: [u8; 4] = self.data[PolicyRegistry::MEASUREMENT_COUNT_OFFSET
-            ..PolicyRegistry::MEASUREMENT_COUNT_OFFSET + 4]
+        let count_bytes: [u8; 4] = self.data
+            [PolicyRegistry::MEASUREMENT_COUNT_OFFSET..PolicyRegistry::MEASUREMENT_COUNT_OFFSET + 4]
             .try_into()
             .unwrap();
         let count = u32::from_le_bytes(count_bytes).min(8) as usize;
@@ -309,12 +298,7 @@ impl UsedNonceAccount {
     pub const SIZE: usize = 8 + 8 + 1 + 32; // 49 bytes
 
     pub fn new(slot: u64, bump: u8) -> Self {
-        Self {
-            discriminator: USED_NONCE_DISCRIMINATOR,
-            slot,
-            bump,
-            refund_pubkey: [0; 32],
-        }
+        Self { discriminator: USED_NONCE_DISCRIMINATOR, slot, bump, refund_pubkey: [0; 32] }
     }
 }
 
@@ -354,10 +338,7 @@ impl JwksAccount {
     pub const MAX_AGE_SLOTS: u64 = 216_000;
 
     pub fn is_fresh_at_slot(&self, slot: u64) -> bool {
-        !self.is_revoked
-            && slot
-                .checked_sub(self.registered_slot)
-                .is_some_and(|age| age <= Self::MAX_AGE_SLOTS)
+        !self.is_revoked && slot.checked_sub(self.registered_slot).is_some_and(|age| age <= Self::MAX_AGE_SLOTS)
     }
 
     pub const SIZE: usize = 8 + 32 + 256 + 4 + 8 + 256 + 8 + 1 + 1; // 574 bytes
@@ -423,14 +404,8 @@ impl GcpTenantPolicy {
         Ok(value)
     }
     pub fn expected(&self) -> Result<(&[u8], &[u8]), ProgramError> {
-        let aud = self
-            .audience
-            .get(..usize::from(self.audience_len))
-            .filter(|s| !s.is_empty());
-        let sub = self
-            .subject
-            .get(..usize::from(self.subject_len))
-            .filter(|s| !s.is_empty());
+        let aud = self.audience.get(..usize::from(self.audience_len)).filter(|s| !s.is_empty());
+        let sub = self.subject.get(..usize::from(self.subject_len)).filter(|s| !s.is_empty());
         match (aud, sub) {
             (Some(a), Some(s)) if self.discriminator == Self::DISCRIMINATOR => Ok((a, s)),
             _ => Err(ProgramError::InvalidAccountData),
@@ -595,8 +570,7 @@ impl TdxSessionAccount {
     pub const TTL_SLOTS: u64 = 150;
 
     pub fn is_live_at(&self, slot: u64) -> bool {
-        slot.checked_sub(self.slot)
-            .is_some_and(|age| age <= Self::TTL_SLOTS)
+        slot.checked_sub(self.slot).is_some_and(|age| age <= Self::TTL_SLOTS)
     }
 }
 

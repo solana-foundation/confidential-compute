@@ -20,8 +20,7 @@ use p256::ecdsa::signature::Signer as _;
 use p256::ecdsa::SigningKey;
 use solana_compute_budget_interface::ComputeBudgetInstruction;
 use solana_confidential_compute_verifier::payload::{
-    TDX_ATTESTATION_SOURCE, VERIFY_TDX_MODE_A, VERIFY_TDX_QE_REPORT_DISCRIMINATOR,
-    VERIFY_TDX_QUOTE_DISCRIMINATOR,
+    TDX_ATTESTATION_SOURCE, VERIFY_TDX_MODE_A, VERIFY_TDX_QE_REPORT_DISCRIMINATOR, VERIFY_TDX_QUOTE_DISCRIMINATOR,
 };
 use solana_confidential_compute_verifier::state::{
     AttestedSignerAccount, BackendPolicy, ChallengeAccount, TdxSessionAccount, UsedNonceAccount,
@@ -175,27 +174,18 @@ async fn tdx_instructions_fit_the_compute_budget() {
     program_test.add_program("solana_confidential_compute_verifier", program_id, None);
     program_test.prefer_bpf(true);
 
-    let (policy_key, policy_bump) = Pubkey::find_program_address(
-        &[BackendPolicy::SEED, &[TDX_ATTESTATION_SOURCE]],
-        &program_id,
-    );
+    let (policy_key, policy_bump) =
+        Pubkey::find_program_address(&[BackendPolicy::SEED, &[TDX_ATTESTATION_SOURCE]], &program_id);
     program_test.add_account(
         policy_key,
         policy_account(
-            &[
-                pad33(&pck_pubkey),
-                pad32(&qe_identity_digest(quote.qe_report()).unwrap()),
-                pad32(&GPU_RIM),
-            ],
+            &[pad33(&pck_pubkey), pad32(&qe_identity_digest(quote.qe_report()).unwrap()), pad32(&GPU_RIM)],
             policy_bump,
         ),
     );
 
     let (session_key, _) = Pubkey::find_program_address(
-        &[
-            TdxSessionAccount::SEED,
-            &TdxSessionAccount::seed_for(&attestation_key),
-        ],
+        &[TdxSessionAccount::SEED, &TdxSessionAccount::seed_for(&attestation_key)],
         &program_id,
     );
 
@@ -232,11 +222,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
 
     let blockhash = banks.get_new_latest_blockhash(&_hash).await.unwrap();
     let tx = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(MAX_BUDGET as u32),
-            precompile,
-            qe_ix,
-        ],
+        &[ComputeBudgetInstruction::set_compute_unit_limit(MAX_BUDGET as u32), precompile, qe_ix],
         Some(&payer.pubkey()),
         &[&payer],
         blockhash,
@@ -244,8 +230,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
 
     match banks.process_transaction_with_metadata(tx).await {
         Ok(meta) => {
-            meta.result
-                .expect("the QE instruction must succeed to be measured");
+            meta.result.expect("the QE instruction must succeed to be measured");
             let cus = meta.metadata.map(|m| m.compute_units_consumed).unwrap_or(0);
             eprintln!("verify_tdx_qe_report: {cus} CU");
             assert!(
@@ -256,10 +241,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
             // Recorded so a regression shows up as a number rather than a
             // vague slowdown. The transaction total includes 150 CU for the
             // compute-budget instruction.
-            assert!(
-                (12_000..22_000).contains(&cus),
-                "QE cost moved to {cus} CU, outside the measured band",
-            );
+            assert!((12_000..22_000).contains(&cus), "QE cost moved to {cus} CU, outside the measured band",);
         }
         Err(error) => {
             // The test runtime does not execute precompiles, so the
@@ -283,13 +265,8 @@ async fn tdx_instructions_fit_the_compute_budget() {
     // move by several thousand CU between runs.
     let workload = Keypair::new_from_array([3u8; 32]);
     let mut body = QUOTE[..632].to_vec();
-    let report_data = expected_report_data(
-        &workload.pubkey().to_bytes(),
-        &SLOT_HASH,
-        &GPU_RIM,
-        &MODEL,
-        &CHALLENGE_NONCE,
-    );
+    let report_data =
+        expected_report_data(&workload.pubkey().to_bytes(), &SLOT_HASH, &GPU_RIM, &MODEL, &CHALLENGE_NONCE);
     body[48 + 520..48 + 584].copy_from_slice(&report_data);
 
     let isv_key = SigningKey::from_slice(&{
@@ -303,10 +280,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
 
     // Session as the first half would have written it.
     let (quote_session_key, quote_session_bump) = Pubkey::find_program_address(
-        &[
-            TdxSessionAccount::SEED,
-            &TdxSessionAccount::seed_for(&isv_pubkey),
-        ],
+        &[TdxSessionAccount::SEED, &TdxSessionAccount::seed_for(&isv_pubkey)],
         &program_id,
     );
     let session_record = TdxSessionAccount {
@@ -322,11 +296,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
     let platform = td_platform_digest(&body[48..]).unwrap();
 
     let (challenge_key, challenge_bump) = Pubkey::find_program_address(
-        &[
-            ChallengeAccount::SEED,
-            &[TDX_ATTESTATION_SOURCE],
-            &CHALLENGE_NONCE,
-        ],
+        &[ChallengeAccount::SEED, &[TDX_ATTESTATION_SOURCE], &CHALLENGE_NONCE],
         &program_id,
     );
     let challenge = ChallengeAccount {
@@ -343,10 +313,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
     let mut pt2 = ProgramTest::default();
     pt2.add_program("solana_confidential_compute_verifier", program_id, None);
     pt2.prefer_bpf(true);
-    pt2.add_account(
-        policy_key,
-        policy_account(&[pad32(&platform), pad32(&GPU_RIM)], policy_bump),
-    );
+    pt2.add_account(policy_key, policy_account(&[pad32(&platform), pad32(&GPU_RIM)], policy_bump));
     pt2.add_account(
         quote_session_key,
         Account {
@@ -369,10 +336,8 @@ async fn tdx_instructions_fit_the_compute_budget() {
     );
     let (mut banks2, payer2, hash2) = pt2.start().await;
 
-    let (signer_pda, _) = Pubkey::find_program_address(
-        &[b"attested_signer_v2", &workload.pubkey().to_bytes()],
-        &program_id,
-    );
+    let (signer_pda, _) =
+        Pubkey::find_program_address(&[b"attested_signer_v2", &workload.pubkey().to_bytes()], &program_id);
     let quote_body_digest = solana_sdk::hash::hashv(&[body.as_slice()]).to_bytes();
     let seed = solana_confidential_compute_verifier::payload::tdx_nonce_seed(
         &workload.pubkey().to_bytes(),
@@ -380,8 +345,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
         &SLOT_HASH,
         &CHALLENGE_NONCE,
     );
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[TDX_ATTESTATION_SOURCE], &seed], &program_id);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[TDX_ATTESTATION_SOURCE], &seed], &program_id);
 
     let mut quote_data = VERIFY_TDX_QUOTE_DISCRIMINATOR.to_vec();
     quote_data.push(VERIFY_TDX_MODE_A);
@@ -411,11 +375,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
 
     let blockhash2 = banks2.get_new_latest_blockhash(&hash2).await.unwrap();
     let tx2 = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(MAX_BUDGET as u32),
-            isv_precompile,
-            quote_ix,
-        ],
+        &[ComputeBudgetInstruction::set_compute_unit_limit(MAX_BUDGET as u32), isv_precompile, quote_ix],
         Some(&payer2.pubkey()),
         &[&payer2, &workload],
         blockhash2,
@@ -423,8 +383,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
 
     match banks2.process_transaction_with_metadata(tx2).await {
         Ok(meta) => {
-            meta.result
-                .expect("the quote instruction must succeed to be measured");
+            meta.result.expect("the quote instruction must succeed to be measured");
             let cus = meta.metadata.map(|m| m.compute_units_consumed).unwrap_or(0);
             eprintln!("verify_tdx_quote: {cus} CU");
             assert!(
@@ -436,10 +395,7 @@ async fn tdx_instructions_fit_the_compute_budget() {
             // variable number of iterations. Passing stored bumps and using
             // `create_program_address` instead would make this deterministic
             // and cheaper -- worth doing if the budget ever gets tight.
-            assert!(
-                (40_000..70_000).contains(&cus),
-                "quote cost moved to {cus} CU, outside the measured band",
-            );
+            assert!((40_000..70_000).contains(&cus), "quote cost moved to {cus} CU, outside the measured band",);
             // The two halves together, which is what one attestation costs.
             assert!(
                 cus + 20_000 < MAX_BUDGET / 4,

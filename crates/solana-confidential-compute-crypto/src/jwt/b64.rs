@@ -27,18 +27,9 @@ pub fn decode_b64url(input: &[u8], output: &mut [u8]) -> Result<usize, CryptoErr
     let mut written = 0usize;
     let mut i = 0usize;
     while i + 4 <= src.len() {
-        let n = pack4(
-            decode_char(src[i])?,
-            decode_char(src[i + 1])?,
-            decode_char(src[i + 2])?,
-            decode_char(src[i + 3])?,
-        );
-        written = write_bytes(
-            output,
-            written,
-            &[(n >> 16) as u8, (n >> 8) as u8, n as u8],
-            3,
-        )?;
+        let n =
+            pack4(decode_char(src[i])?, decode_char(src[i + 1])?, decode_char(src[i + 2])?, decode_char(src[i + 3])?);
+        written = write_bytes(output, written, &[(n >> 16) as u8, (n >> 8) as u8, n as u8], 3)?;
         i += 4;
     }
 
@@ -90,13 +81,7 @@ impl<'a> B64Decoder<'a> {
         while end > 0 && src[end - 1] == b'=' {
             end -= 1;
         }
-        Self {
-            src: &src[..end],
-            pos: 0,
-            buf: [0; 3],
-            buf_len: 0,
-            buf_pos: 0,
-        }
+        Self { src: &src[..end], pos: 0, buf: [0; 3], buf_len: 0, buf_pos: 0 }
     }
 
     /// Pull the next decoded byte, or `None` at end of input.
@@ -185,12 +170,7 @@ fn pack4(a: u8, b: u8, c: u8, d: u8) -> u32 {
     ((a as u32) << 18) | ((b as u32) << 12) | ((c as u32) << 6) | (d as u32)
 }
 
-fn write_bytes(
-    output: &mut [u8],
-    written: usize,
-    bytes: &[u8],
-    count: usize,
-) -> Result<usize, CryptoError> {
+fn write_bytes(output: &mut [u8], written: usize, bytes: &[u8], count: usize) -> Result<usize, CryptoError> {
     if written + count > output.len() {
         return Err(CryptoError::MalformedJwt);
     }

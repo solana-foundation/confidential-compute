@@ -1,6 +1,4 @@
-use solana_confidential_compute_sdk::{
-    hash_compiled_action, validate_compiled_action, ActionCommitmentError,
-};
+use solana_confidential_compute_sdk::{hash_compiled_action, validate_compiled_action, ActionCommitmentError};
 use solana_sdk::{
     hash::Hash,
     instruction::{AccountMeta, Instruction},
@@ -10,11 +8,7 @@ use solana_sdk::{
 };
 
 fn ix(program: u8, keys: Vec<AccountMeta>) -> Instruction {
-    Instruction {
-        program_id: Pubkey::new_from_array([program; 32]),
-        accounts: keys,
-        data: vec![7, 8, 9],
-    }
+    Instruction { program_id: Pubkey::new_from_array([program; 32]), accounts: keys, data: vec![7, 8, 9] }
 }
 fn compiled(ixs: &[Instruction], payer: &Pubkey) -> VersionedMessage {
     VersionedMessage::Legacy(Message::new(ixs, Some(payer)))
@@ -37,43 +31,22 @@ fn complete_message_elevates_other_instruction_flags_and_payer() {
     let elevated = compiled(&[action.clone(), other], &payer);
     let writable = hash_compiled_action(&elevated, 0, 0).unwrap();
     assert_ne!(h, writable);
-    assert_eq!(
-        writable,
-        hex32("6777901e314a11c4c8bad75331b061ab7c90c832603f5970937033ff21fd51cc")
-    );
-    let signer = compiled(
-        &[
-            action.clone(),
-            ix(4, vec![AccountMeta::new_readonly(key, true)]),
-        ],
-        &payer,
-    );
+    assert_eq!(writable, hex32("6777901e314a11c4c8bad75331b061ab7c90c832603f5970937033ff21fd51cc"));
+    let signer = compiled(&[action.clone(), ix(4, vec![AccountMeta::new_readonly(key, true)])], &payer);
     assert_ne!(h, hash_compiled_action(&signer, 0, 0).unwrap());
     // Same consumer program, ordered pubkeys, and bytes in every message.
     for m in [&base, &elevated, &signer] {
         let c = &m.instructions()[0];
         assert_eq!(c.data, action.data);
+        assert_eq!(m.static_account_keys()[c.program_id_index as usize], action.program_id);
         assert_eq!(
-            m.static_account_keys()[c.program_id_index as usize],
-            action.program_id
-        );
-        assert_eq!(
-            c.accounts
-                .iter()
-                .map(|i| m.static_account_keys()[*i as usize])
-                .collect::<Vec<_>>(),
+            c.accounts.iter().map(|i| m.static_account_keys()[*i as usize]).collect::<Vec<_>>(),
             action.accounts.iter().map(|a| a.pubkey).collect::<Vec<_>>()
         );
     }
     let other_payer = Pubkey::new_from_array([5; 32]);
-    assert_ne!(
-        h,
-        hash_compiled_action(&compiled(&[action], &other_payer), 0, 0).unwrap()
-    );
-    assert_eq!(
-        validate_compiled_action(&elevated, 0, &h),
-        Err(ActionCommitmentError::Mismatch)
-    );
+    assert_ne!(h, hash_compiled_action(&compiled(&[action], &other_payer), 0, 0).unwrap());
+    assert_eq!(validate_compiled_action(&elevated, 0, &h), Err(ActionCommitmentError::Mismatch));
 }
 fn hex32(s: &str) -> [u8; 32] {
     std::array::from_fn(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).unwrap())
@@ -82,28 +55,14 @@ fn hex32(s: &str) -> [u8; 32] {
 fn sdk_program_demotion_and_reserved_write_rejection() {
     let payer = Pubkey::new_unique();
     let program = Pubkey::new_unique();
-    let action = Instruction {
-        program_id: program,
-        accounts: vec![AccountMeta::new(program, false)],
-        data: vec![7],
-    };
+    let action = Instruction { program_id: program, accounts: vec![AccountMeta::new(program, false)], data: vec![7] };
     let m = compiled(&[action], &payer);
     assert_eq!(
         hash_compiled_action(&m, 0, 0).unwrap(),
-        solana_confidential_compute_sdk::hash_action(
-            &[7],
-            &[AccountMeta::new_readonly(program, false)],
-            &[]
-        )
+        solana_confidential_compute_sdk::hash_action(&[7], &[AccountMeta::new_readonly(program, false)], &[])
     );
-    let bad = ix(
-        2,
-        vec![AccountMeta::new(solana_sdk::sysvar::clock::ID, false)],
-    );
-    assert_eq!(
-        hash_compiled_action(&compiled(&[bad], &payer), 0, 0),
-        Err(ActionCommitmentError::ReservedWritable)
-    );
+    let bad = ix(2, vec![AccountMeta::new(solana_sdk::sysvar::clock::ID, false)]);
+    assert_eq!(hash_compiled_action(&compiled(&[bad], &payer), 0, 0), Err(ActionCommitmentError::ReservedWritable));
 }
 #[test]
 fn normal_nitro_builder_accepts_template_then_rejects_legacy_digest() {
@@ -140,14 +99,8 @@ fn normal_nitro_builder_accepts_template_then_rejects_legacy_digest() {
         )
     };
     let tx = build(expected).unwrap();
-    assert_eq!(
-        hash_compiled_action(&VersionedMessage::Legacy(tx.message), 1, 0).unwrap(),
-        expected
-    );
-    assert_eq!(
-        build([0; 32]).unwrap_err(),
-        solana_confidential_compute_sdk::SdkError::DisallowedInstruction
-    );
+    assert_eq!(hash_compiled_action(&VersionedMessage::Legacy(tx.message), 1, 0).unwrap(), expected);
+    assert_eq!(build([0; 32]).unwrap_err(), solana_confidential_compute_sdk::SdkError::DisallowedInstruction);
 }
 
 #[test]

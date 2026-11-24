@@ -30,9 +30,7 @@ pub struct InstructionIntrospectionVerifier {
 
 impl InstructionIntrospectionVerifier {
     pub const fn new(expected_program_id: Pubkey) -> Self {
-        Self {
-            expected_program_id,
-        }
+        Self { expected_program_id }
     }
 }
 
@@ -44,8 +42,7 @@ impl SignatureVerifier for InstructionIntrospectionVerifier {
         signature_rs: &[u8; 96],
         instructions_sysvar: Option<&AccountInfo>,
     ) -> Result<(), ProgramError> {
-        let instructions_sysvar =
-            instructions_sysvar.ok_or(ProgramError::InvalidInstructionData)?;
+        let instructions_sysvar = instructions_sysvar.ok_or(ProgramError::InvalidInstructionData)?;
         if instructions_sysvar.key != &instructions::ID {
             return Err(ProgramError::IncorrectProgramId);
         }
@@ -113,11 +110,7 @@ mod tests {
         sigverify_data_for(&PUBKEY, digest, &SIG)
     }
 
-    fn sysvar_account<'a>(
-        key: &'a Pubkey,
-        lamports: &'a mut u64,
-        data: &'a mut [u8],
-    ) -> AccountInfo<'a> {
+    fn sysvar_account<'a>(key: &'a Pubkey, lamports: &'a mut u64, data: &'a mut [u8]) -> AccountInfo<'a> {
         AccountInfo::new(key, false, false, lamports, data, key, false)
     }
 
@@ -135,8 +128,7 @@ mod tests {
         let verifier = InstructionIntrospectionVerifier::new(program_id);
         let data = sigverify_data(&DIGEST);
         let current = [0u8; 1];
-        let mut sysvar_data =
-            serialize_instructions(&[(program_id, &data), (Pubkey::new_unique(), &current)], 1);
+        let mut sysvar_data = serialize_instructions(&[(program_id, &data), (Pubkey::new_unique(), &current)], 1);
         let sysvar_key = instructions::ID;
         let mut lamports = 1;
         let acc = sysvar_account(&sysvar_key, &mut lamports, &mut sysvar_data);
@@ -149,15 +141,11 @@ mod tests {
         let verifier = InstructionIntrospectionVerifier::new(program_id);
         let data = sigverify_data(&DIGEST);
         let current = [0u8; 1];
-        let mut sysvar_data =
-            serialize_instructions(&[(program_id, &data), (Pubkey::new_unique(), &current)], 1);
+        let mut sysvar_data = serialize_instructions(&[(program_id, &data), (Pubkey::new_unique(), &current)], 1);
         let fake_key = Pubkey::new_unique();
         let mut lamports = 1;
         let acc = sysvar_account(&fake_key, &mut lamports, &mut sysvar_data);
-        assert_eq!(
-            check(&verifier, Some(&acc), &DIGEST),
-            Err(ProgramError::IncorrectProgramId)
-        );
+        assert_eq!(check(&verifier, Some(&acc), &DIGEST), Err(ProgramError::IncorrectProgramId));
     }
 
     #[test]
@@ -169,10 +157,7 @@ mod tests {
         let sysvar_key = instructions::ID;
         let mut lamports = 1;
         let acc = sysvar_account(&sysvar_key, &mut lamports, &mut sysvar_data);
-        assert_eq!(
-            check(&verifier, Some(&acc), &DIGEST),
-            Err(VerifierError::InvalidInstruction.into())
-        );
+        assert_eq!(check(&verifier, Some(&acc), &DIGEST), Err(VerifierError::InvalidInstruction.into()));
     }
 
     #[test]
@@ -181,20 +166,12 @@ mod tests {
         let verifier = InstructionIntrospectionVerifier::new(expected);
         let data = sigverify_data(&DIGEST);
         let current = [0u8; 1];
-        let mut sysvar_data = serialize_instructions(
-            &[
-                (Pubkey::new_unique(), &data),
-                (Pubkey::new_unique(), &current),
-            ],
-            1,
-        );
+        let mut sysvar_data =
+            serialize_instructions(&[(Pubkey::new_unique(), &data), (Pubkey::new_unique(), &current)], 1);
         let sysvar_key = instructions::ID;
         let mut lamports = 1;
         let acc = sysvar_account(&sysvar_key, &mut lamports, &mut sysvar_data);
-        assert_eq!(
-            check(&verifier, Some(&acc), &DIGEST),
-            Err(VerifierError::InvalidSignature.into())
-        );
+        assert_eq!(check(&verifier, Some(&acc), &DIGEST), Err(VerifierError::InvalidSignature.into()));
     }
 
     #[test]
@@ -203,15 +180,11 @@ mod tests {
         let verifier = InstructionIntrospectionVerifier::new(program_id);
         let data = sigverify_data(&[0x44; 48]);
         let current = [0u8; 1];
-        let mut sysvar_data =
-            serialize_instructions(&[(program_id, &data), (Pubkey::new_unique(), &current)], 1);
+        let mut sysvar_data = serialize_instructions(&[(program_id, &data), (Pubkey::new_unique(), &current)], 1);
         let sysvar_key = instructions::ID;
         let mut lamports = 1;
         let acc = sysvar_account(&sysvar_key, &mut lamports, &mut sysvar_data);
-        assert_eq!(
-            check(&verifier, Some(&acc), &DIGEST),
-            Err(VerifierError::InvalidSignature.into())
-        );
+        assert_eq!(check(&verifier, Some(&acc), &DIGEST), Err(VerifierError::InvalidSignature.into()));
     }
 
     fn instructions_account(ixs: &[(Pubkey, &[u8])], current_index: u16) -> (Vec<u8>, u64) {
@@ -231,22 +204,12 @@ mod tests {
         let data_0 = sigverify_data_for(&PUBKEY_0, &DIGEST_0, &SIG_0);
         let data_1 = sigverify_data_for(&PUBKEY_1, &DIGEST_1, &SIG_1);
         let current = [0u8; 1];
-        let (mut sysvar_data, mut lamports) = instructions_account(
-            &[
-                (program_id, &data_0),
-                (program_id, &data_1),
-                (Pubkey::new_unique(), &current),
-            ],
-            2,
-        );
+        let (mut sysvar_data, mut lamports) =
+            instructions_account(&[(program_id, &data_0), (program_id, &data_1), (Pubkey::new_unique(), &current)], 2);
         let sysvar_key = instructions::ID;
         let acc = sysvar_account(&sysvar_key, &mut lamports, &mut sysvar_data);
-        assert!(verifier
-            .verify_p384(&PUBKEY_0, &DIGEST_0, &SIG_0, Some(&acc))
-            .is_ok());
-        assert!(verifier
-            .verify_p384(&PUBKEY_1, &DIGEST_1, &SIG_1, Some(&acc))
-            .is_ok());
+        assert!(verifier.verify_p384(&PUBKEY_0, &DIGEST_0, &SIG_0, Some(&acc)).is_ok());
+        assert!(verifier.verify_p384(&PUBKEY_1, &DIGEST_1, &SIG_1, Some(&acc)).is_ok());
     }
 
     #[test]
@@ -257,11 +220,7 @@ mod tests {
         let unrelated = [0xAB; 4];
         let current = [0u8; 1];
         let (mut sysvar_data, mut lamports) = instructions_account(
-            &[
-                (program_id, &data),
-                (Pubkey::new_unique(), &unrelated),
-                (Pubkey::new_unique(), &current),
-            ],
+            &[(program_id, &data), (Pubkey::new_unique(), &unrelated), (Pubkey::new_unique(), &current)],
             2,
         );
         let sysvar_key = instructions::ID;
@@ -276,14 +235,8 @@ mod tests {
         let data_0 = sigverify_data_for(&[0x11; 96], &[0x22; 48], &[0x33; 96]);
         let data_1 = sigverify_data_for(&[0x44; 96], &[0x55; 48], &[0x66; 96]);
         let current = [0u8; 1];
-        let (mut sysvar_data, mut lamports) = instructions_account(
-            &[
-                (program_id, &data_0),
-                (program_id, &data_1),
-                (Pubkey::new_unique(), &current),
-            ],
-            2,
-        );
+        let (mut sysvar_data, mut lamports) =
+            instructions_account(&[(program_id, &data_0), (program_id, &data_1), (Pubkey::new_unique(), &current)], 2);
         let sysvar_key = instructions::ID;
         let acc = sysvar_account(&sysvar_key, &mut lamports, &mut sysvar_data);
         assert_eq!(
@@ -299,19 +252,12 @@ mod tests {
         let data = sigverify_data(&DIGEST);
         let current = [0u8; 1];
         let (mut sysvar_data, mut lamports) = instructions_account(
-            &[
-                (Pubkey::new_unique(), &current),
-                (Pubkey::new_unique(), &current),
-                (program_id, &data),
-            ],
+            &[(Pubkey::new_unique(), &current), (Pubkey::new_unique(), &current), (program_id, &data)],
             1,
         );
         let sysvar_key = instructions::ID;
         let acc = sysvar_account(&sysvar_key, &mut lamports, &mut sysvar_data);
-        assert_eq!(
-            check(&verifier, Some(&acc), &DIGEST),
-            Err(VerifierError::InvalidSignature.into())
-        );
+        assert_eq!(check(&verifier, Some(&acc), &DIGEST), Err(VerifierError::InvalidSignature.into()));
     }
 
     #[test]
@@ -322,14 +268,10 @@ mod tests {
         data.push(0xFF);
         assert!(data.len() > SIGVERIFY_IX_DATA_LEN);
         let current = [0u8; 1];
-        let mut sysvar_data =
-            serialize_instructions(&[(program_id, &data), (Pubkey::new_unique(), &current)], 1);
+        let mut sysvar_data = serialize_instructions(&[(program_id, &data), (Pubkey::new_unique(), &current)], 1);
         let sysvar_key = instructions::ID;
         let mut lamports = 1;
         let acc = sysvar_account(&sysvar_key, &mut lamports, &mut sysvar_data);
-        assert_eq!(
-            check(&verifier, Some(&acc), &DIGEST),
-            Err(VerifierError::InvalidSignature.into())
-        );
+        assert_eq!(check(&verifier, Some(&acc), &DIGEST), Err(VerifierError::InvalidSignature.into()));
     }
 }

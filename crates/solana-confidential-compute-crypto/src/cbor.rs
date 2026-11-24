@@ -211,9 +211,7 @@ impl<'a> CborCursor<'a> {
             }
             27 => {
                 let b = self.read_exact(8)?;
-                Ok(u64::from_be_bytes([
-                    b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
-                ]))
+                Ok(u64::from_be_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]))
             }
             _ => Err(CryptoError::MalformedCbor),
         }
@@ -276,10 +274,7 @@ impl<'a> CborCursor<'a> {
     }
 
     fn read_exact(&mut self, len: usize) -> Result<&'a [u8], CryptoError> {
-        let end = self
-            .pos
-            .checked_add(len)
-            .ok_or(CryptoError::MalformedCbor)?;
+        let end = self.pos.checked_add(len).ok_or(CryptoError::MalformedCbor)?;
         if end > self.buf.len() {
             return Err(CryptoError::MalformedCbor);
         }
@@ -388,10 +383,7 @@ mod tests {
         let mut c = CborCursor::new(&[0xff]);
         assert_eq!(c.read_header(), Ok(CborHeader::Break));
         assert!(c.is_empty());
-        assert_ne!(
-            CborCursor::new(&[0xff]).read_header(),
-            Ok(CborHeader::Simple(31))
-        );
+        assert_ne!(CborCursor::new(&[0xff]).read_header(), Ok(CborHeader::Simple(31)));
     }
 
     #[test]

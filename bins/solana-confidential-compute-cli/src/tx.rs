@@ -27,9 +27,9 @@ pub use solana_confidential_compute_sdk::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR;
 
 /// NIST P-384 group order `n`.
 pub const P384_N: [u8; 48] = [
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC7, 0x63, 0x4D, 0x81, 0xF4, 0x37, 0x2D, 0xDF,
-    0x58, 0x1A, 0x0D, 0xB2, 0x48, 0xB0, 0xA7, 0x7A, 0xEC, 0xEC, 0x19, 0x6A, 0xCC, 0xC5, 0x29, 0x73,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC7, 0x63, 0x4D, 0x81, 0xF4, 0x37, 0x2D, 0xDF, 0x58, 0x1A, 0x0D, 0xB2, 0x48, 0xB0,
+    0xA7, 0x7A, 0xEC, 0xEC, 0x19, 0x6A, 0xCC, 0xC5, 0x29, 0x73,
 ];
 
 const fn n_half(n: [u8; 48]) -> [u8; 48] {
@@ -93,13 +93,9 @@ pub fn negate_s_mod_n(s_be: &[u8; 48]) -> [u8; 48] {
 /// High-S signatures are accepted (FIPS 186-4) and logged.
 ///
 /// @spec SCC-CLI-005 SCC-SEC-010
-pub fn verify_report_locally(
-    report: &[u8; SNP_REPORT_SIZE],
-    vcek_pubkey_xy: &[u8; 96],
-) -> Result<(), CliError> {
+pub fn verify_report_locally(report: &[u8; SNP_REPORT_SIZE], vcek_pubkey_xy: &[u8; 96]) -> Result<(), CliError> {
     let view = SnpReportView::from_array(report);
-    view.validate_security_invariants()
-        .map_err(CliError::Report)?;
+    view.validate_security_invariants().map_err(CliError::Report)?;
     let r = view.signature_r_be().map_err(CliError::Report)?;
     let s = view.signature_s_be().map_err(CliError::Report)?;
     log_high_s_if_needed(&s);
@@ -107,11 +103,7 @@ pub fn verify_report_locally(
     let mut sig_rs = [0u8; 96];
     sig_rs[..48].copy_from_slice(&r);
     sig_rs[48..].copy_from_slice(&s);
-    match solana_confidential_compute_crypto::verify_snp_report_signature(
-        vcek_pubkey_xy,
-        view.signed_body(),
-        &sig_rs,
-    ) {
+    match solana_confidential_compute_crypto::verify_snp_report_signature(vcek_pubkey_xy, view.signed_body(), &sig_rs) {
         Ok(true) => Ok(()),
         Ok(false) | Err(_) => Err(CliError::InvalidSignature),
     }
@@ -122,11 +114,7 @@ pub enum AttestationMode {
     /// Mode A: `verify_and_register`.
     Stateful,
     /// Mode B: `verify_atomic` or `verify_atomic_with_nonce`.
-    Atomic {
-        action_hash: [u8; 32],
-        consumer_program: Pubkey,
-        require_nonce: bool,
-    },
+    Atomic { action_hash: [u8; 32], consumer_program: Pubkey, require_nonce: bool },
 }
 
 /// Inputs required to assemble an attestation transaction.
@@ -149,10 +137,7 @@ pub fn assemble_attestation_tx(params: &TxBuildParams<'_>) -> Result<Transaction
         ixs.push(set_compute_unit_price(micro_lamports));
     }
     ixs.push(build_attestation_instruction(params)?);
-    Ok(Transaction::new_unsigned(Message::new(
-        &ixs,
-        Some(&params.payer),
-    )))
+    Ok(Transaction::new_unsigned(Message::new(&ixs, Some(&params.payer))))
 }
 
 /// Serializes a transaction to `(base64, hex)` for `--dry-run` stdout.
@@ -175,9 +160,8 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
             let signer_pubkey = view.pubkey();
             let nonce = view.nonce();
             let (attested_signer, _) = client.derive_signer_pda(&signer_pubkey);
-            let (used_nonce, _) = client
-                .derive_used_nonce_pda_for_source(1, &signer_pubkey, &nonce)
-                .expect("fixed AMD source");
+            let (used_nonce, _) =
+                client.derive_used_nonce_pda_for_source(1, &signer_pubkey, &nonce).expect("fixed AMD source");
             let mut data = Vec::with_capacity(8 + 8 + SNP_REPORT_SIZE);
             data.extend_from_slice(&VERIFY_AND_REGISTER_DISCRIMINATOR);
             data.extend_from_slice(&params.nonce_slot.to_le_bytes());
@@ -195,39 +179,27 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
                     AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
                     AccountMeta::new_readonly(Pubkey::new_from_array(signer_pubkey), true),
                     AccountMeta::new_readonly(
-                        solana_confidential_compute_sdk::derive_backend_policy_pda(
-                            &params.program_id,
-                            1,
-                        )
-                        .expect("fixed AMD backend")
-                        .0,
+                        solana_confidential_compute_sdk::derive_backend_policy_pda(&params.program_id, 1)
+                            .expect("fixed AMD backend")
+                            .0,
                         false,
                     ),
                     AccountMeta::new_readonly(
-                        client
-                            .derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce())
-                            .0,
+                        client.derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce()).0,
                         false,
                     ),
                 ],
                 data,
             })
         }
-        AttestationMode::Atomic {
-            action_hash,
-            consumer_program,
-            require_nonce,
-        } => {
+        AttestationMode::Atomic { action_hash, consumer_program, require_nonce } => {
             let header = VerifyAtomicHeader {
                 nonce_slot: params.nonce_slot,
                 action_hash: *action_hash,
                 consumer_program_id: consumer_program.to_bytes(),
             };
-            let disc = if *require_nonce {
-                VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-            } else {
-                VERIFY_ATOMIC_DISCRIMINATOR
-            };
+            let disc =
+                if *require_nonce { VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR } else { VERIFY_ATOMIC_DISCRIMINATOR };
             let mut data = Vec::with_capacity(8 + 72 + SNP_REPORT_SIZE);
             data.extend_from_slice(&disc);
             data.extend_from_slice(&encode_atomic_header(&header));
@@ -235,9 +207,8 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
 
             if *require_nonce {
                 let commitment = compute_commitment_from_report(&view);
-                let (used_nonce, _) = client
-                    .derive_used_nonce_pda_for_source(1, &view.pubkey(), &commitment)
-                    .expect("fixed AMD source");
+                let (used_nonce, _) =
+                    client.derive_used_nonce_pda_for_source(1, &view.pubkey(), &commitment).expect("fixed AMD source");
                 Ok(Instruction {
                     program_id: params.program_id,
                     accounts: vec![
@@ -249,18 +220,13 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
                         AccountMeta::new_readonly(solana_sdk::sysvar::clock::ID, false),
                         AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
                         AccountMeta::new_readonly(
-                            solana_confidential_compute_sdk::derive_backend_policy_pda(
-                                &params.program_id,
-                                1,
-                            )
-                            .expect("fixed AMD backend")
-                            .0,
+                            solana_confidential_compute_sdk::derive_backend_policy_pda(&params.program_id, 1)
+                                .expect("fixed AMD backend")
+                                .0,
                             false,
                         ),
                         AccountMeta::new_readonly(
-                            client
-                                .derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce())
-                                .0,
+                            client.derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce()).0,
                             false,
                         ),
                     ],
@@ -275,18 +241,13 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
                         AccountMeta::new_readonly(solana_sdk::sysvar::slot_hashes::ID, false),
                         AccountMeta::new_readonly(solana_sdk::sysvar::clock::ID, false),
                         AccountMeta::new_readonly(
-                            solana_confidential_compute_sdk::derive_backend_policy_pda(
-                                &params.program_id,
-                                1,
-                            )
-                            .expect("fixed AMD backend")
-                            .0,
+                            solana_confidential_compute_sdk::derive_backend_policy_pda(&params.program_id, 1)
+                                .expect("fixed AMD backend")
+                                .0,
                             false,
                         ),
                         AccountMeta::new_readonly(
-                            client
-                                .derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce())
-                                .0,
+                            client.derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce()).0,
                             false,
                         ),
                     ],
@@ -321,22 +282,14 @@ fn compute_commitment_from_report(view: &SnpReportView<'_>) -> [u8; 32] {
 fn set_compute_unit_limit(units: u32) -> Instruction {
     let mut data = vec![2u8];
     data.extend_from_slice(&units.to_le_bytes());
-    Instruction {
-        program_id: compute_budget_program_id(),
-        accounts: vec![],
-        data,
-    }
+    Instruction { program_id: compute_budget_program_id(), accounts: vec![], data }
 }
 
 /// Compute Budget: `SetComputeUnitPrice` (discriminator 3).
 fn set_compute_unit_price(micro_lamports: u64) -> Instruction {
     let mut data = vec![3u8];
     data.extend_from_slice(&micro_lamports.to_le_bytes());
-    Instruction {
-        program_id: compute_budget_program_id(),
-        accounts: vec![],
-        data,
-    }
+    Instruction { program_id: compute_budget_program_id(), accounts: vec![], data }
 }
 
 fn compute_budget_program_id() -> Pubkey {
@@ -371,11 +324,7 @@ fn encode_base64(input: &[u8]) -> String {
 /// SHA-256 of the three Mode B commitment inputs.
 ///
 /// @spec SCC-CLI-003 SCC-VERIFY-012
-pub fn mode_b_commitment(
-    slot_hash: &[u8; 32],
-    action_hash: &[u8; 32],
-    consumer_program_id: &[u8; 32],
-) -> [u8; 32] {
+pub fn mode_b_commitment(slot_hash: &[u8; 32], action_hash: &[u8; 32], consumer_program_id: &[u8; 32]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(slot_hash);
     hasher.update(action_hash);
@@ -416,11 +365,7 @@ mod tests {
         let view = SnpReportView::from_array(&report);
         let s = view.signature_s_be().expect("valid s padding");
 
-        let (low, high) = if is_high_s(&s) {
-            (negate_s_mod_n(&s), s)
-        } else {
-            (s, negate_s_mod_n(&s))
-        };
+        let (low, high) = if is_high_s(&s) { (negate_s_mod_n(&s), s) } else { (s, negate_s_mod_n(&s)) };
         assert!(!is_high_s(&low), "canonical s must be low-S");
         assert!(is_high_s(&high), "n - s must be high-S");
         assert_eq!(negate_s_mod_n(&high), low);
@@ -429,9 +374,7 @@ mod tests {
 
         write_signature_s_be(&mut report, &high);
         let view_high = SnpReportView::from_array(&report);
-        assert!(is_high_s(
-            &view_high.signature_s_be().expect("high-S padding")
-        ));
+        assert!(is_high_s(&view_high.signature_s_be().expect("high-S padding")));
         verify_report_locally(&report, &vcek).expect("high-S remains valid under FIPS 186-4");
     }
 
@@ -478,10 +421,7 @@ mod tests {
         let action_hash = [0x11u8; 32];
         let consumer = Pubkey::new_unique();
         let commitment = compute_action_commitment(&slot_hash, &action_hash, &consumer.to_bytes());
-        assert_eq!(
-            mode_b_commitment(&slot_hash, &action_hash, &consumer.to_bytes()),
-            commitment
-        );
+        assert_eq!(mode_b_commitment(&slot_hash, &action_hash, &consumer.to_bytes()), commitment);
 
         let mut user_data = [0u8; 64];
         user_data[32..].copy_from_slice(&commitment);
@@ -495,11 +435,7 @@ mod tests {
             report: &report,
             vcek_pubkey_xy: &vcek,
             nonce_slot: 500,
-            mode: AttestationMode::Atomic {
-                action_hash,
-                consumer_program: consumer,
-                require_nonce: false,
-            },
+            mode: AttestationMode::Atomic { action_hash, consumer_program: consumer, require_nonce: false },
             priority_fee: None,
         };
         let tx = assemble_attestation_tx(&params).expect("mode B tx");

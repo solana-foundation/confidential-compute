@@ -55,12 +55,7 @@ async fn enrollment_stores_confirmed_limits_instead_of_estimated_ttl() {
         enclave_mode: EnclaveMode::GcpConfidentialSpace,
         keys: RwLock::new(keys),
         provider: Arc::new(MockAttestationProvider::new_gcp(None)),
-        onchain: Arc::new(OnchainAttestor::new(
-            &format!("http://{addr}"),
-            None,
-            Some(Keypair::new()),
-            false,
-        )),
+        onchain: Arc::new(OnchainAttestor::new(&format!("http://{addr}"), None, Some(Keypair::new()), false)),
         status: RwLock::new(AttestationSessionStatus::default()),
         allowed_consumer_program_id: None,
     };

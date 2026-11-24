@@ -45,20 +45,11 @@ const PINNED_UNIX: i64 = 1_790_288_000;
 const CONSUME_BUDGET: u32 = 1_400_000;
 
 fn funded(owner: Pubkey, data: Vec<u8>) -> Account {
-    Account {
-        lamports: 100_000_000,
-        owner,
-        data,
-        ..Account::default()
-    }
+    Account { lamports: 100_000_000, owner, data, ..Account::default() }
 }
 
 fn at_slot(slot: u64) -> Clock {
-    Clock {
-        slot,
-        unix_timestamp: PINNED_UNIX,
-        ..Clock::default()
-    }
+    Clock { slot, unix_timestamp: PINNED_UNIX, ..Clock::default() }
 }
 
 fn instruction_error(err: BanksClientError) -> InstructionError {
@@ -82,35 +73,17 @@ async fn send(
     ctx.last_blockhash = ctx.get_new_latest_blockhash().await.unwrap();
     let mut signers: Vec<&Keypair> = vec![&ctx.payer];
     signers.extend(signer);
-    let tx = Transaction::new_signed_with_payer(
-        instructions,
-        Some(&ctx.payer.pubkey()),
-        &signers,
-        ctx.last_blockhash,
-    );
-    assert!(
-        solana_packet::Packet::from_data(None, &tx)
-            .unwrap()
-            .meta()
-            .size
-            <= 1232
-    );
+    let tx = Transaction::new_signed_with_payer(instructions, Some(&ctx.payer.pubkey()), &signers, ctx.last_blockhash);
+    assert!(solana_packet::Packet::from_data(None, &tx).unwrap().meta().size <= 1232);
     ctx.banks_client.process_transaction(tx).await
 }
 
 async fn data_of(ctx: &mut ProgramTestContext, key: Pubkey) -> Vec<u8> {
-    ctx.banks_client
-        .get_account(key)
-        .await
-        .unwrap()
-        .unwrap()
-        .data
+    ctx.banks_client.get_account(key).await.unwrap().unwrap().data
 }
 
 fn real_payload() -> Vec<u8> {
-    let ask = include_bytes!(
-        "../../../crates/solana-confidential-compute-crypto/tests/data/milan_ask.der"
-    );
+    let ask = include_bytes!("../../../crates/solana-confidential-compute-crypto/tests/data/milan_ask.der");
     let leaf = include_bytes!("../../../fixtures/vcek_milan.der");
     let identity = solana_confidential_compute_crypto::parse_vcek_identity(leaf).unwrap();
     let key_at = leaf.windows(4).position(|b| b == [3, 98, 0, 4]).unwrap() + 4;
@@ -126,15 +99,7 @@ fn real_payload() -> Vec<u8> {
 }
 
 fn stage_address(pid: &Pubkey, authority: &Pubkey, payload: &[u8]) -> Pubkey {
-    Pubkey::find_program_address(
-        &[
-            b"attestation_stage",
-            authority.as_ref(),
-            hash(payload).as_ref(),
-        ],
-        pid,
-    )
-    .0
+    Pubkey::find_program_address(&[b"attestation_stage", authority.as_ref(), hash(payload).as_ref()], pid).0
 }
 
 #[tokio::test]
@@ -151,20 +116,12 @@ async fn authentic_milan_transport_and_adversarial_lifecycle() {
     let chip_hash = hash(&payload[8..72]);
     let tcb = &payload[72..80];
     let (registry_key, bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
-    let (vcek_key, _) =
-        Pubkey::find_program_address(&[VcekAccount::SEED, chip_hash.as_ref(), tcb], &pid);
-    let deny =
-        Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, chip_hash.as_ref()], &pid).0;
+    let (vcek_key, _) = Pubkey::find_program_address(&[VcekAccount::SEED, chip_hash.as_ref(), tcb], &pid);
+    let deny = Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, chip_hash.as_ref()], &pid).0;
 
     let mut pt = sbf::verifier_program_test(pid);
-    pt.add_account(
-        authority.pubkey(),
-        funded(solana_sdk_ids::system_program::ID, vec![]),
-    );
-    pt.add_account(
-        foreign.pubkey(),
-        funded(solana_sdk_ids::system_program::ID, vec![]),
-    );
+    pt.add_account(authority.pubkey(), funded(solana_sdk_ids::system_program::ID, vec![]));
+    pt.add_account(foreign.pubkey(), funded(solana_sdk_ids::system_program::ID, vec![]));
     pt.add_account(
         registry_key,
         funded(
@@ -188,30 +145,18 @@ async fn authentic_milan_transport_and_adversarial_lifecycle() {
     let mut ctx = pt.start_with_context().await;
     ctx.set_sysvar(&at_slot(100));
 
-    let pair = |stage: Pubkey| {
-        vec![
-            AccountMeta::new(authority.pubkey(), true),
-            AccountMeta::new(stage, false),
-        ]
-    };
+    let pair = |stage: Pubkey| vec![AccountMeta::new(authority.pubkey(), true), AccountMeta::new(stage, false)];
     let make = |tag: [u8; 8], rest: Vec<u8>, accounts: Vec<AccountMeta>| {
         let mut data = tag.to_vec();
         data.extend(rest);
-        Instruction {
-            program_id: pid,
-            accounts,
-            data,
-        }
+        Instruction { program_id: pid, accounts, data }
     };
     let begin = |stage: Pubkey, payload: &[u8], expiry: u64| {
         let mut rest = hash(payload).to_bytes().to_vec();
         rest.extend((payload.len() as u32).to_le_bytes());
         rest.extend(expiry.to_le_bytes());
         let mut accounts = pair(stage);
-        accounts.push(AccountMeta::new_readonly(
-            solana_sdk_ids::system_program::ID,
-            false,
-        ));
+        accounts.push(AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false));
         make(BEGIN, rest, accounts)
     };
     let chunks = |stage: Pubkey, payload: &[u8]| {
@@ -226,9 +171,7 @@ async fn authentic_milan_transport_and_adversarial_lifecycle() {
             .collect::<Vec<_>>()
     };
 
-    send(&mut ctx, Some(&authority), &[begin(stage, &payload, 150)])
-        .await
-        .unwrap();
+    send(&mut ctx, Some(&authority), &[begin(stage, &payload, 150)]).await.unwrap();
     let empty = data_of(&mut ctx, stage).await;
 
     // Nothing but an in-order UPLOAD advances a freshly begun stage.
@@ -238,9 +181,7 @@ async fn authentic_milan_transport_and_adversarial_lifecycle() {
         (UPLOAD, vec![1, 0, 0, 0, 7], invalid()),
         (UPLOAD, vec![0; MAX_CHUNK + 5], invalid()),
     ] {
-        let err = send(&mut ctx, Some(&authority), &[make(tag, rest, pair(stage))])
-            .await
-            .unwrap_err();
+        let err = send(&mut ctx, Some(&authority), &[make(tag, rest, pair(stage))]).await.unwrap_err();
         assert_eq!(instruction_error(err), expected, "{tag:?}");
         assert_eq!(data_of(&mut ctx, stage).await, empty);
     }
@@ -248,17 +189,12 @@ async fn authentic_milan_transport_and_adversarial_lifecycle() {
     let mut unsigned = make(UPLOAD, vec![0, 0, 0, 0, 7], pair(stage));
     unsigned.accounts[0].is_signer = false;
     let err = send(&mut ctx, None, &[unsigned]).await.unwrap_err();
-    assert_eq!(
-        instruction_error(err),
-        InstructionError::MissingRequiredSignature
-    );
+    assert_eq!(instruction_error(err), InstructionError::MissingRequiredSignature);
 
     // Any signer may ask, but only the recorded authority owns the stage.
     let mut intruder = make(CLOSE, vec![], pair(stage));
     intruder.accounts[0].pubkey = foreign.pubkey();
-    let err = send(&mut ctx, Some(&foreign), &[intruder])
-        .await
-        .unwrap_err();
+    let err = send(&mut ctx, Some(&foreign), &[intruder]).await.unwrap_err();
     assert_eq!(instruction_error(err), InstructionError::InvalidAccountData);
 
     for ix in chunks(stage, &payload) {
@@ -266,59 +202,27 @@ async fn authentic_milan_transport_and_adversarial_lifecycle() {
     }
     let complete = data_of(&mut ctx, stage).await;
 
-    let err = send(
-        &mut ctx,
-        Some(&authority),
-        &[make(UPLOAD, vec![0, 0, 0, 0, 9], pair(stage))],
-    )
-    .await
-    .unwrap_err();
+    let err = send(&mut ctx, Some(&authority), &[make(UPLOAD, vec![0, 0, 0, 0, 9], pair(stage))]).await.unwrap_err();
     assert_eq!(instruction_error(err), invalid());
 
     // Sealing authenticates the bytes against the digest committed at BEGIN.
     let mut corrupt = complete.clone();
     corrupt[HEADER + 500] ^= 1;
-    ctx.set_account(
-        &stage,
-        &AccountSharedData::from(funded(pid, corrupt.clone())),
-    );
-    let err = send(
-        &mut ctx,
-        Some(&authority),
-        &[make(SEAL, vec![], pair(stage))],
-    )
-    .await
-    .unwrap_err();
+    ctx.set_account(&stage, &AccountSharedData::from(funded(pid, corrupt.clone())));
+    let err = send(&mut ctx, Some(&authority), &[make(SEAL, vec![], pair(stage))]).await.unwrap_err();
     assert_eq!(instruction_error(err), invalid());
 
-    ctx.set_account(
-        &stage,
-        &AccountSharedData::from(funded(pid, complete.clone())),
-    );
-    send(
-        &mut ctx,
-        Some(&authority),
-        &[make(SEAL, vec![], pair(stage))],
-    )
-    .await
-    .unwrap();
+    ctx.set_account(&stage, &AccountSharedData::from(funded(pid, complete.clone())));
+    send(&mut ctx, Some(&authority), &[make(SEAL, vec![], pair(stage))]).await.unwrap();
 
     // A sealed stage is frozen: no further bytes, no second seal.
     for (tag, rest) in [(UPLOAD, vec![0, 0, 0, 0, 9]), (SEAL, vec![])] {
-        let err = send(&mut ctx, Some(&authority), &[make(tag, rest, pair(stage))])
-            .await
-            .unwrap_err();
+        let err = send(&mut ctx, Some(&authority), &[make(tag, rest, pair(stage))]).await.unwrap_err();
         assert_eq!(instruction_error(err), invalid(), "{tag:?}");
     }
 
     // Handler error leaves the stage sealed, not consumed.
-    let err = send(
-        &mut ctx,
-        Some(&authority),
-        &[make(CONSUME, vec![], pair(stage))],
-    )
-    .await
-    .unwrap_err();
+    let err = send(&mut ctx, Some(&authority), &[make(CONSUME, vec![], pair(stage))]).await.unwrap_err();
     assert_eq!(instruction_error(err), invalid());
     assert_eq!(data_of(&mut ctx, stage).await[88], 1);
 
@@ -331,144 +235,71 @@ async fn authentic_milan_transport_and_adversarial_lifecycle() {
             AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
             AccountMeta::new_readonly(deny, false),
         ]);
-        vec![
-            ComputeBudgetInstruction::set_compute_unit_limit(CONSUME_BUDGET),
-            make(CONSUME, vec![], accounts),
-        ]
+        vec![ComputeBudgetInstruction::set_compute_unit_limit(CONSUME_BUDGET), make(CONSUME, vec![], accounts)]
     };
 
     ctx.set_sysvar(&at_slot(150));
-    let err = send(&mut ctx, Some(&authority), &handler(stage))
-        .await
-        .unwrap_err();
+    let err = send(&mut ctx, Some(&authority), &handler(stage)).await.unwrap_err();
     assert_eq!(instruction_error(err), invalid());
     assert!(data_of(&mut ctx, vcek_key).await.iter().all(|b| *b == 0));
 
     ctx.set_sysvar(&at_slot(149));
-    send(&mut ctx, Some(&authority), &handler(stage))
-        .await
-        .unwrap();
+    send(&mut ctx, Some(&authority), &handler(stage)).await.unwrap();
     let saved = VcekAccount::try_from_slice(&data_of(&mut ctx, vcek_key).await).unwrap();
     assert_eq!(saved.public_key_xy.as_slice(), &payload[80..176]);
     assert_eq!(data_of(&mut ctx, stage).await[88], 2);
 
-    let err = send(&mut ctx, Some(&authority), &handler(stage))
-        .await
-        .unwrap_err();
+    let err = send(&mut ctx, Some(&authority), &handler(stage)).await.unwrap_err();
     assert_eq!(instruction_error(err), invalid());
 
     // A sealed upload with a corrupted vendor signature is storage-authentic,
     // but still fails real on-chain cryptographic verification.
-    send(&mut ctx, Some(&authority), &[begin(bad, &tampered, 150)])
-        .await
-        .unwrap();
+    send(&mut ctx, Some(&authority), &[begin(bad, &tampered, 150)]).await.unwrap();
     for ix in chunks(bad, &tampered) {
         send(&mut ctx, Some(&authority), &[ix]).await.unwrap();
     }
-    send(&mut ctx, Some(&authority), &[make(SEAL, vec![], pair(bad))])
-        .await
-        .unwrap();
-    let err = send(&mut ctx, Some(&authority), &handler(bad))
-        .await
-        .unwrap_err();
-    assert_eq!(
-        instruction_error(err),
-        InstructionError::Custom(VerifierError::VerificationFailed as u32)
-    );
+    send(&mut ctx, Some(&authority), &[make(SEAL, vec![], pair(bad))]).await.unwrap();
+    let err = send(&mut ctx, Some(&authority), &handler(bad)).await.unwrap_err();
+    assert_eq!(instruction_error(err), InstructionError::Custom(VerifierError::VerificationFailed as u32));
     let sealed = data_of(&mut ctx, bad).await;
     assert_eq!(sealed[88], 1);
 
     // Owner, address and length are each sufficient on their own to reject.
-    ctx.set_account(
-        &bad,
-        &AccountSharedData::from(funded(Pubkey::new_unique(), sealed.clone())),
-    );
-    let err = send(&mut ctx, Some(&authority), &[make(SEAL, vec![], pair(bad))])
-        .await
-        .unwrap_err();
+    ctx.set_account(&bad, &AccountSharedData::from(funded(Pubkey::new_unique(), sealed.clone())));
+    let err = send(&mut ctx, Some(&authority), &[make(SEAL, vec![], pair(bad))]).await.unwrap_err();
     assert_eq!(instruction_error(err), InstructionError::IllegalOwner);
     ctx.set_account(&bad, &AccountSharedData::from(funded(pid, sealed.clone())));
 
     let squatter = Pubkey::new_unique();
     ctx.set_account(&squatter, &AccountSharedData::from(funded(pid, sealed)));
-    let err = send(
-        &mut ctx,
-        Some(&authority),
-        &[make(SEAL, vec![], pair(squatter))],
-    )
-    .await
-    .unwrap_err();
+    let err = send(&mut ctx, Some(&authority), &[make(SEAL, vec![], pair(squatter))]).await.unwrap_err();
     assert_eq!(instruction_error(err), InstructionError::InvalidSeeds);
 
     let truncated = Pubkey::new_unique();
-    ctx.set_account(
-        &truncated,
-        &AccountSharedData::from(funded(pid, vec![0; HEADER - 1])),
-    );
-    let err = send(
-        &mut ctx,
-        Some(&authority),
-        &[make(CONSUME, vec![], pair(truncated))],
-    )
-    .await
-    .unwrap_err();
+    ctx.set_account(&truncated, &AccountSharedData::from(funded(pid, vec![0; HEADER - 1])));
+    let err = send(&mut ctx, Some(&authority), &[make(CONSUME, vec![], pair(truncated))]).await.unwrap_err();
     assert_eq!(instruction_error(err), InstructionError::InvalidAccountData);
 
     // Oversized/zero allocations and deadlines fail before CPI/allocation.
-    for (length, expiry) in [
-        (0u32, 150u64),
-        ((MAX_PAYLOAD + 1) as u32, 150),
-        (8, 149),
-        (8, 300),
-    ] {
+    for (length, expiry) in [(0u32, 150u64), ((MAX_PAYLOAD + 1) as u32, 150), (8, 149), (8, 300)] {
         let mut rest = [1; 32].to_vec();
         rest.extend(length.to_le_bytes());
         rest.extend(expiry.to_le_bytes());
-        let err = send(
-            &mut ctx,
-            Some(&authority),
-            &[make(BEGIN, rest, pair(stage))],
-        )
-        .await
-        .unwrap_err();
+        let err = send(&mut ctx, Some(&authority), &[make(BEGIN, rest, pair(stage))]).await.unwrap_err();
         assert_eq!(instruction_error(err), invalid(), "{length}/{expiry}");
     }
 
     // Expiry blocks verification but never strands the uploader's rent.
     ctx.set_sysvar(&at_slot(150));
-    send(
-        &mut ctx,
-        Some(&authority),
-        &[make(CLOSE, vec![], pair(bad))],
-    )
-    .await
-    .unwrap();
+    send(&mut ctx, Some(&authority), &[make(CLOSE, vec![], pair(bad))]).await.unwrap();
     assert!(ctx.banks_client.get_account(bad).await.unwrap().is_none());
 
-    let prior = ctx
-        .banks_client
-        .get_balance(authority.pubkey())
-        .await
-        .unwrap();
+    let prior = ctx.banks_client.get_balance(authority.pubkey()).await.unwrap();
     let rent = ctx.banks_client.get_balance(stage).await.unwrap();
-    send(
-        &mut ctx,
-        Some(&authority),
-        &[make(CLOSE, vec![], pair(stage))],
-    )
-    .await
-    .unwrap();
-    assert_eq!(
-        ctx.banks_client
-            .get_balance(authority.pubkey())
-            .await
-            .unwrap(),
-        prior + rent
-    );
+    send(&mut ctx, Some(&authority), &[make(CLOSE, vec![], pair(stage))]).await.unwrap();
+    assert_eq!(ctx.banks_client.get_balance(authority.pubkey()).await.unwrap(), prior + rent);
     assert!(ctx.banks_client.get_account(stage).await.unwrap().is_none());
 
-    let err = send(&mut ctx, Some(&authority), &handler(stage))
-        .await
-        .unwrap_err();
+    let err = send(&mut ctx, Some(&authority), &handler(stage)).await.unwrap_err();
     assert_eq!(instruction_error(err), InstructionError::IllegalOwner);
 }

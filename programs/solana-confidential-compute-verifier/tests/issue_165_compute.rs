@@ -14,9 +14,7 @@
 //! falling back to a native processor.
 use borsh::BorshSerialize;
 use solana_compute_budget_interface::ComputeBudgetInstruction;
-use solana_confidential_compute_crypto::jwt::{
-    compute_n0_and_r2, eat_nonce_tombstone_seed, kid_hash, RSA_EXPONENT,
-};
+use solana_confidential_compute_crypto::jwt::{compute_n0_and_r2, eat_nonce_tombstone_seed, kid_hash, RSA_EXPONENT};
 use solana_confidential_compute_verifier::{payload::*, state::*};
 use solana_program_test::{processor, ProgramTest, ProgramTestContext};
 use solana_sdk::{
@@ -42,19 +40,9 @@ fn fixture() -> ([u8; 256], &'static str) {
     (modulus, jwt)
 }
 fn owned(data: Vec<u8>, owner: Pubkey) -> Account {
-    Account {
-        lamports: 10_000_000,
-        data,
-        owner,
-        executable: false,
-        rent_epoch: 0,
-    }
+    Account { lamports: 10_000_000, data, owner, executable: false, rent_epoch: 0 }
 }
-fn noop(
-    _: &Pubkey,
-    _: &[solana_sdk::account_info::AccountInfo],
-    _: &[u8],
-) -> solana_sdk::entrypoint::ProgramResult {
+fn noop(_: &Pubkey, _: &[solana_sdk::account_info::AccountInfo], _: &[u8]) -> solana_sdk::entrypoint::ProgramResult {
     Ok(())
 }
 async fn send(
@@ -69,22 +57,10 @@ async fn send(
         signers.push(key);
     }
     let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
-    let tx = Transaction::new_signed_with_payer(
-        &instructions,
-        Some(&ctx.payer.pubkey()),
-        &signers,
-        blockhash,
-    );
-    let result = ctx
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .unwrap();
+    let tx = Transaction::new_signed_with_payer(&instructions, Some(&ctx.payer.pubkey()), &signers, blockhash);
+    let result = ctx.banks_client.process_transaction_with_metadata(tx).await.unwrap();
     let metadata = result.metadata.expect("execution metadata required");
-    eprintln!(
-        "result={:?} units={}",
-        result.result, metadata.compute_units_consumed
-    );
+    eprintln!("result={:?} units={}", result.result, metadata.compute_units_consumed);
     (result.result, metadata.compute_units_consumed)
 }
 async fn run() {
@@ -102,16 +78,9 @@ async fn run() {
         0,
         "program-test only supports SBPFv0; never claim v3 execution"
     );
-    assert_eq!(
-        path.file_name().unwrap(),
-        "solana_confidential_compute_verifier.so"
-    );
+    assert_eq!(path.file_name().unwrap(), "solana_confidential_compute_verifier.so");
     use sha2::{Digest, Sha256};
-    eprintln!(
-        "actual SBPFv0 artifact sha256={:x} bytes={}",
-        Sha256::digest(&bytes),
-        bytes.len()
-    );
+    eprintln!("actual SBPFv0 artifact sha256={:x} bytes={}", Sha256::digest(&bytes), bytes.len());
     sbf::add_sbf_program(&mut pt, "solana_confidential_compute_verifier", pid);
     // Only the inert consumer is native; it never touches a sysvar.
     //
@@ -125,10 +94,7 @@ async fn run() {
         consumer,
         processor!(noop).expect("the processor macro always yields a registerer"),
     );
-    pt.add_account(
-        authority.pubkey(),
-        owned(vec![], solana_sdk_ids::system_program::ID),
-    );
+    pt.add_account(authority.pubkey(), owned(vec![], solana_sdk_ids::system_program::ID));
     let (registry, _) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     // Init authenticates the upgrade authority from canonical loader-owned ProgramData.
     let loader = solana_sdk_ids::bpf_loader_upgradeable::id();
@@ -184,17 +150,10 @@ async fn run() {
     let slot_hash = [0x11; 32];
     // Controlled V3 fixture shared with the native JWT processor regression.
     // Hash the actual complete consumer instruction, not an arbitrary digest.
-    let consumer_ix = Instruction {
-        program_id: consumer,
-        accounts: vec![],
-        data: vec![0x99; 11],
-    };
+    let consumer_ix = Instruction { program_id: consumer, accounts: vec![], data: vec![0x99; 11] };
     let action = solana_confidential_compute_core::action::hash_instruction(&consumer_ix);
-    let commitment = solana_confidential_compute_core::types::compute_action_commitment(
-        &slot_hash,
-        &action,
-        &consumer.to_bytes(),
-    );
+    let commitment =
+        solana_confidential_compute_core::types::compute_action_commitment(&slot_hash, &action, &consumer.to_bytes());
     // #205: GCP (source 3) tombstones live in the source-tagged namespace; the legacy
     // PDA is still passed (readonly, never created) so the migration guard can check it.
     let nonce_seed = eat_nonce_tombstone_seed(&commitment);
@@ -211,16 +170,9 @@ async fn run() {
     .unwrap();
     pt.add_account(tenant, owned(borsh::to_vec(&tenant_policy).unwrap(), pid));
     let mut ctx = pt.start_with_context().await;
-    let clock = solana_sdk::clock::Clock {
-        slot: 520,
-        unix_timestamp: 1_700_000_100,
-        ..Default::default()
-    };
+    let clock = solana_sdk::clock::Clock { slot: 520, unix_timestamp: 1_700_000_100, ..Default::default() };
     ctx.set_sysvar(&clock);
-    ctx.set_sysvar(&solana_sdk::slot_hashes::SlotHashes::new(&[(
-        500,
-        Hash::new_from_array(slot_hash),
-    )]));
+    ctx.set_sysvar(&solana_sdk::slot_hashes::SlotHashes::new(&[(500, Hash::new_from_array(slot_hash))]));
     let mut measurements = [[0; 48]; 8];
     measurements[0][..32].fill(0xab);
     let mut data = INIT_POLICY_REGISTRY_DISCRIMINATOR.to_vec();
@@ -250,13 +202,9 @@ async fn run() {
     assert!(result.is_ok(), "init sanity control");
     assert!(cu > 0 && cu < 100_000);
     let mut data = REGISTER_JWKS_KEY_DISCRIMINATOR.to_vec();
-    RegisterJwksKeyArgs {
-        kid: b"meter-registration".to_vec(),
-        modulus,
-        exponent: RSA_EXPONENT,
-    }
-    .serialize(&mut data)
-    .unwrap();
+    RegisterJwksKeyArgs { kid: b"meter-registration".to_vec(), modulus, exponent: RSA_EXPONENT }
+        .serialize(&mut data)
+        .unwrap();
     let register = Instruction {
         program_id: pid,
         accounts: vec![
@@ -321,22 +269,10 @@ async fn run() {
             )
         ))
     );
-    assert!(
-        registered.is_ok(),
-        "registration exceeds compute budget or fails: {registered:?}"
-    );
-    assert!(
-        verified.is_ok(),
-        "verification exceeds compute budget or fails: {verified:?}"
-    );
-    assert!(
-        reg_cu <= 200_000,
-        "registration exceeds default single-instruction budget"
-    );
-    assert!(
-        verify_cu <= 400_000,
-        "JWT exceeds explicit sidecar budget request"
-    );
+    assert!(registered.is_ok(), "registration exceeds compute budget or fails: {registered:?}");
+    assert!(verified.is_ok(), "verification exceeds compute budget or fails: {verified:?}");
+    assert!(reg_cu <= 200_000, "registration exceeds default single-instruction budget");
+    assert!(verify_cu <= 400_000, "JWT exceeds explicit sidecar budget request");
 }
 #[tokio::test]
 async fn issue_165_actual_sbf_compute() {

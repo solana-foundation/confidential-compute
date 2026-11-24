@@ -7,13 +7,7 @@ use solana_confidential_compute_verifier::{
 };
 use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 
-fn account(
-    key: Pubkey,
-    owner: Pubkey,
-    signer: bool,
-    writable: bool,
-    data: Vec<u8>,
-) -> AccountInfo<'static> {
+fn account(key: Pubkey, owner: Pubkey, signer: bool, writable: bool, data: Vec<u8>) -> AccountInfo<'static> {
     AccountInfo::new(
         Box::leak(Box::new(key)),
         signer,
@@ -76,34 +70,19 @@ fn authority_handover_requires_both_signatures_and_moves_governance() {
     let pid = Pubkey::new_unique();
     let old = Pubkey::new_unique();
     let new = Pubkey::new_unique();
-    let a = vec![
-        account(old, pid, true, false, vec![]),
-        registry(pid, old),
-        account(new, pid, true, false, vec![]),
-    ];
+    let a = vec![account(old, pid, true, false, vec![]), registry(pid, old), account(new, pid, true, false, vec![])];
     let mut expected = saved(&a[1]);
     expected.authority = new.to_bytes();
     assert_eq!(Processor::process(&pid, &a, &rotate()), Ok(()));
     assert_eq!(saved(&a[1]), expected); // all policy and trust-root bytes preserved
     assert!(Processor::process(&pid, &a, &update([10, 20, 30, 40], 1)).is_err());
     let next = vec![a[2].clone(), a[1].clone()];
-    assert_eq!(
-        Processor::process(&pid, &next, &update([10, 20, 30, 40], 1)),
-        Ok(())
-    );
-    let root_ix = instruction(
-        ROTATE_ROOT_CERT_DISCRIMINATOR,
-        &RotateRootCertArgs {
-            new_ark_pubkey_xy: [5; 96],
-        },
-    );
+    assert_eq!(Processor::process(&pid, &next, &update([10, 20, 30, 40], 1)), Ok(()));
+    let root_ix = instruction(ROTATE_ROOT_CERT_DISCRIMINATOR, &RotateRootCertArgs { new_ark_pubkey_xy: [5; 96] });
     assert!(Processor::process(&pid, &a, &root_ix).is_err());
     // Issue #172: even the new authority's root rotation is refused, registry unchanged.
     let before = a[1].data.borrow().to_vec();
-    assert_eq!(
-        Processor::process(&pid, &next, &root_ix),
-        Err(VerifierError::InvalidInstruction.into())
-    );
+    assert_eq!(Processor::process(&pid, &next, &root_ix), Err(VerifierError::InvalidInstruction.into()));
     assert_eq!(*a[1].data.borrow(), before.as_slice());
 }
 #[test]
@@ -112,11 +91,8 @@ fn invalid_handover_preserves_every_registry_byte() {
     let old = Pubkey::new_unique();
     let new = Pubkey::new_unique();
     for case in 0..10 {
-        let mut a = vec![
-            account(old, pid, true, false, vec![]),
-            registry(pid, old),
-            account(new, pid, true, false, vec![]),
-        ];
+        let mut a =
+            vec![account(old, pid, true, false, vec![]), registry(pid, old), account(new, pid, true, false, vec![])];
         let mut ix = rotate();
         match case {
             0 => a[0].is_signer = false,

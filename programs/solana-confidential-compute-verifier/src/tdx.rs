@@ -24,9 +24,7 @@
 use solana_program::account_info::AccountInfo;
 use solana_program::program_error::ProgramError;
 use solana_program::pubkey::Pubkey;
-use solana_program::sysvar::instructions::{
-    self, load_current_index_checked, load_instruction_at_checked,
-};
+use solana_program::sysvar::instructions::{self, load_current_index_checked, load_instruction_at_checked};
 
 use crate::error::VerifierError;
 
@@ -37,8 +35,8 @@ use crate::error::VerifierError;
 /// mainnet-beta, devnet and testnet.
 /// @spec SCC-TDX-001
 pub const SECP256R1_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
-    0x06, 0x92, 0x0d, 0xec, 0x2f, 0xea, 0x71, 0xb5, 0xb7, 0x23, 0x81, 0x4d, 0x74, 0x2d, 0xa9, 0x03,
-    0x1c, 0x83, 0xe7, 0x5f, 0xdb, 0x79, 0x5d, 0x56, 0x8e, 0x75, 0x47, 0x80, 0x20, 0x00, 0x00, 0x00,
+    0x06, 0x92, 0x0d, 0xec, 0x2f, 0xea, 0x71, 0xb5, 0xb7, 0x23, 0x81, 0x4d, 0x74, 0x2d, 0xa9, 0x03, 0x1c, 0x83, 0xe7,
+    0x5f, 0xdb, 0x79, 0x5d, 0x56, 0x8e, 0x75, 0x47, 0x80, 0x20, 0x00, 0x00, 0x00,
 ]);
 
 /// Quote header length.
@@ -51,9 +49,8 @@ pub const ISV_SIGNED_LEN: usize = QUOTE_HEADER_LEN + TD10_BODY_LEN;
 pub const QE_REPORT_LEN: usize = 384;
 
 /// Intel's QE vendor id. A quote carrying any other value is not an Intel quote.
-const INTEL_QE_VENDOR_ID: [u8; 16] = [
-    0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0x0a, 0x0d, 0xb3, 0x95, 0x7f, 0x06, 0x07,
-];
+const INTEL_QE_VENDOR_ID: [u8; 16] =
+    [0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0x0a, 0x0d, 0xb3, 0x95, 0x7f, 0x06, 0x07];
 
 /// `ECDSA-256-with-P-256`. The only attestation key type this module accepts.
 const ATTESTATION_KEY_TYPE_ECDSA_P256: u16 = 2;
@@ -134,17 +131,12 @@ impl<'a> TdxQuote<'a> {
         }
 
         let qe_auth_data_len = u16::from_le_bytes(array2(raw, OFF_QE_AUTH_DATA_LEN)?) as usize;
-        let qe_auth_end = OFF_QE_AUTH_DATA
-            .checked_add(qe_auth_data_len)
-            .ok_or(VerifierError::InvalidInstruction)?;
+        let qe_auth_end = OFF_QE_AUTH_DATA.checked_add(qe_auth_data_len).ok_or(VerifierError::InvalidInstruction)?;
         if qe_auth_end > sig_data_end {
             return Err(VerifierError::InvalidInstruction.into());
         }
 
-        Ok(Self {
-            raw,
-            qe_auth_data_len,
-        })
+        Ok(Self { raw, qe_auth_data_len })
     }
 
     /// Bytes covered by the ISV signature: `header || td_report_body`.
@@ -224,10 +216,7 @@ impl<'a> TdxQuote<'a> {
     /// the second a 32-byte suffix is free space an attacker controls.
     /// @spec SCC-TDX-002
     pub fn verify_qe_binding(&self) -> Result<(), ProgramError> {
-        let digest = solana_program::hash::hashv(&[
-            self.attestation_pubkey_xy().as_slice(),
-            self.qe_auth_data(),
-        ]);
+        let digest = solana_program::hash::hashv(&[self.attestation_pubkey_xy().as_slice(), self.qe_auth_data()]);
         let report_data = self.qe_report_data();
         if digest.to_bytes() != report_data[..32] {
             return Err(VerifierError::InvalidSignature.into());
@@ -272,9 +261,7 @@ pub fn expected_report_data(
     challenge_nonce: &[u8; 32],
 ) -> [u8; 64] {
     const _: () = assert!(REPORT_DATA_DOMAIN.len() == 42);
-    let composite =
-        solana_program::hash::hashv(&[workload_signer, slot_hash, gpu_rim_digest, model_digest])
-            .to_bytes();
+    let composite = solana_program::hash::hashv(&[workload_signer, slot_hash, gpu_rim_digest, model_digest]).to_bytes();
 
     let domain_len = 42u32.to_le_bytes();
     let preimage: [&[u8]; 8] = [
@@ -334,9 +321,7 @@ const BODY_XFAM: usize = 128;
 ///
 /// @spec SCC-TDX-001
 pub fn reject_debug_qe(qe_report: &[u8]) -> Result<(), ProgramError> {
-    let flags = qe_report
-        .get(QE_ATTRIBUTES)
-        .ok_or(VerifierError::InvalidInstruction)?;
+    let flags = qe_report.get(QE_ATTRIBUTES).ok_or(VerifierError::InvalidInstruction)?;
     if flags & SGX_ATTRIBUTE_DEBUG != 0 {
         return Err(VerifierError::DisallowedMeasurement.into());
     }
@@ -361,15 +346,9 @@ pub fn reject_debug_qe(qe_report: &[u8]) -> Result<(), ProgramError> {
 ///
 /// @spec SCC-TDX-001
 pub fn qe_identity_digest(qe_report: &[u8]) -> Result<[u8; 32], ProgramError> {
-    let mr_signer = qe_report
-        .get(QE_MR_SIGNER..QE_MR_SIGNER + 32)
-        .ok_or(VerifierError::InvalidInstruction)?;
-    let isv_prod_id = qe_report
-        .get(QE_ISV_PROD_ID..QE_ISV_PROD_ID + 2)
-        .ok_or(VerifierError::InvalidInstruction)?;
-    let isv_svn = qe_report
-        .get(QE_ISV_SVN..QE_ISV_SVN + 2)
-        .ok_or(VerifierError::InvalidInstruction)?;
+    let mr_signer = qe_report.get(QE_MR_SIGNER..QE_MR_SIGNER + 32).ok_or(VerifierError::InvalidInstruction)?;
+    let isv_prod_id = qe_report.get(QE_ISV_PROD_ID..QE_ISV_PROD_ID + 2).ok_or(VerifierError::InvalidInstruction)?;
+    let isv_svn = qe_report.get(QE_ISV_SVN..QE_ISV_SVN + 2).ok_or(VerifierError::InvalidInstruction)?;
     Ok(solana_program::hash::hashv(&[mr_signer, isv_prod_id, isv_svn]).to_bytes())
 }
 
@@ -382,9 +361,7 @@ pub fn qe_identity_digest(qe_report: &[u8]) -> Result<[u8; 32], ProgramError> {
 ///
 /// @spec SCC-TDX-002
 pub fn reject_debug_td(body: &[u8]) -> Result<(), ProgramError> {
-    let attributes = body
-        .get(BODY_TD_ATTRIBUTES)
-        .ok_or(VerifierError::InvalidInstruction)?;
+    let attributes = body.get(BODY_TD_ATTRIBUTES).ok_or(VerifierError::InvalidInstruction)?;
     if attributes & TD_ATTRIBUTE_DEBUG != 0 {
         return Err(VerifierError::DisallowedMeasurement.into());
     }
@@ -423,8 +400,7 @@ pub fn reject_debug_td(body: &[u8]) -> Result<(), ProgramError> {
 /// @spec SCC-TDX-002
 pub fn td_platform_digest(body: &[u8]) -> Result<[u8; 32], ProgramError> {
     let field = |offset: usize, len: usize| {
-        body.get(offset..offset + len)
-            .ok_or(ProgramError::from(VerifierError::InvalidInstruction))
+        body.get(offset..offset + len).ok_or(ProgramError::from(VerifierError::InvalidInstruction))
     };
     Ok(solana_program::hash::hashv(&[
         field(BODY_TEE_TCB_SVN, 16)?,
@@ -453,14 +429,14 @@ pub fn compress_p256(xy: &[u8; 64]) -> [u8; 33] {
 
 /// `floor(n / 2)` for the P-256 group order, big-endian.
 const P256_HALF_ORDER: [u8; 32] = [
-    0x7F, 0xFF, 0xFF, 0xFF, 0x80, 0x00, 0x00, 0x00, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xDE, 0x73, 0x7D, 0x56, 0xD3, 0x8B, 0xCF, 0x42, 0x79, 0xDC, 0xE5, 0x61, 0x7E, 0x31, 0x92, 0xA8,
+    0x7F, 0xFF, 0xFF, 0xFF, 0x80, 0x00, 0x00, 0x00, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xDE, 0x73, 0x7D,
+    0x56, 0xD3, 0x8B, 0xCF, 0x42, 0x79, 0xDC, 0xE5, 0x61, 0x7E, 0x31, 0x92, 0xA8,
 ];
 
 /// The P-256 group order `n`, big-endian.
 const P256_ORDER: [u8; 32] = [
-    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17, 0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x51,
+    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBC, 0xE6, 0xFA,
+    0xAD, 0xA7, 0x17, 0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x51,
 ];
 
 /// Normalize an ECDSA signature to low-S form.
@@ -632,22 +608,15 @@ pub fn extract_secp256r1_verified(
         compressed_pubkey.copy_from_slice(&ix.data[16..49]);
         let mut signature = [0u8; 64];
         signature.copy_from_slice(&ix.data[49..113]);
-        return Ok(VerifiedSecp256r1 {
-            compressed_pubkey,
-            message: ix.data[113..].to_vec(),
-            signature,
-        });
+        return Ok(VerifiedSecp256r1 { compressed_pubkey, message: ix.data[113..].to_vec(), signature });
     }
 
     Err(VerifierError::InvalidSignature.into())
 }
 
 fn slice(buf: &[u8], offset: usize, len: usize) -> Result<&[u8], ProgramError> {
-    let end = offset
-        .checked_add(len)
-        .ok_or(VerifierError::InvalidInstruction)?;
-    buf.get(offset..end)
-        .ok_or_else(|| VerifierError::InvalidInstruction.into())
+    let end = offset.checked_add(len).ok_or(VerifierError::InvalidInstruction)?;
+    buf.get(offset..end).ok_or_else(|| VerifierError::InvalidInstruction.into())
 }
 
 fn array2(buf: &[u8], offset: usize) -> Result<[u8; 2], ProgramError> {
@@ -663,15 +632,11 @@ fn array4(buf: &[u8], offset: usize) -> Result<[u8; 4], ProgramError> {
 // The two helpers below are only reachable from `TdxQuote`, whose constructor
 // has already bounds-checked every offset they are called with.
 fn array_ref48(buf: &[u8], offset: usize) -> &[u8; 48] {
-    buf[offset..offset + 48]
-        .try_into()
-        .expect("offset validated by TdxQuote::parse")
+    buf[offset..offset + 48].try_into().expect("offset validated by TdxQuote::parse")
 }
 
 fn array_ref64(buf: &[u8], offset: usize) -> &[u8; 64] {
-    buf[offset..offset + 64]
-        .try_into()
-        .expect("offset validated by TdxQuote::parse")
+    buf[offset..offset + 64].try_into().expect("offset validated by TdxQuote::parse")
 }
 
 #[cfg(test)]
@@ -683,10 +648,7 @@ mod tests {
     /// because the loop would simply never find a matching instruction.
     #[test]
     fn secp256r1_program_id_matches_the_published_address() {
-        assert_eq!(
-            SECP256R1_PROGRAM_ID.to_string(),
-            "Secp256r1SigVerify1111111111111111111111111"
-        );
+        assert_eq!(SECP256R1_PROGRAM_ID.to_string(), "Secp256r1SigVerify1111111111111111111111111");
     }
 
     #[test]

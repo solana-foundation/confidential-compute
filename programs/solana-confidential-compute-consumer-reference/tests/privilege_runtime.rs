@@ -49,21 +49,15 @@ fn legacy_consumer(_: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Program
     Ok(())
 }
 fn proof(hash: [u8; 32], consumer: Pubkey) -> Instruction {
-    let mut data =
-        Vec::from(solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
+    let mut data = Vec::from(solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
     data.extend_from_slice(&500u64.to_le_bytes());
     data.extend_from_slice(&hash);
     data.extend_from_slice(consumer.as_ref());
     let mut report = vec![0; 1184];
     report[0x50..0x70].copy_from_slice(&[0x33; 32]);
-    report[0x90..0xc0]
-        .copy_from_slice(&solana_confidential_compute_consumer_reference::EXPECTED_MEASUREMENT);
+    report[0x90..0xc0].copy_from_slice(&solana_confidential_compute_consumer_reference::EXPECTED_MEASUREMENT);
     data.extend(report);
-    Instruction {
-        program_id: solana_confidential_compute_cpi::ID,
-        accounts: vec![],
-        data,
-    }
+    Instruction { program_id: solana_confidential_compute_cpi::ID, accounts: vec![], data }
 }
 #[tokio::test]
 async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_rejects_it() {
@@ -76,26 +70,12 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
         solana_confidential_compute_consumer_reference::ID,
         processor!(solana_confidential_compute_consumer_reference::process_instruction),
     );
-    pt.add_program(
-        "legacy_privilege_fixture",
-        legacy,
-        processor!(legacy_consumer),
-    );
-    pt.add_program(
-        "verifier_fixture",
-        solana_confidential_compute_cpi::ID,
-        processor!(noop),
-    );
+    pt.add_program("legacy_privilege_fixture", legacy, processor!(legacy_consumer));
+    pt.add_program("verifier_fixture", solana_confidential_compute_cpi::ID, processor!(noop));
     pt.add_program("elevator_fixture", elevator, processor!(noop));
     pt.add_account(
         state.pubkey(),
-        Account {
-            lamports: 1_000_000,
-            data: vec![0],
-            owner: legacy,
-            executable: false,
-            rent_epoch: 0,
-        },
+        Account { lamports: 1_000_000, data: vec![0], owner: legacy, executable: false, rent_epoch: 0 },
     );
     pt.add_account(
         alternate_payer.pubkey(),
@@ -111,10 +91,7 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
     let keys = vec![solana_sdk::sysvar::instructions::ID, state.pubkey()];
     let action = Instruction {
         program_id: legacy,
-        accounts: keys
-            .iter()
-            .map(|k| AccountMeta::new_readonly(*k, false))
-            .collect(),
+        accounts: keys.iter().map(|k| AccountMeta::new_readonly(*k, false)).collect(),
         data: vec![1, 8, 9],
     };
     let old = legacy_hash(&keys, &action.data[1..]);
@@ -126,20 +103,9 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
         ctx.last_blockhash,
     );
     ctx.banks_client.process_transaction(tx).await.unwrap();
-    assert_eq!(
-        ctx.banks_client
-            .get_account(state.pubkey())
-            .await
-            .unwrap()
-            .unwrap()
-            .data,
-        [0]
-    );
-    let elevate = Instruction {
-        program_id: elevator,
-        accounts: vec![AccountMeta::new(state.pubkey(), false)],
-        data: vec![],
-    };
+    assert_eq!(ctx.banks_client.get_account(state.pubkey()).await.unwrap().unwrap().data, [0]);
+    let elevate =
+        Instruction { program_id: elevator, accounts: vec![AccountMeta::new(state.pubkey(), false)], data: vec![] };
     // Consumer bytes and ordered keys are IDENTICAL, but compiler globally upgrades writable.
     let tx = Transaction::new_signed_with_payer(
         &[elevate.clone(), old_proof, action.clone()],
@@ -148,15 +114,7 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
         ctx.last_blockhash,
     );
     ctx.banks_client.process_transaction(tx).await.unwrap();
-    assert_eq!(
-        ctx.banks_client
-            .get_account(state.pubkey())
-            .await
-            .unwrap()
-            .unwrap()
-            .data,
-        [1]
-    );
+    assert_eq!(ctx.banks_client.get_account(state.pubkey()).await.unwrap().unwrap().data, [1]);
     // Signer elevation also reaches AccountInfo although the consumer meta is unchanged.
     let sign = Instruction {
         program_id: elevator,
@@ -169,16 +127,11 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
         &[&ctx.payer, &state],
         ctx.last_blockhash,
     );
-    assert!(format!(
-        "{:?}",
-        ctx.banks_client.process_transaction(tx).await.unwrap_err()
-    )
-    .contains("7273"));
+    assert!(format!("{:?}", ctx.banks_client.process_transaction(tx).await.unwrap_err()).contains("7273"));
     // The actual reference consumer recomputes V3 from received AccountInfos.
     let mut current = action.clone();
     current.program_id = solana_confidential_compute_consumer_reference::ID;
-    let digest =
-        solana_confidential_compute_cpi::hash_action(&[1], &current.accounts, &current.data[1..]);
+    let digest = solana_confidential_compute_cpi::hash_action(&[1], &current.accounts, &current.data[1..]);
     let tx = Transaction::new_signed_with_payer(
         &[proof(digest, current.program_id), current.clone()],
         Some(&ctx.payer.pubkey()),
@@ -187,11 +140,7 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
     );
     ctx.banks_client.process_transaction(tx).await.unwrap();
     let tx = Transaction::new_signed_with_payer(
-        &[
-            elevate.clone(),
-            proof(digest, current.program_id),
-            current.clone(),
-        ],
+        &[elevate.clone(), proof(digest, current.program_id), current.clone()],
         Some(&ctx.payer.pubkey()),
         &[&ctx.payer],
         ctx.last_blockhash,
@@ -214,14 +163,9 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
         accounts: vec![AccountMeta::new_readonly(state.pubkey(), true)],
         data: vec![],
     };
-    let readonly_digest =
-        solana_confidential_compute_cpi::hash_action(&[1], &current.accounts, &current.data[1..]);
+    let readonly_digest = solana_confidential_compute_cpi::hash_action(&[1], &current.accounts, &current.data[1..]);
     let tx = Transaction::new_signed_with_payer(
-        &[
-            sign.clone(),
-            proof(readonly_digest, current.program_id),
-            current.clone(),
-        ],
+        &[sign.clone(), proof(readonly_digest, current.program_id), current.clone()],
         Some(&ctx.payer.pubkey()),
         &[&ctx.payer, &state],
         ctx.last_blockhash,
@@ -229,14 +173,9 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
     assert!(ctx.banks_client.process_transaction(tx).await.is_err());
     let mut signed_metas = current.accounts.clone();
     signed_metas[1].is_signer = true;
-    let signed_digest =
-        solana_confidential_compute_cpi::hash_action(&[1], &signed_metas, &current.data[1..]);
+    let signed_digest = solana_confidential_compute_cpi::hash_action(&[1], &signed_metas, &current.data[1..]);
     let tx = Transaction::new_signed_with_payer(
-        &[
-            sign,
-            proof(signed_digest, current.program_id),
-            current.clone(),
-        ],
+        &[sign, proof(signed_digest, current.program_id), current.clone()],
         Some(&ctx.payer.pubkey()),
         &[&ctx.payer, &state],
         ctx.last_blockhash,
@@ -244,29 +183,17 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
     ctx.banks_client.process_transaction(tx).await.unwrap();
     // Changing only the fee payer elevates a declared readonly non-signer account.
     let mut payer_action = current.clone();
-    payer_action
-        .accounts
-        .push(AccountMeta::new_readonly(alternate_payer.pubkey(), false));
-    let readonly = solana_confidential_compute_cpi::hash_action(
-        &[1],
-        &payer_action.accounts,
-        &payer_action.data[1..],
-    );
+    payer_action.accounts.push(AccountMeta::new_readonly(alternate_payer.pubkey(), false));
+    let readonly = solana_confidential_compute_cpi::hash_action(&[1], &payer_action.accounts, &payer_action.data[1..]);
     let tx = Transaction::new_signed_with_payer(
-        &[
-            proof(readonly, payer_action.program_id),
-            payer_action.clone(),
-        ],
+        &[proof(readonly, payer_action.program_id), payer_action.clone()],
         Some(&ctx.payer.pubkey()),
         &[&ctx.payer],
         ctx.last_blockhash,
     );
     ctx.banks_client.process_transaction(tx).await.unwrap();
     let tx = Transaction::new_signed_with_payer(
-        &[
-            proof(readonly, payer_action.program_id),
-            payer_action.clone(),
-        ],
+        &[proof(readonly, payer_action.program_id), payer_action.clone()],
         Some(&alternate_payer.pubkey()),
         &[&alternate_payer],
         ctx.last_blockhash,
@@ -275,8 +202,7 @@ async fn baseline_privilege_substitution_changes_downstream_effect_and_v2_reject
     let mut final_metas = payer_action.accounts.clone();
     final_metas[2].is_signer = true;
     final_metas[2].is_writable = true;
-    let final_digest =
-        solana_confidential_compute_cpi::hash_action(&[1], &final_metas, &payer_action.data[1..]);
+    let final_digest = solana_confidential_compute_cpi::hash_action(&[1], &final_metas, &payer_action.data[1..]);
     let tx = Transaction::new_signed_with_payer(
         &[proof(final_digest, payer_action.program_id), payer_action],
         Some(&alternate_payer.pubkey()),

@@ -48,8 +48,7 @@ impl EphemeralKeyManager {
     /// stays in `self.secret`.
     /// @spec SCC-SEC-007 SCC-SIDECAR-001
     fn with_signing_key<T>(&self, op: impl FnOnce(&Keypair) -> T) -> T {
-        let keypair =
-            Keypair::from_seed(self.secret.0.as_ref()).expect("ephemeral seed is 32 bytes");
+        let keypair = Keypair::from_seed(self.secret.0.as_ref()).expect("ephemeral seed is 32 bytes");
         op(&keypair)
     }
 
@@ -66,10 +65,7 @@ impl EphemeralKeyManager {
 
     /// Partially signs a Solana `VersionedTransaction`.
     /// Requires a distinct external fee payer and an authorized workload signer.
-    pub fn sign_transaction(
-        &self,
-        tx: &mut VersionedTransaction,
-    ) -> Result<Signature, SidecarError> {
+    pub fn sign_transaction(&self, tx: &mut VersionedTransaction) -> Result<Signature, SidecarError> {
         let message = &tx.message;
         let static_keys = message.static_account_keys();
         let required_sigs = message.header().num_required_signatures as usize;
@@ -77,15 +73,12 @@ impl EphemeralKeyManager {
         self.require_external_payer(static_keys.first())?;
 
         // Find the index of this ephemeral signer in static accounts
-        let signer_index = static_keys
-            .iter()
-            .position(|k| k == &self.pubkey)
-            .ok_or_else(|| {
-                SidecarError::UnauthorizedSigner(format!(
-                    "Ephemeral public key {} not present in transaction accounts",
-                    self.pubkey
-                ))
-            })?;
+        let signer_index = static_keys.iter().position(|k| k == &self.pubkey).ok_or_else(|| {
+            SidecarError::UnauthorizedSigner(format!(
+                "Ephemeral public key {} not present in transaction accounts",
+                self.pubkey
+            ))
+        })?;
 
         if signer_index >= required_sigs {
             return Err(SidecarError::UnauthorizedSigner(format!(
@@ -107,11 +100,7 @@ impl EphemeralKeyManager {
     }
 
     /// Adds the workload signature to a legacy transaction. The secret stays inside this manager.
-    pub fn partial_sign(
-        &self,
-        tx: &mut Transaction,
-        recent_blockhash: Hash,
-    ) -> Result<(), SidecarError> {
+    pub fn partial_sign(&self, tx: &mut Transaction, recent_blockhash: Hash) -> Result<(), SidecarError> {
         self.require_external_payer(tx.message.account_keys.first())?;
         self.with_signing_key(|keypair| tx.try_partial_sign(&[keypair], recent_blockhash))
             .map_err(|e| SidecarError::KeyError(format!("workload sign failed: {e}")))?;
@@ -184,14 +173,9 @@ mod tests {
         let payer = Pubkey::new_unique();
 
         let ix = system_instruction::transfer(&manager.pubkey(), &recipient, 1_000);
-        let message = VersionedMessage::V0(
-            Message::try_compile(&payer, &[ix], &[], Hash::default()).expect("compile"),
-        );
+        let message = VersionedMessage::V0(Message::try_compile(&payer, &[ix], &[], Hash::default()).expect("compile"));
 
-        let mut tx = VersionedTransaction {
-            signatures: vec![Signature::default()],
-            message,
-        };
+        let mut tx = VersionedTransaction { signatures: vec![Signature::default()], message };
 
         let sig = manager.sign_transaction(&mut tx).expect("sign");
         assert_ne!(sig, Signature::default());
@@ -206,14 +190,10 @@ mod tests {
         let recipient = Pubkey::new_unique();
 
         let ix = system_instruction::transfer(&other_payer, &recipient, 1_000);
-        let message = VersionedMessage::V0(
-            Message::try_compile(&other_payer, &[ix], &[], Hash::default()).expect("compile"),
-        );
+        let message =
+            VersionedMessage::V0(Message::try_compile(&other_payer, &[ix], &[], Hash::default()).expect("compile"));
 
-        let mut tx = VersionedTransaction {
-            signatures: vec![Signature::default()],
-            message,
-        };
+        let mut tx = VersionedTransaction { signatures: vec![Signature::default()], message };
 
         let err = manager.sign_transaction(&mut tx);
         assert!(err.is_err());
@@ -258,9 +238,6 @@ mod tests {
 
     fn from_secret(secret: [u8; 32]) -> EphemeralKeyManager {
         let pubkey = Keypair::new_from_array(secret).pubkey();
-        EphemeralKeyManager {
-            secret: EphemeralSecret(secret),
-            pubkey,
-        }
+        EphemeralKeyManager { secret: EphemeralSecret(secret), pubkey }
     }
 }

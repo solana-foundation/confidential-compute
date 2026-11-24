@@ -19,14 +19,8 @@ fn governed_tenant_setter_matches_program_bytes_and_accounts() {
         ix.accounts,
         vec![
             AccountMeta::new_readonly(authority, true),
-            AccountMeta::new_readonly(
-                Pubkey::find_program_address(&[b"policy_registry"], &pid).0,
-                false
-            ),
-            AccountMeta::new(
-                Pubkey::find_program_address(&[b"gcp_tenant_policy"], &pid).0,
-                false
-            ),
+            AccountMeta::new_readonly(Pubkey::find_program_address(&[b"policy_registry"], &pid).0, false),
+            AccountMeta::new(Pubkey::find_program_address(&[b"gcp_tenant_policy"], &pid).0, false),
             AccountMeta::new(payer, true),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false)
         ]
@@ -34,15 +28,6 @@ fn governed_tenant_setter_matches_program_bytes_and_accounts() {
     for (a, s) in [("", "s"), ("a", ""), ("a\0b", "s")] {
         assert!(build_set_gcp_tenant_policy_ix(&pid, &authority, &payer, a, s).is_err());
     }
-    assert!(
-        build_set_gcp_tenant_policy_ix(&pid, &authority, &payer, &"é".repeat(65), "s").is_err()
-    );
-    assert!(build_set_gcp_tenant_policy_ix(
-        &pid,
-        &authority,
-        &payer,
-        &"a".repeat(128),
-        &"s".repeat(160)
-    )
-    .is_ok());
+    assert!(build_set_gcp_tenant_policy_ix(&pid, &authority, &payer, &"é".repeat(65), "s").is_err());
+    assert!(build_set_gcp_tenant_policy_ix(&pid, &authority, &payer, &"a".repeat(128), &"s".repeat(160)).is_ok());
 }

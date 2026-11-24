@@ -24,17 +24,10 @@ pub fn derive_used_nonce_pda_for_source(
     if ![1, 2].contains(&source) {
         return Err(NonceError::InvalidSource);
     }
-    Ok(Pubkey::find_program_address(
-        &[b"nonce", &[source], signer, nonce],
-        program_id,
-    ))
+    Ok(Pubkey::find_program_address(&[b"nonce", &[source], signer, nonce], program_id))
 }
 /// Canonical pre-upgrade account, required as readonly migration guard.
-pub fn derive_legacy_used_nonce_pda(
-    program_id: &Pubkey,
-    signer: &[u8; 32],
-    nonce: &[u8; 32],
-) -> (Pubkey, u8) {
+pub fn derive_legacy_used_nonce_pda(program_id: &Pubkey, signer: &[u8; 32], nonce: &[u8; 32]) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"nonce", signer, nonce], program_id)
 }
 fn google_binding_hash(binding: &[u8]) -> Result<[u8; 32], NonceError> {
@@ -45,25 +38,13 @@ fn google_binding_hash(binding: &[u8]) -> Result<[u8; 32], NonceError> {
 }
 /// SHA256 exactly once over decoded pubkey||slotHash64 (A) or commitment32 (B).
 /// Never pass JSON/base64 strings or a prehashed ModeA binding.
-pub fn derive_google_used_nonce_pda(
-    program_id: &Pubkey,
-    binding: &[u8],
-) -> Result<(Pubkey, u8), NonceError> {
+pub fn derive_google_used_nonce_pda(program_id: &Pubkey, binding: &[u8]) -> Result<(Pubkey, u8), NonceError> {
     let digest = google_binding_hash(binding)?;
-    Ok(Pubkey::find_program_address(
-        &[b"nonce", &[3], &digest],
-        program_id,
-    ))
+    Ok(Pubkey::find_program_address(&[b"nonce", &[3], &digest], program_id))
 }
-pub fn derive_legacy_google_used_nonce_pda(
-    program_id: &Pubkey,
-    binding: &[u8],
-) -> Result<(Pubkey, u8), NonceError> {
+pub fn derive_legacy_google_used_nonce_pda(program_id: &Pubkey, binding: &[u8]) -> Result<(Pubkey, u8), NonceError> {
     let digest = google_binding_hash(binding)?;
-    Ok(Pubkey::find_program_address(
-        &[b"nonce", &digest],
-        program_id,
-    ))
+    Ok(Pubkey::find_program_address(&[b"nonce", &digest], program_id))
 }
 pub(crate) fn with_legacy_nonce(mut ix: Instruction, legacy: Pubkey) -> Instruction {
     ix.accounts.push(AccountMeta::new_readonly(legacy, false));

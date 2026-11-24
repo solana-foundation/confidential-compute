@@ -55,11 +55,7 @@ struct SnpGuestRequest {
 #[cfg(any(test, target_os = "linux"))]
 fn attestation_report_prefix(resp: &SnpReportResp) -> [u8; SNP_REPORT_SIZE] {
     let mut report = [0u8; SNP_REPORT_SIZE];
-    let offset = if has_psp_report_prefix(&resp.data) {
-        SNP_PSP_REPORT_PREFIX_LEN
-    } else {
-        0
-    };
+    let offset = if has_psp_report_prefix(&resp.data) { SNP_PSP_REPORT_PREFIX_LEN } else { 0 };
     let Some(end) = offset.checked_add(SNP_REPORT_SIZE) else {
         return report;
     };
@@ -74,9 +70,9 @@ fn attestation_report_prefix(resp: &SnpReportResp) -> [u8; SNP_REPORT_SIZE] {
 #[cfg(any(test, target_os = "linux"))]
 fn has_psp_report_prefix(data: &[u8; SNP_GUEST_RESP_DATA_LEN]) -> bool {
     let status_ok = data.get(..4).is_some_and(|status| status == [0, 0, 0, 0]);
-    let size_ok = data.get(4..8).is_some_and(|bytes| {
-        u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) == SNP_REPORT_SIZE as u32
-    });
+    let size_ok = data
+        .get(4..8)
+        .is_some_and(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) == SNP_REPORT_SIZE as u32);
     let prefixed_end = SNP_PSP_REPORT_PREFIX_LEN.checked_add(SNP_REPORT_SIZE);
     status_ok && size_ok && prefixed_end.is_some_and(|end| end <= data.len())
 }
@@ -90,9 +86,7 @@ pub struct SevSnpProvider {
 
 impl SevSnpProvider {
     pub fn new(device_path: Option<&str>) -> Self {
-        Self {
-            device_path: device_path.unwrap_or("/dev/sev-guest").to_string(),
-        }
+        Self { device_path: device_path.unwrap_or("/dev/sev-guest").to_string() }
     }
 }
 
@@ -122,16 +116,9 @@ impl AttestationProvider for SevSnpProvider {
                 use std::fs::OpenOptions;
                 use std::os::unix::io::AsRawFd;
 
-                let file = OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(&self.device_path)
-                    .map_err(|e| {
-                        SidecarError::IoctlError(format!(
-                            "Failed to open SEV guest device {}: {}",
-                            self.device_path, e
-                        ))
-                    })?;
+                let file = OpenOptions::new().read(true).write(true).open(&self.device_path).map_err(|e| {
+                    SidecarError::IoctlError(format!("Failed to open SEV guest device {}: {}", self.device_path, e))
+                })?;
 
                 #[repr(C)]
                 struct SnpReportReq {
@@ -140,15 +127,9 @@ impl AttestationProvider for SevSnpProvider {
                     rsvd: [u8; 28],
                 }
 
-                let req = SnpReportReq {
-                    user_data,
-                    vmpl: 0,
-                    rsvd: [0u8; 28],
-                };
-                let mut resp = SnpReportResp {
-                    data: [0u8; SNP_GUEST_RESP_DATA_LEN],
-                    reserved: [0u8; SNP_GUEST_RESP_TAIL_LEN],
-                };
+                let req = SnpReportReq { user_data, vmpl: 0, rsvd: [0u8; 28] };
+                let mut resp =
+                    SnpReportResp { data: [0u8; SNP_GUEST_RESP_DATA_LEN], reserved: [0u8; SNP_GUEST_RESP_TAIL_LEN] };
 
                 let mut guest_req = SnpGuestRequest {
                     msg_version: 1,
@@ -160,11 +141,8 @@ impl AttestationProvider for SevSnpProvider {
 
                 const SNP_GET_REPORT_MAGIC: u8 = b'S';
                 const SNP_GET_REPORT_NR: u8 = 0x00;
-                let ioctl_num = nix_like_iowr(
-                    SNP_GET_REPORT_MAGIC,
-                    SNP_GET_REPORT_NR,
-                    std::mem::size_of::<SnpGuestRequest>(),
-                );
+                let ioctl_num =
+                    nix_like_iowr(SNP_GET_REPORT_MAGIC, SNP_GET_REPORT_NR, std::mem::size_of::<SnpGuestRequest>());
 
                 // SAFETY: `req`, `resp`, and `guest_req` live on this stack frame
                 // for the syscall. The kernel writes 4,000 bytes at `resp_data`,
@@ -181,27 +159,18 @@ impl AttestationProvider for SevSnpProvider {
                 let mut version_bytes = [0u8; 4];
                 version_bytes.copy_from_slice(&report_bytes[..4]);
                 if u32::from_le_bytes(version_bytes) == 0 {
-                    return Err(SidecarError::IoctlError(
-                        "SEV-SNP report header version is zero".to_string(),
-                    ));
+                    return Err(SidecarError::IoctlError("SEV-SNP report header version is zero".to_string()));
                 }
                 if report_bytes[0x50..0x90] != user_data {
                     return Err(SidecarError::IoctlError(
                         "SEV-SNP report did not echo the requested user_data".to_string(),
                     ));
                 }
-                let view =
-                    solana_confidential_compute_core::SnpReportView::try_from_slice(&report_bytes)
-                        .map_err(|e| {
-                            SidecarError::IoctlError(format!("Malformed SNP report: {e}"))
-                        })?;
-                view.validate_security_invariants().map_err(|e| {
-                    SidecarError::IoctlError(format!("SNP report failed security invariants: {e}"))
-                })?;
-                Ok(AttestationReport::SevSnp {
-                    report: report_bytes,
-                    vcek_cert: None,
-                })
+                let view = solana_confidential_compute_core::SnpReportView::try_from_slice(&report_bytes)
+                    .map_err(|e| SidecarError::IoctlError(format!("Malformed SNP report: {e}")))?;
+                view.validate_security_invariants()
+                    .map_err(|e| SidecarError::IoctlError(format!("SNP report failed security invariants: {e}")))?;
+                Ok(AttestationReport::SevSnp { report: report_bytes, vcek_cert: None })
             }
 
             #[cfg(not(target_os = "linux"))]
@@ -222,10 +191,7 @@ fn nix_like_iowr(magic: u8, nr: u8, size: usize) -> libc::c_ulong {
     const IOC_READ: libc::c_ulong = 2;
     const IOC_WRITE: libc::c_ulong = 1;
     let dir = IOC_READ | IOC_WRITE;
-    (dir << 30)
-        | ((size as libc::c_ulong & 0x3fff) << 16)
-        | ((magic as libc::c_ulong) << 8)
-        | (nr as libc::c_ulong)
+    (dir << 30) | ((size as libc::c_ulong & 0x3fff) << 16) | ((magic as libc::c_ulong) << 8) | (nr as libc::c_ulong)
 }
 
 #[cfg(test)]
@@ -235,19 +201,14 @@ mod tests {
     #[test]
     fn snp_guest_request_is_32_bytes_and_report_starts_at_zero() {
         assert_eq!(std::mem::size_of::<SnpGuestRequest>(), 32);
-        assert_eq!(
-            std::mem::size_of::<SnpReportResp>(),
-            SNP_GUEST_RESP_DATA_LEN + SNP_GUEST_RESP_TAIL_LEN
-        );
+        assert_eq!(std::mem::size_of::<SnpReportResp>(), SNP_GUEST_RESP_DATA_LEN + SNP_GUEST_RESP_TAIL_LEN);
         assert_eq!(std::mem::size_of::<SnpReportResp>(), 4_032);
         let size = std::mem::size_of::<SnpGuestRequest>() as u64;
         let ioctl = (3u64 << 30) | ((size & 0x3fff) << 16) | ((b'S' as u64) << 8);
         assert_eq!(ioctl, 0xC020_5300);
 
-        let mut resp = SnpReportResp {
-            data: [0u8; SNP_GUEST_RESP_DATA_LEN],
-            reserved: [0xA5; SNP_GUEST_RESP_TAIL_LEN],
-        };
+        let mut resp =
+            SnpReportResp { data: [0u8; SNP_GUEST_RESP_DATA_LEN], reserved: [0xA5; SNP_GUEST_RESP_TAIL_LEN] };
         resp.data[..4].copy_from_slice(&2u32.to_le_bytes());
         resp.data[SNP_REPORT_SIZE] = 0xFF;
         let base = std::ptr::from_ref(&resp) as usize;
@@ -260,10 +221,7 @@ mod tests {
 
     #[test]
     fn psp_prefix_report_starts_at_offset_32() {
-        let mut resp = SnpReportResp {
-            data: [0u8; SNP_GUEST_RESP_DATA_LEN],
-            reserved: [0u8; SNP_GUEST_RESP_TAIL_LEN],
-        };
+        let mut resp = SnpReportResp { data: [0u8; SNP_GUEST_RESP_DATA_LEN], reserved: [0u8; SNP_GUEST_RESP_TAIL_LEN] };
         resp.data[4..8].copy_from_slice(&(SNP_REPORT_SIZE as u32).to_le_bytes());
         resp.data[20] = 0xA5;
         let start = SNP_PSP_REPORT_PREFIX_LEN;
@@ -281,10 +239,8 @@ mod tests {
     #[test]
     fn raw_report_versions_are_not_treated_as_psp_prefix() {
         for version in 1u8..=5 {
-            let mut resp = SnpReportResp {
-                data: [0u8; SNP_GUEST_RESP_DATA_LEN],
-                reserved: [0u8; SNP_GUEST_RESP_TAIL_LEN],
-            };
+            let mut resp =
+                SnpReportResp { data: [0u8; SNP_GUEST_RESP_DATA_LEN], reserved: [0u8; SNP_GUEST_RESP_TAIL_LEN] };
             resp.data[0] = version;
             resp.data[4..8].copy_from_slice(&1184u32.to_le_bytes());
             resp.data[10] = 0x42;
@@ -296,10 +252,7 @@ mod tests {
 
     #[test]
     fn zero_status_with_other_size_stays_a_raw_buffer() {
-        let mut resp = SnpReportResp {
-            data: [0u8; SNP_GUEST_RESP_DATA_LEN],
-            reserved: [0u8; SNP_GUEST_RESP_TAIL_LEN],
-        };
+        let mut resp = SnpReportResp { data: [0u8; SNP_GUEST_RESP_DATA_LEN], reserved: [0u8; SNP_GUEST_RESP_TAIL_LEN] };
         resp.data[4..8].copy_from_slice(&32u32.to_le_bytes());
         resp.data[10] = 0x42;
         let report = attestation_report_prefix(&resp);

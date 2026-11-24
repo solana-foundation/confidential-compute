@@ -14,8 +14,8 @@
 
 use solana_confidential_compute_consumer_reference::{
     hash_action, AttestedSignerAccount, CpiError, EXPECTED_MEASUREMENT, IX_EXECUTE_ATOMIC_ACTION,
-    IX_EXECUTE_SESSION_ACTION, MODE_A_CU_CEILING, MODE_B_CU_CEILING, VERIFIER_PROGRAM_ID,
-    VERIFY_ATOMIC_DISCRIMINATOR, VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
+    IX_EXECUTE_SESSION_ACTION, MODE_A_CU_CEILING, MODE_B_CU_CEILING, VERIFIER_PROGRAM_ID, VERIFY_ATOMIC_DISCRIMINATOR,
+    VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
 };
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
 use solana_program_test::{processor, ProgramTest};
@@ -45,19 +45,11 @@ fn noop_confidential_compute(
 
 fn program_test() -> ProgramTest {
     let mut pt = sbf::consumer_program_test(solana_confidential_compute_consumer_reference::id());
-    pt.add_program(
-        "solana_confidential_compute_verifier",
-        VERIFIER_PROGRAM_ID,
-        processor!(noop_confidential_compute),
-    );
+    pt.add_program("solana_confidential_compute_verifier", VERIFIER_PROGRAM_ID, processor!(noop_confidential_compute));
     pt
 }
 
-fn pack_attested_signer(
-    signer_pubkey: [u8; 32],
-    measurement: [u8; 48],
-    expires_slot: u64,
-) -> Vec<u8> {
+fn pack_attested_signer(signer_pubkey: [u8; 32], measurement: [u8; 48], expires_slot: u64) -> Vec<u8> {
     AttestedSignerAccount {
         discriminator: AttestedSignerAccount::DISCRIMINATOR,
         signer_pubkey,
@@ -106,16 +98,8 @@ fn session_ix(attested_signer: Pubkey, workload_signer: Pubkey) -> Instruction {
     }
 }
 
-fn atomic_confidential_compute_ix(
-    require_nonce: bool,
-    action_hash: [u8; 32],
-    measurement: [u8; 48],
-) -> Instruction {
-    let disc = if require_nonce {
-        VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-    } else {
-        VERIFY_ATOMIC_DISCRIMINATOR
-    };
+fn atomic_confidential_compute_ix(require_nonce: bool, action_hash: [u8; 32], measurement: [u8; 48]) -> Instruction {
+    let disc = if require_nonce { VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR } else { VERIFY_ATOMIC_DISCRIMINATOR };
     let mut data = Vec::with_capacity(80 + SNP_REPORT_SIZE);
     data.extend_from_slice(&disc);
     data.extend_from_slice(&500u64.to_le_bytes());
@@ -125,11 +109,7 @@ fn atomic_confidential_compute_ix(
     report[0x50..0x70].copy_from_slice(&WORKLOAD_SIGNER);
     report[0x90..0xC0].copy_from_slice(&measurement);
     data.extend_from_slice(&report);
-    Instruction {
-        program_id: VERIFIER_PROGRAM_ID,
-        accounts: vec![],
-        data,
-    }
+    Instruction { program_id: VERIFIER_PROGRAM_ID, accounts: vec![], data }
 }
 
 fn atomic_consumer_ix(payload: &[u8]) -> Instruction {
@@ -148,9 +128,7 @@ fn attested_action_hash(payload: &[u8]) -> [u8; 32] {
     let sysvar = instructions::ID;
     hash_action(
         &[IX_EXECUTE_ATOMIC_ACTION],
-        &[solana_program::instruction::AccountMeta::new_readonly(
-            sysvar, false,
-        )],
+        &[solana_program::instruction::AccountMeta::new_readonly(sysvar, false)],
         payload,
     )
 }
@@ -178,16 +156,8 @@ async fn mode_a_happy_path_and_cu_budget() {
         &[&context.payer, &workload_signer],
         context.last_blockhash,
     );
-    let res = context
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .expect("mode A transaction processed");
-    assert!(
-        res.result.is_ok(),
-        "mode A happy path failed: {:?}",
-        res.result
-    );
+    let res = context.banks_client.process_transaction_with_metadata(tx).await.expect("mode A transaction processed");
+    assert!(res.result.is_ok(), "mode A happy path failed: {:?}", res.result);
     let cus = res.metadata.unwrap().compute_units_consumed;
     eprintln!("Mode A consumer CUs: {cus} (ceiling {MODE_A_CU_CEILING})");
     assert!(
@@ -200,13 +170,8 @@ async fn mode_a_happy_path_and_cu_budget() {
 async fn mode_a_rejects_expired_slot() {
     let workload_signer = Keypair::new();
     let mut pt = program_test();
-    let attested = add_attested_signer(
-        &mut pt,
-        workload_signer.pubkey().to_bytes(),
-        EXPECTED_MEASUREMENT,
-        0,
-        VERIFIER_PROGRAM_ID,
-    );
+    let attested =
+        add_attested_signer(&mut pt, workload_signer.pubkey().to_bytes(), EXPECTED_MEASUREMENT, 0, VERIFIER_PROGRAM_ID);
     let context = pt.start_with_context().await;
     let tx = Transaction::new_signed_with_payer(
         &[session_ix(attested, workload_signer.pubkey())],
@@ -214,11 +179,7 @@ async fn mode_a_rejects_expired_slot() {
         &[&context.payer, &workload_signer],
         context.last_blockhash,
     );
-    let res = context
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .expect("expired transaction processed");
+    let res = context.banks_client.process_transaction_with_metadata(tx).await.expect("expired transaction processed");
     assert_eq!(
         res.result.unwrap_err(),
         TransactionError::InstructionError(0, custom_err(CpiError::AttestationExpired))
@@ -315,10 +276,7 @@ async fn mode_a_rejects_signer_mismatch() {
         .process_transaction_with_metadata(tx)
         .await
         .expect("signer-mismatch transaction processed");
-    assert_eq!(
-        res.result.unwrap_err(),
-        TransactionError::InstructionError(0, custom_err(CpiError::SignerMismatch))
-    );
+    assert_eq!(res.result.unwrap_err(), TransactionError::InstructionError(0, custom_err(CpiError::SignerMismatch)));
 }
 
 #[tokio::test]
@@ -339,15 +297,9 @@ async fn mode_a_rejects_wrong_owner() {
         &[&context.payer, &workload_signer],
         context.last_blockhash,
     );
-    let res = context
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .expect("wrong-owner transaction processed");
-    assert_eq!(
-        res.result.unwrap_err(),
-        TransactionError::InstructionError(0, InstructionError::IncorrectProgramId)
-    );
+    let res =
+        context.banks_client.process_transaction_with_metadata(tx).await.expect("wrong-owner transaction processed");
+    assert_eq!(res.result.unwrap_err(), TransactionError::InstructionError(0, InstructionError::IncorrectProgramId));
 }
 
 #[tokio::test]
@@ -355,24 +307,13 @@ async fn mode_b_happy_path_and_cu_budget() {
     let context = program_test().start_with_context().await;
     let action_hash = attested_action_hash(&ACTION_PAYLOAD);
     let tx = Transaction::new_signed_with_payer(
-        &[
-            atomic_confidential_compute_ix(true, action_hash, EXPECTED_MEASUREMENT),
-            atomic_consumer_ix(&ACTION_PAYLOAD),
-        ],
+        &[atomic_confidential_compute_ix(true, action_hash, EXPECTED_MEASUREMENT), atomic_consumer_ix(&ACTION_PAYLOAD)],
         Some(&context.payer.pubkey()),
         &[&context.payer],
         context.last_blockhash,
     );
-    let res = context
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .expect("mode B transaction processed");
-    assert!(
-        res.result.is_ok(),
-        "mode B happy path failed: {:?}",
-        res.result
-    );
+    let res = context.banks_client.process_transaction_with_metadata(tx).await.expect("mode B transaction processed");
+    assert!(res.result.is_ok(), "mode B happy path failed: {:?}", res.result);
     let cus = res.metadata.unwrap().compute_units_consumed;
     eprintln!("Mode B consumer CUs: {cus} (ceiling {MODE_B_CU_CEILING})");
     assert!(
@@ -394,17 +335,11 @@ async fn mode_b_rejects_missing_nonce() {
         &[&context.payer],
         context.last_blockhash,
     );
-    let res = context
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .expect("missing-nonce transaction processed");
+    let res =
+        context.banks_client.process_transaction_with_metadata(tx).await.expect("missing-nonce transaction processed");
     assert_eq!(
         res.result.unwrap_err(),
-        TransactionError::InstructionError(
-            1,
-            custom_err(CpiError::UnsupportedAttestationInstruction)
-        )
+        TransactionError::InstructionError(1, custom_err(CpiError::UnsupportedAttestationInstruction))
     );
 }
 
@@ -413,19 +348,13 @@ async fn mode_b_rejects_tampered_action_hash() {
     let context = program_test().start_with_context().await;
     let action_hash = attested_action_hash(&ACTION_PAYLOAD);
     let tx = Transaction::new_signed_with_payer(
-        &[
-            atomic_confidential_compute_ix(true, action_hash, EXPECTED_MEASUREMENT),
-            atomic_consumer_ix(&[0xAB, 0xCE]),
-        ],
+        &[atomic_confidential_compute_ix(true, action_hash, EXPECTED_MEASUREMENT), atomic_consumer_ix(&[0xAB, 0xCE])],
         Some(&context.payer.pubkey()),
         &[&context.payer],
         context.last_blockhash,
     );
-    let res = context
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .expect("tampered-hash transaction processed");
+    let res =
+        context.banks_client.process_transaction_with_metadata(tx).await.expect("tampered-hash transaction processed");
     assert_eq!(
         res.result.unwrap_err(),
         TransactionError::InstructionError(1, custom_err(CpiError::ActionHashMismatch))
@@ -437,21 +366,11 @@ async fn mode_a_rejects_other_platform_with_same_measurement() {
     let workload = Keypair::new();
     let mut pt = program_test();
     let key = Pubkey::new_unique();
-    let mut data = pack_attested_signer(
-        workload.pubkey().to_bytes(),
-        EXPECTED_MEASUREMENT,
-        HAPPY_EXPIRES_SLOT,
-    );
+    let mut data = pack_attested_signer(workload.pubkey().to_bytes(), EXPECTED_MEASUREMENT, HAPPY_EXPIRES_SLOT);
     data[40] = 3; // GCP; this consumer explicitly pins AMD.
     pt.add_account(
         key,
-        Account {
-            lamports: 1_000_000,
-            data,
-            owner: VERIFIER_PROGRAM_ID,
-            executable: false,
-            rent_epoch: 0,
-        },
+        Account { lamports: 1_000_000, data, owner: VERIFIER_PROGRAM_ID, executable: false, rent_epoch: 0 },
     );
     let context = pt.start_with_context().await;
     let tx = Transaction::new_signed_with_payer(
@@ -460,18 +379,8 @@ async fn mode_a_rejects_other_platform_with_same_measurement() {
         &[&context.payer, &workload],
         context.last_blockhash,
     );
-    let result = context
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .unwrap();
-    assert_eq!(
-        result.result,
-        Err(TransactionError::InstructionError(
-            0,
-            custom_err(CpiError::PlatformMismatch)
-        ))
-    );
+    let result = context.banks_client.process_transaction_with_metadata(tx).await.unwrap();
+    assert_eq!(result.result, Err(TransactionError::InstructionError(0, custom_err(CpiError::PlatformMismatch))));
 }
 
 #[tokio::test]
@@ -479,44 +388,20 @@ async fn mode_a_rejects_v2_unix_expiry_from_trusted_clock() {
     let workload = Keypair::new();
     let mut pt = program_test();
     let key = Pubkey::new_unique();
-    let mut data = pack_attested_signer(
-        workload.pubkey().to_bytes(),
-        EXPECTED_MEASUREMENT,
-        HAPPY_EXPIRES_SLOT,
-    );
+    let mut data = pack_attested_signer(workload.pubkey().to_bytes(), EXPECTED_MEASUREMENT, HAPPY_EXPIRES_SLOT);
     data[146..154].copy_from_slice(&1000i64.to_le_bytes());
     pt.add_account(
         key,
-        Account {
-            lamports: 1_000_000,
-            data,
-            owner: VERIFIER_PROGRAM_ID,
-            executable: false,
-            rent_epoch: 0,
-        },
+        Account { lamports: 1_000_000, data, owner: VERIFIER_PROGRAM_ID, executable: false, rent_epoch: 0 },
     );
     let context = pt.start_with_context().await;
-    context.set_sysvar(&solana_sdk::clock::Clock {
-        slot: 1,
-        unix_timestamp: 1000,
-        ..Default::default()
-    });
+    context.set_sysvar(&solana_sdk::clock::Clock { slot: 1, unix_timestamp: 1000, ..Default::default() });
     let tx = Transaction::new_signed_with_payer(
         &[session_ix(key, workload.pubkey())],
         Some(&context.payer.pubkey()),
         &[&context.payer, &workload],
         context.last_blockhash,
     );
-    let result = context
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .unwrap();
-    assert_eq!(
-        result.result,
-        Err(TransactionError::InstructionError(
-            0,
-            custom_err(CpiError::AttestationExpired)
-        ))
-    );
+    let result = context.banks_client.process_transaction_with_metadata(tx).await.unwrap();
+    assert_eq!(result.result, Err(TransactionError::InstructionError(0, custom_err(CpiError::AttestationExpired))));
 }

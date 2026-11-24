@@ -17,8 +17,8 @@ use solana_confidential_compute_sidecar::attestation::intel_tdx::IntelTdxProvide
 use solana_confidential_compute_sidecar::keys::EphemeralKeyManager;
 use solana_confidential_compute_sidecar::onchain::{MockCluster, OnchainAttestor};
 use solana_confidential_compute_sidecar::tdx_enrolment::{
-    decode_challenge_account, dry_run_quote_parts, split_tdx_quote, validate_challenge_readback,
-    ChallengeRecord, CHALLENGE_ACCOUNT_LEN, CHALLENGE_DISCRIMINATOR, ISV_SIGNED_LEN, QE_REPORT_LEN,
+    decode_challenge_account, dry_run_quote_parts, split_tdx_quote, validate_challenge_readback, ChallengeRecord,
+    CHALLENGE_ACCOUNT_LEN, CHALLENGE_DISCRIMINATOR, ISV_SIGNED_LEN, QE_REPORT_LEN,
 };
 use solana_confidential_compute_sidecar::{AttestationReport, SidecarError};
 
@@ -29,13 +29,7 @@ const TARGET_SLOT_HASH: [u8; 32] = [0x5a; 32];
 const TDX_SOURCE: u8 = 5;
 
 fn cluster() -> MockCluster {
-    MockCluster::new(
-        CURRENT_SLOT,
-        vec![
-            (TARGET_SLOT, TARGET_SLOT_HASH),
-            (TARGET_SLOT - 1, [0x11; 32]),
-        ],
-    )
+    MockCluster::new(CURRENT_SLOT, vec![(TARGET_SLOT, TARGET_SLOT_HASH), (TARGET_SLOT - 1, [0x11; 32])])
 }
 
 fn attestor(cluster: MockCluster, program_id: Pubkey) -> OnchainAttestor {
@@ -56,10 +50,7 @@ async fn dry_run_builds_a_challenge_packet_then_a_v1_enrolment_packet() {
     let workload = EphemeralKeyManager::new();
     let provider = IntelTdxProvider::new(None, None, true);
 
-    let outcome = onchain
-        .enrol_intel_tdx(&workload, &provider)
-        .await
-        .expect("dry-run enrolment");
+    let outcome = onchain.enrol_intel_tdx(&workload, &provider).await.expect("dry-run enrolment");
 
     // The challenge is a separate, earlier transaction. Merging it would ask
     // the enclave to read an account the same transaction is still writing.
@@ -107,10 +98,7 @@ async fn dry_run_builds_a_challenge_packet_then_a_v1_enrolment_packet() {
     // 2,056 rather than the 2,052 this measured before the SDK began filling
     // in the loaded accounts budget. That field is four bytes and leaving it
     // unset is what a cluster rejects, so the four bytes are the point.
-    assert_eq!(
-        outcome.enrolment_tx_len, 2056,
-        "enrolment transaction size changed",
-    );
+    assert_eq!(outcome.enrolment_tx_len, 2056, "enrolment transaction size changed",);
 
     // Both required keys signed, and the payer is not the workload key.
     assert_eq!(tx.signatures.len(), 2);
@@ -118,11 +106,7 @@ async fn dry_run_builds_a_challenge_packet_then_a_v1_enrolment_packet() {
 
     assert_eq!(
         outcome.attested_signer,
-        solana_confidential_compute_sdk::tdx::derive_attested_signer_pda(
-            &program_id,
-            &workload.pubkey()
-        )
-        .0,
+        solana_confidential_compute_sdk::tdx::derive_attested_signer_pda(&program_id, &workload.pubkey()).0,
         "the outcome names the AttestedSigner PDA a Solscan link would point at",
     );
 }
@@ -151,16 +135,8 @@ async fn the_challenge_nonce_is_fresh_and_is_not_the_slot_hash() {
         "two enrolments against the same slot must not collide on one PDA",
     );
     assert_ne!(
-        solana_confidential_compute_sdk::tdx::derive_tdx_challenge_pda(
-            &program_id,
-            &first.challenge_nonce
-        )
-        .0,
-        solana_confidential_compute_sdk::tdx::derive_tdx_challenge_pda(
-            &program_id,
-            &second.challenge_nonce
-        )
-        .0,
+        solana_confidential_compute_sdk::tdx::derive_tdx_challenge_pda(&program_id, &first.challenge_nonce).0,
+        solana_confidential_compute_sdk::tdx::derive_tdx_challenge_pda(&program_id, &second.challenge_nonce).0,
     );
 }
 
@@ -186,23 +162,12 @@ async fn submit_attestation_no_longer_refuses_intel_tdx() {
 /// opened -- the RPC URL below is deliberately unreachable.
 #[tokio::test]
 async fn live_mode_refuses_a_simulated_provider_before_broadcasting() {
-    let onchain = OnchainAttestor::new(
-        "http://127.0.0.1:1",
-        Some(Pubkey::new_unique()),
-        Some(Keypair::new()),
-        false,
-    );
+    let onchain = OnchainAttestor::new("http://127.0.0.1:1", Some(Pubkey::new_unique()), Some(Keypair::new()), false);
     let error = onchain
-        .enrol_intel_tdx(
-            &EphemeralKeyManager::new(),
-            &IntelTdxProvider::new(None, None, true),
-        )
+        .enrol_intel_tdx(&EphemeralKeyManager::new(), &IntelTdxProvider::new(None, None, true))
         .await
         .expect_err("a simulated provider must not enrol live");
-    assert!(
-        matches!(error, SidecarError::InvalidConfig(_)),
-        "expected a fail-closed config refusal, got {error:?}",
-    );
+    assert!(matches!(error, SidecarError::InvalidConfig(_)), "expected a fail-closed config refusal, got {error:?}",);
 }
 
 /// A dry run with no payer still refuses rather than building half a pipeline.
@@ -210,10 +175,7 @@ async fn live_mode_refuses_a_simulated_provider_before_broadcasting() {
 async fn enrolment_without_a_payer_is_refused() {
     let onchain = OnchainAttestor::mock(cluster(), Some(Pubkey::new_unique()), None);
     let error = onchain
-        .enrol_intel_tdx(
-            &EphemeralKeyManager::new(),
-            &IntelTdxProvider::new(None, None, true),
-        )
+        .enrol_intel_tdx(&EphemeralKeyManager::new(), &IntelTdxProvider::new(None, None, true))
         .await
         .expect_err("no payer");
     assert!(matches!(error, SidecarError::OnchainError(_)));
@@ -273,44 +235,20 @@ fn challenge_account_decodes_at_the_programs_offsets() {
 fn a_challenge_that_does_not_read_back_as_issued_is_refused() {
     let issued = issued_record();
     let ok = |record: &ChallengeRecord| {
-        validate_challenge_readback(
-            record,
-            TDX_SOURCE,
-            &issued.nonce,
-            issued.challenge_slot,
-            &issued.slot_hash,
-        )
+        validate_challenge_readback(record, TDX_SOURCE, &issued.nonce, issued.challenge_slot, &issued.slot_hash)
     };
     ok(&issued).expect("the record as issued is accepted");
 
     let cases = [
-        ChallengeRecord {
-            nonce: [0xcd; 32],
-            ..issued
-        },
-        ChallengeRecord {
-            challenge_slot: issued.challenge_slot + 1,
-            ..issued
-        },
-        ChallengeRecord {
-            slot_hash: [0x77; 32],
-            ..issued
-        },
-        ChallengeRecord {
-            source: 4,
-            ..issued
-        },
+        ChallengeRecord { nonce: [0xcd; 32], ..issued },
+        ChallengeRecord { challenge_slot: issued.challenge_slot + 1, ..issued },
+        ChallengeRecord { slot_hash: [0x77; 32], ..issued },
+        ChallengeRecord { source: 4, ..issued },
         // Tombstoned by a quote that was already accepted against it.
-        ChallengeRecord {
-            expires_slot: 0,
-            ..issued
-        },
+        ChallengeRecord { expires_slot: 0, ..issued },
     ];
     for (index, case) in cases.iter().enumerate() {
-        assert!(
-            ok(case).is_err(),
-            "case {index} should have been refused before a quote was requested",
-        );
+        assert!(ok(case).is_err(), "case {index} should have been refused before a quote was requested",);
     }
 }
 
@@ -318,14 +256,13 @@ fn a_challenge_that_does_not_read_back_as_issued_is_refused() {
 // Quote splitting
 // ---------------------------------------------------------------------------
 
-const INTEL_QE_VENDOR_ID: [u8; 16] = [
-    0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0x0a, 0x0d, 0xb3, 0x95, 0x7f, 0x06, 0x07,
-];
+const INTEL_QE_VENDOR_ID: [u8; 16] =
+    [0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0x0a, 0x0d, 0xb3, 0x95, 0x7f, 0x06, 0x07];
 /// `SubjectPublicKeyInfo` for `id-ecPublicKey` over `prime256v1`, through the
 /// `0x04` uncompressed-point tag.
 const P256_SPKI_PREFIX: [u8; 27] = [
-    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x08, 0x2A,
-    0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04,
+    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE,
+    0x3D, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04,
 ];
 
 struct QuoteFixture {
@@ -380,15 +317,7 @@ fn quote_fixture(cert_data_type: u16) -> QuoteFixture {
     raw[cert_start + 2..cert_start + 6].copy_from_slice(&(pem.len() as u32).to_le_bytes());
     raw[cert_start + 6..].copy_from_slice(pem.as_bytes());
 
-    QuoteFixture {
-        raw,
-        attestation_pubkey_xy,
-        qe_report,
-        qe_report_signature,
-        qe_auth_data,
-        isv_signature,
-        pck_xy,
-    }
+    QuoteFixture { raw, attestation_pubkey_xy, qe_report, qe_report_signature, qe_auth_data, isv_signature, pck_xy }
 }
 
 #[test]
@@ -466,8 +395,5 @@ fn dry_run_parts_are_correctly_shaped_and_carry_the_report_data() {
 
 /// `tokio::test` is not available to the plain `#[test]` above.
 fn futures_block_on<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .expect("runtime")
-        .block_on(future)
+    tokio::runtime::Builder::new_current_thread().build().expect("runtime").block_on(future)
 }

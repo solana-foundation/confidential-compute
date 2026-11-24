@@ -40,10 +40,7 @@
 use solana_confidential_compute_sdk::staged::*;
 use solana_confidential_compute_verifier::{
     processor::{transport::HEADER, Processor},
-    state::{
-        AttestedSignerAccount, BackendPolicy, PolicyRegistry, UsedNonceAccount,
-        POLICY_REGISTRY_DISCRIMINATOR,
-    },
+    state::{AttestedSignerAccount, BackendPolicy, PolicyRegistry, UsedNonceAccount, POLICY_REGISTRY_DISCRIMINATOR},
 };
 use solana_program::{
     account_info::AccountInfo,
@@ -59,11 +56,7 @@ impl SyscallStubs for Stub {
     fn sol_get_clock_sysvar(&self, p: *mut u8) -> u64 {
         let c = current_clock();
         unsafe {
-            std::ptr::copy_nonoverlapping(
-                (&c as *const Clock).cast::<u8>(),
-                p,
-                std::mem::size_of::<Clock>(),
-            );
+            std::ptr::copy_nonoverlapping((&c as *const Clock).cast::<u8>(), p, std::mem::size_of::<Clock>());
         }
         0
     }
@@ -75,11 +68,7 @@ impl Drop for Restore {
     }
 }
 fn current_clock() -> Clock {
-    Clock {
-        slot: SLOT.load(Ordering::SeqCst),
-        unix_timestamp: UNIX.load(Ordering::SeqCst),
-        ..Clock::default()
-    }
+    Clock { slot: SLOT.load(Ordering::SeqCst), unix_timestamp: UNIX.load(Ordering::SeqCst), ..Clock::default() }
 }
 fn account(key: Pubkey, owner: Pubkey, signer: bool, data: Vec<u8>) -> AccountInfo<'static> {
     AccountInfo::new(
@@ -99,11 +88,7 @@ fn run(
 ) -> solana_program::entrypoint::ProgramResult {
     Processor::process(pid, accounts, &ix.data)
 }
-fn stage_plan(
-    plan: &StagePlan,
-    payer: &AccountInfo<'static>,
-    payload_len: usize,
-) -> AccountInfo<'static> {
+fn stage_plan(plan: &StagePlan, payer: &AccountInfo<'static>, payload_len: usize) -> AccountInfo<'static> {
     let pid = plan.begin.program_id;
     let stage = account(plan.address, pid, false, vec![0; HEADER + payload_len]);
     let pair = [payer.clone(), stage.clone()];
@@ -116,19 +101,12 @@ fn stage_plan(
 fn set_time(clock: &AccountInfo, slot: u64, unix: i64) {
     SLOT.store(slot, Ordering::SeqCst);
     UNIX.store(unix, Ordering::SeqCst);
-    clock
-        .try_borrow_mut_data()
-        .unwrap()
-        .copy_from_slice(&bincode::serialize(&current_clock()).unwrap());
+    clock.try_borrow_mut_data().unwrap().copy_from_slice(&bincode::serialize(&current_clock()).unwrap());
 }
 /// The slot hash signed inside the authentic document (CBOR `nonce` bstr).
 fn signed_nonce(doc: &[u8]) -> [u8; 32] {
     let key = b"\x65nonce\x58\x20";
-    let at = doc
-        .windows(key.len())
-        .position(|w| w == key)
-        .expect("fixture carries a 32-byte nonce")
-        + key.len();
+    let at = doc.windows(key.len()).position(|w| w == key).expect("fixture carries a 32-byte nonce") + key.len();
     doc[at..at + 32].try_into().unwrap()
 }
 #[test]
@@ -152,20 +130,12 @@ fn real_nitro_staged_mode_a_mints_v2_and_preserves_cpi_boundaries() {
     let workload_key = Pubkey::new_from_array([0x55; 32]);
     let nonce = signed_nonce(doc);
     let pcr: [u8; 48] = [
-        0x2a, 0x86, 0xe6, 0x10, 0x29, 0x83, 0x2f, 0xc6, 0x4b, 0x04, 0x7e, 0x72, 0x7b, 0x2f, 0x22,
-        0x65, 0xeb, 0x07, 0x21, 0x5d, 0x07, 0x3c, 0xd4, 0x58, 0xbf, 0x6d, 0xeb, 0xf5, 0xe5, 0x57,
-        0xa4, 0x3a, 0x14, 0x69, 0x16, 0x54, 0x60, 0x30, 0xcf, 0x5d, 0xd8, 0x39, 0x81, 0x75, 0xf8,
-        0x44, 0x1e, 0x66,
+        0x2a, 0x86, 0xe6, 0x10, 0x29, 0x83, 0x2f, 0xc6, 0x4b, 0x04, 0x7e, 0x72, 0x7b, 0x2f, 0x22, 0x65, 0xeb, 0x07,
+        0x21, 0x5d, 0x07, 0x3c, 0xd4, 0x58, 0xbf, 0x6d, 0xeb, 0xf5, 0xe5, 0x57, 0xa4, 0x3a, 0x14, 0x69, 0x16, 0x54,
+        0x60, 0x30, 0xcf, 0x5d, 0xd8, 0x39, 0x81, 0x75, 0xf8, 0x44, 0x1e, 0x66,
     ];
-    let payer = account(
-        Pubkey::new_unique(),
-        solana_sdk_ids::system_program::ID,
-        true,
-        vec![],
-    );
-    let plan =
-        build_staged_nitro_registration(pid, *payer.key, workload_key, 400, doc, nonce, 520, 650)
-            .unwrap();
+    let payer = account(Pubkey::new_unique(), solana_sdk_ids::system_program::ID, true, vec![]);
+    let plan = build_staged_nitro_registration(pid, *payer.key, workload_key, 400, doc, nonce, 520, 650).unwrap();
     let stage = stage_plan(&plan, &payer, 53 + doc.len());
     let pair = [payer.clone(), stage.clone()];
     run(&pid, &plan.seal, &pair).unwrap();
@@ -177,40 +147,20 @@ fn real_nitro_staged_mode_a_mints_v2_and_preserves_cpi_boundaries() {
     registry[528] = bump;
     let registry = account(registry_key, pid, false, registry);
     let (signer_key, _) = Pubkey::find_program_address(
-        &[
-            solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-            workload_key.as_ref(),
-        ],
+        &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload_key.as_ref()],
         &pid,
     );
     let record = account(signer_key, pid, false, vec![0; AttestedSignerAccount::SIZE]);
-    let (nonce_key, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], workload_key.as_ref(), &nonce], &pid);
+    let (nonce_key, _) = Pubkey::find_program_address(&[b"nonce", &[2], workload_key.as_ref(), &nonce], &pid);
     let tombstone = account(nonce_key, pid, false, vec![0; UsedNonceAccount::SIZE]);
     let mut slots = 1u64.to_le_bytes().to_vec();
     slots.extend(400u64.to_le_bytes());
     slots.extend(nonce);
     let slots = account(sysvar::slot_hashes::ID, sysvar::ID, false, slots);
-    let clock = account(
-        sysvar::clock::ID,
-        sysvar::ID,
-        false,
-        bincode::serialize(&current_clock()).unwrap(),
-    );
-    let system = account(
-        solana_sdk_ids::system_program::ID,
-        solana_sdk_ids::system_program::ID,
-        false,
-        vec![],
-    );
-    let workload = account(
-        workload_key,
-        solana_sdk_ids::system_program::ID,
-        true,
-        vec![],
-    );
-    let (backend_key, backend_bump) =
-        Pubkey::find_program_address(&[BackendPolicy::SEED, &[2]], &pid);
+    let clock = account(sysvar::clock::ID, sysvar::ID, false, bincode::serialize(&current_clock()).unwrap());
+    let system = account(solana_sdk_ids::system_program::ID, solana_sdk_ids::system_program::ID, false, vec![]);
+    let workload = account(workload_key, solana_sdk_ids::system_program::ID, true, vec![]);
+    let (backend_key, backend_bump) = Pubkey::find_program_address(&[BackendPolicy::SEED, &[2]], &pid);
     let mut backend_bytes = vec![0; BackendPolicy::SIZE];
     backend_bytes[..8].copy_from_slice(&BackendPolicy::DISCRIMINATOR);
     backend_bytes[8] = 2;
@@ -218,14 +168,8 @@ fn real_nitro_staged_mode_a_mints_v2_and_preserves_cpi_boundaries() {
     backend_bytes[13..61].copy_from_slice(&pcr);
     backend_bytes[397] = backend_bump;
     let backend = account(backend_key, pid, false, backend_bytes);
-    let (legacy_key, _) =
-        Pubkey::find_program_address(&[b"nonce", workload_key.as_ref(), &nonce], &pid);
-    let legacy = account(
-        legacy_key,
-        solana_sdk_ids::system_program::ID,
-        false,
-        vec![],
-    );
+    let (legacy_key, _) = Pubkey::find_program_address(&[b"nonce", workload_key.as_ref(), &nonce], &pid);
+    let legacy = account(legacy_key, solana_sdk_ids::system_program::ID, false, vec![]);
     let all = [
         payer.clone(),
         stage.clone(),
@@ -241,11 +185,7 @@ fn real_nitro_staged_mode_a_mints_v2_and_preserves_cpi_boundaries() {
         legacy,
     ];
     // Explicit B rejection happens before any handler nonce/signer writes.
-    let mut b_payload = plan
-        .uploads
-        .iter()
-        .flat_map(|i| i.data[12..].iter().copied())
-        .collect::<Vec<_>>();
+    let mut b_payload = plan.uploads.iter().flat_map(|i| i.data[12..].iter().copied()).collect::<Vec<_>>();
     b_payload[8] = 1;
     let mut b_source = solana_sdk::instruction::Instruction {
         program_id: pid,
@@ -258,10 +198,7 @@ fn real_nitro_staged_mode_a_mints_v2_and_preserves_cpi_boundaries() {
     ));
     // Construct raw storage operations to exercise the program's independent gate.
     let digest = solana_sdk::hash::hash(&b_payload);
-    let (bad_key, _) = Pubkey::find_program_address(
-        &[b"attestation_stage", payer.key.as_ref(), digest.as_ref()],
-        &pid,
-    );
+    let (bad_key, _) = Pubkey::find_program_address(&[b"attestation_stage", payer.key.as_ref(), digest.as_ref()], &pid);
     let bad = account(bad_key, pid, false, vec![0; HEADER + b_payload.len()]);
     let mut args = digest.to_bytes().to_vec();
     args.extend((b_payload.len() as u32).to_le_bytes());
@@ -292,12 +229,7 @@ fn real_nitro_staged_mode_a_mints_v2_and_preserves_cpi_boundaries() {
     unsigned[9].is_signer = false;
     assert!(run(&pid, &plan.consume, &unsigned).is_err());
     let mut wrong = all.clone();
-    wrong[9] = account(
-        Pubkey::new_unique(),
-        solana_sdk_ids::system_program::ID,
-        true,
-        vec![],
-    );
+    wrong[9] = account(Pubkey::new_unique(), solana_sdk_ids::system_program::ID, true, vec![]);
     assert!(run(&pid, &plan.consume, &wrong).is_err());
     assert_eq!(stage.try_borrow_data().unwrap()[88], 1);
     assert!(tombstone.try_borrow_data().unwrap().iter().all(|b| *b == 0));
@@ -316,45 +248,20 @@ fn real_nitro_staged_mode_a_mints_v2_and_preserves_cpi_boundaries() {
     assert_eq!(stage.try_borrow_data().unwrap()[88], 2);
     assert_eq!(record.data_len(), 154);
     use solana_confidential_compute_cpi::{assert_attestation_signer, AttestationPlatform};
-    assert!(
-        assert_attestation_signer(&record, &workload, &pcr, AttestationPlatform::AwsNitro).is_ok()
-    );
-    assert!(
-        assert_attestation_signer(&record, &workload, &pcr, AttestationPlatform::AmdSevSnp)
-            .is_err()
-    );
-    assert!(
-        assert_attestation_signer(&record, &unsigned[9], &pcr, AttestationPlatform::AwsNitro)
-            .is_err()
-    );
-    assert!(
-        assert_attestation_signer(&record, &wrong[9], &pcr, AttestationPlatform::AwsNitro).is_err()
-    );
-    let expiry = i64::from_le_bytes(
-        record.try_borrow_data().unwrap()[146..154]
-            .try_into()
-            .unwrap(),
-    );
+    assert!(assert_attestation_signer(&record, &workload, &pcr, AttestationPlatform::AwsNitro).is_ok());
+    assert!(assert_attestation_signer(&record, &workload, &pcr, AttestationPlatform::AmdSevSnp).is_err());
+    assert!(assert_attestation_signer(&record, &unsigned[9], &pcr, AttestationPlatform::AwsNitro).is_err());
+    assert!(assert_attestation_signer(&record, &wrong[9], &pcr, AttestationPlatform::AwsNitro).is_err());
+    let expiry = i64::from_le_bytes(record.try_borrow_data().unwrap()[146..154].try_into().unwrap());
     set_time(&clock, 520, expiry);
-    assert!(
-        assert_attestation_signer(&record, &workload, &pcr, AttestationPlatform::AwsNitro).is_err()
-    );
+    assert!(assert_attestation_signer(&record, &workload, &pcr, AttestationPlatform::AwsNitro).is_err());
     set_time(&clock, 520, -1);
-    assert!(
-        assert_attestation_signer(&record, &workload, &pcr, AttestationPlatform::AwsNitro).is_err()
-    );
+    assert!(assert_attestation_signer(&record, &workload, &pcr, AttestationPlatform::AwsNitro).is_err());
     set_time(&clock, 520, 1790375264);
     assert!(run(&pid, &plan.consume, &all).is_err());
     // A new uploader and fresh stage cannot replay the already-used attestation.
-    let second = account(
-        Pubkey::new_unique(),
-        solana_sdk_ids::system_program::ID,
-        true,
-        vec![],
-    );
-    let again =
-        build_staged_nitro_registration(pid, *second.key, workload_key, 400, doc, nonce, 520, 650)
-            .unwrap();
+    let second = account(Pubkey::new_unique(), solana_sdk_ids::system_program::ID, true, vec![]);
+    let again = build_staged_nitro_registration(pid, *second.key, workload_key, 400, doc, nonce, 520, 650).unwrap();
     let second_stage = stage_plan(&again, &second, 53 + doc.len());
     run(&pid, &again.seal, &[second.clone(), second_stage.clone()]).unwrap();
     let mut replay = all.clone();

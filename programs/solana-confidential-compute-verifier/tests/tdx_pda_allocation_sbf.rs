@@ -61,12 +61,12 @@ use {
         payload::TDX_ATTESTATION_SOURCE,
         processor::Processor,
         state::{
-            AttestedSignerAccount, BackendPolicy, ChallengeAccount, TdxSessionAccount,
-            UsedNonceAccount, ATTESTED_SIGNER_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR,
+            AttestedSignerAccount, BackendPolicy, ChallengeAccount, TdxSessionAccount, UsedNonceAccount,
+            ATTESTED_SIGNER_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR,
         },
         tdx::{
-            expected_report_data, qe_identity_digest, td_platform_digest, TdxQuote,
-            QE_REPORT_DATA_OFFSET, QUOTE_HEADER_LEN,
+            expected_report_data, qe_identity_digest, td_platform_digest, TdxQuote, QE_REPORT_DATA_OFFSET,
+            QUOTE_HEADER_LEN,
         },
     },
     solana_program::hash::hashv,
@@ -198,12 +198,8 @@ async fn assert_allocated(
     label: &str,
 ) -> Vec<u8> {
     let rent: Rent = ctx.banks_client.get_sysvar().await.unwrap();
-    let account = ctx
-        .banks_client
-        .get_account(key)
-        .await
-        .unwrap()
-        .unwrap_or_else(|| panic!("{label} was never allocated"));
+    let account =
+        ctx.banks_client.get_account(key).await.unwrap().unwrap_or_else(|| panic!("{label} was never allocated"));
     assert_eq!(&account.owner, program_id, "{label} has the wrong owner");
     assert_eq!(account.data.len(), space, "{label} has the wrong length");
     assert!(
@@ -227,18 +223,10 @@ async fn assert_allocated(
 /// parses it: a `u64` count followed by 40-byte `(slot, hash)` entries,
 /// newest first.
 async fn newest_slot_hash_slot(ctx: &mut ProgramTestContext) -> u64 {
-    let data = ctx
-        .banks_client
-        .get_account(slot_hashes::ID)
-        .await
-        .unwrap()
-        .expect("the SlotHashes sysvar always exists")
-        .data;
+    let data =
+        ctx.banks_client.get_account(slot_hashes::ID).await.unwrap().expect("the SlotHashes sysvar always exists").data;
     let count = u64::from_le_bytes(data[0..8].try_into().unwrap());
-    assert!(
-        count > 0,
-        "SlotHashes is empty, so no challenge can be issued"
-    );
+    assert!(count > 0, "SlotHashes is empty, so no challenge can be issued");
     u64::from_le_bytes(data[8..16].try_into().unwrap())
 }
 
@@ -286,15 +274,13 @@ async fn tdx_enrolment_allocates_every_pda_from_empty_accounts_under_sbf() {
     // TEE_TCB_SVN, MRSEAM, TD_ATTRIBUTES, XFAM, MRTD, MRCONFIGID and
     // RTMR0..2, and REPORTDATA -- the only field this test rewrites -- is not
     // among them.
-    let platform_digest = td_platform_digest(&quote.isv_signed_region()[QUOTE_HEADER_LEN..])
-        .expect("the fixture body parses");
+    let platform_digest =
+        td_platform_digest(&quote.isv_signed_region()[QUOTE_HEADER_LEN..]).expect("the fixture body parses");
 
     // ---- runtime --------------------------------------------------------
     let mut pt = sbf::verifier_program_test(program_id);
-    let (policy_key, policy_bump) = Pubkey::find_program_address(
-        &[BackendPolicy::SEED, &[TDX_ATTESTATION_SOURCE]],
-        &program_id,
-    );
+    let (policy_key, policy_bump) =
+        Pubkey::find_program_address(&[BackendPolicy::SEED, &[TDX_ATTESTATION_SOURCE]], &program_id);
     assert_eq!(
         policy_key,
         sdk::derive_tdx_backend_policy_pda(&program_id),
@@ -320,31 +306,17 @@ async fn tdx_enrolment_allocates_every_pda_from_empty_accounts_under_sbf() {
     let (challenge_pda, _) = sdk::derive_tdx_challenge_pda(&program_id, &CHALLENGE_NONCE);
     assert_absent(&mut ctx, challenge_pda, "the challenge PDA").await;
 
-    let issue_ix = sdk::build_issue_tdx_challenge_ix_for_program(
-        &program_id,
-        &ctx.payer.pubkey(),
-        &CHALLENGE_NONCE,
-        nonce_slot,
-    );
-    let tx = Transaction::new_signed_with_payer(
-        &[issue_ix],
-        Some(&ctx.payer.pubkey()),
-        &[&ctx.payer],
-        ctx.last_blockhash,
-    );
+    let issue_ix =
+        sdk::build_issue_tdx_challenge_ix_for_program(&program_id, &ctx.payer.pubkey(), &CHALLENGE_NONCE, nonce_slot);
+    let tx =
+        Transaction::new_signed_with_payer(&[issue_ix], Some(&ctx.payer.pubkey()), &[&ctx.payer], ctx.last_blockhash);
     ctx.banks_client
         .process_transaction(tx)
         .await
         .expect("issue_tdx_challenge must allocate its PDA from an empty account");
 
-    let challenge_data = assert_allocated(
-        &mut ctx,
-        challenge_pda,
-        &program_id,
-        ChallengeAccount::SIZE,
-        "the challenge PDA",
-    )
-    .await;
+    let challenge_data =
+        assert_allocated(&mut ctx, challenge_pda, &program_id, ChallengeAccount::SIZE, "the challenge PDA").await;
     let challenge = ChallengeAccount::try_from_slice(&challenge_data).expect("challenge decodes");
     assert_eq!(challenge.discriminator, ChallengeAccount::DISCRIMINATOR);
     assert_eq!(challenge.source, TDX_ATTESTATION_SOURCE);
@@ -361,13 +333,8 @@ async fn tdx_enrolment_allocates_every_pda_from_empty_accounts_under_sbf() {
     // account the first transaction wrote, and only then can a quote be bound
     // to it.
     let mut isv_signed = quote.isv_signed_region().to_vec();
-    let report_data = expected_report_data(
-        &workload.pubkey().to_bytes(),
-        &challenge.slot_hash,
-        &GPU_RIM,
-        &MODEL,
-        &CHALLENGE_NONCE,
-    );
+    let report_data =
+        expected_report_data(&workload.pubkey().to_bytes(), &challenge.slot_hash, &GPU_RIM, &MODEL, &CHALLENGE_NONCE);
     isv_signed[TD_REPORT_DATA..TD_REPORT_DATA + 64].copy_from_slice(&report_data);
     let isv_signature = sign(&attestation, &isv_signed);
 
@@ -413,78 +380,39 @@ async fn tdx_enrolment_allocates_every_pda_from_empty_accounts_under_sbf() {
             .with_loaded_accounts_data_size_limit(LOADED_ACCOUNTS_DATA_SIZE_LIMIT),
     )
     .expect("the enrolment fits one v1 transaction");
-    let tx = VersionedTransaction::try_new(unsigned.message, &[&ctx.payer, &workload])
-        .expect("payer and workload signer");
-    ctx.banks_client
-        .process_transaction(tx)
-        .await
-        .expect("the enrolment must allocate its PDAs from empty accounts");
+    let tx =
+        VersionedTransaction::try_new(unsigned.message, &[&ctx.payer, &workload]).expect("payer and workload signer");
+    ctx.banks_client.process_transaction(tx).await.expect("the enrolment must allocate its PDAs from empty accounts");
 
     // ---- every PDA the enrolment touches --------------------------------
-    let session_data = assert_allocated(
-        &mut ctx,
-        session_pda,
-        &program_id,
-        TdxSessionAccount::SIZE,
-        "the session PDA",
-    )
-    .await;
+    let session_data =
+        assert_allocated(&mut ctx, session_pda, &program_id, TdxSessionAccount::SIZE, "the session PDA").await;
     let session = TdxSessionAccount::try_from_slice(&session_data).unwrap();
     assert_eq!(session.discriminator, TdxSessionAccount::DISCRIMINATOR);
-    assert_eq!(
-        session.attestation_pubkey,
-        sdk::compress_p256(&attestation_xy)
-    );
+    assert_eq!(session.attestation_pubkey, sdk::compress_p256(&attestation_xy));
     assert_eq!(session.gpu_rim_digest, GPU_RIM);
     assert_eq!(session.model_digest, MODEL);
 
-    let nonce_data = assert_allocated(
-        &mut ctx,
-        nonce_pda,
-        &program_id,
-        UsedNonceAccount::SIZE,
-        "the used-nonce PDA",
-    )
-    .await;
-    assert_eq!(
-        nonce_data[..8],
-        USED_NONCE_DISCRIMINATOR,
-        "the used-nonce PDA was allocated but not initialized",
-    );
+    let nonce_data =
+        assert_allocated(&mut ctx, nonce_pda, &program_id, UsedNonceAccount::SIZE, "the used-nonce PDA").await;
+    assert_eq!(nonce_data[..8], USED_NONCE_DISCRIMINATOR, "the used-nonce PDA was allocated but not initialized",);
 
-    let signer_data = assert_allocated(
-        &mut ctx,
-        signer_pda,
-        &program_id,
-        AttestedSignerAccount::SIZE,
-        "the attested-signer PDA",
-    )
-    .await;
+    let signer_data =
+        assert_allocated(&mut ctx, signer_pda, &program_id, AttestedSignerAccount::SIZE, "the attested-signer PDA")
+            .await;
     let record = AttestedSignerAccount::try_from_slice(&signer_data).unwrap();
     assert_eq!(record.discriminator, ATTESTED_SIGNER_DISCRIMINATOR);
     assert_eq!(record.record.signer_pubkey, workload.pubkey().to_bytes());
-    assert_eq!(
-        record.record.enclave_type,
-        solana_confidential_compute_core::types::EnclaveType::IntelTdx,
-    );
+    assert_eq!(record.record.enclave_type, solana_confidential_compute_core::types::EnclaveType::IntelTdx,);
 
     // The challenge is retired in place rather than reallocated, so it stays
     // the same size and stays rent exempt.
     let retired = ChallengeAccount::try_from_slice(
-        &assert_allocated(
-            &mut ctx,
-            challenge_pda,
-            &program_id,
-            ChallengeAccount::SIZE,
-            "the retired challenge PDA",
-        )
-        .await,
+        &assert_allocated(&mut ctx, challenge_pda, &program_id, ChallengeAccount::SIZE, "the retired challenge PDA")
+            .await,
     )
     .unwrap();
-    assert!(
-        retired.is_consumed(),
-        "an accepted quote must tombstone the challenge it answered",
-    );
+    assert!(retired.is_consumed(), "an accepted quote must tombstone the challenge it answered",);
 }
 
 // ---------------------------------------------------------------------------
@@ -541,12 +469,8 @@ async fn native_linkage_cannot_allocate_but_a_preallocated_pda_hides_it() {
             &CHALLENGE_NONCE,
             nonce_slot,
         );
-        let tx = Transaction::new_signed_with_payer(
-            &[ix],
-            Some(&ctx.payer.pubkey()),
-            &[&ctx.payer],
-            ctx.last_blockhash,
-        );
+        let tx =
+            Transaction::new_signed_with_payer(&[ix], Some(&ctx.payer.pubkey()), &[&ctx.payer], ctx.last_blockhash);
         let outcome = ctx.banks_client.process_transaction(tx).await;
 
         if preallocated {
@@ -554,13 +478,7 @@ async fn native_linkage_cannot_allocate_but_a_preallocated_pda_hides_it() {
                 "a pre-allocated PDA takes the early-return arm, so the native build succeeds \
                  without ever allocating anything -- this is exactly what the existing tests do",
             );
-            let data = ctx
-                .banks_client
-                .get_account(challenge_pda)
-                .await
-                .unwrap()
-                .unwrap()
-                .data;
+            let data = ctx.banks_client.get_account(challenge_pda).await.unwrap().unwrap().data;
             let challenge = ChallengeAccount::try_from_slice(&data).unwrap();
             assert_eq!(challenge.nonce, CHALLENGE_NONCE);
         } else {
@@ -573,11 +491,7 @@ async fn native_linkage_cannot_allocate_but_a_preallocated_pda_hides_it() {
                 "the failure must be the mapped Rent::get() error, not something earlier",
             );
             assert!(
-                ctx.banks_client
-                    .get_account(challenge_pda)
-                    .await
-                    .unwrap()
-                    .is_none(),
+                ctx.banks_client.get_account(challenge_pda).await.unwrap().is_none(),
                 "nothing may be allocated when Rent::get() fails",
             );
         }

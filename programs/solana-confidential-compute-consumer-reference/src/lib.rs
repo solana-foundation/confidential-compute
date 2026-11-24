@@ -6,8 +6,7 @@
 use solana_confidential_compute_cpi::anchor::assert_attestation_atomic_ctx;
 use solana_confidential_compute_cpi::{AtomicAttestationExpectation, AttestationPlatform};
 use solana_program::{
-    account_info::AccountInfo, entrypoint::ProgramResult, program_error::ProgramError,
-    pubkey::Pubkey,
+    account_info::AccountInfo, entrypoint::ProgramResult, program_error::ProgramError, pubkey::Pubkey,
 };
 use thiserror::Error;
 
@@ -40,13 +39,13 @@ pub const IX_EXECUTE_NVIDIA_SESSION_ACTION: u8 = 2;
 
 /// Default synthetic Hopper H100 Golden Reference Integrity Manifest (RIM) measurement.
 pub const DEFAULT_H100_GOLDEN_RIM: [u8; 32] = [
-    0x4e, 0x56, 0x49, 0x44, 0x49, 0x41, 0x5f, 0x48, 0x31, 0x30, 0x30, 0x5f, 0x43, 0x43, 0x5f, 0x52,
-    0x49, 0x4d, 0x5f, 0x56, 0x42, 0x49, 0x4f, 0x53, 0x5f, 0x44, 0x52, 0x49, 0x56, 0x45, 0x52, 0x31,
+    0x4e, 0x56, 0x49, 0x44, 0x49, 0x41, 0x5f, 0x48, 0x31, 0x30, 0x30, 0x5f, 0x43, 0x43, 0x5f, 0x52, 0x49, 0x4d, 0x5f,
+    0x56, 0x42, 0x49, 0x4f, 0x53, 0x5f, 0x44, 0x52, 0x49, 0x56, 0x45, 0x52, 0x31,
 ];
 
 pub use solana_confidential_compute_cpi::{
-    hash_action, hash_action_account_infos, AttestedSignerAccount, CpiError,
-    ID as VERIFIER_PROGRAM_ID, VERIFY_ATOMIC_DISCRIMINATOR, VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
+    hash_action, hash_action_account_infos, AttestedSignerAccount, CpiError, ID as VERIFIER_PROGRAM_ID,
+    VERIFY_ATOMIC_DISCRIMINATOR, VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
 };
 
 /// Stack cap for Mode B account binding. A legacy transaction holds at most 64 keys.
@@ -68,16 +67,10 @@ impl From<ConsumerError> for ProgramError {
 #[cfg(all(target_os = "solana", not(feature = "no-entrypoint")))]
 solana_program::entrypoint!(process_instruction);
 
-pub fn process_instruction(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
+pub fn process_instruction(program_id: &Pubkey, accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
     match instruction_data.first().copied() {
         Some(IX_EXECUTE_SESSION_ACTION) => execute_session_action(accounts),
-        Some(IX_EXECUTE_ATOMIC_ACTION) => {
-            execute_atomic_action(program_id, accounts, instruction_data)
-        }
+        Some(IX_EXECUTE_ATOMIC_ACTION) => execute_atomic_action(program_id, accounts, instruction_data),
         Some(IX_EXECUTE_NVIDIA_SESSION_ACTION) => execute_nvidia_session_action(accounts),
         _ => Err(ConsumerError::InvalidInstruction.into()),
     }
@@ -127,11 +120,7 @@ fn execute_session_action(accounts: &[AccountInfo]) -> ProgramResult {
 /// `expected_signer` stays unset: this sample does not name a replica.
 ///
 /// @spec SCC-CONSUMER-002 SCC-SEC-005 SCC-ANCHOR-002 SCC-VERIFY-013 SCC-VERIFY-014
-fn execute_atomic_action(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
+fn execute_atomic_action(program_id: &Pubkey, accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
     let instructions_sysvar = accounts.first().ok_or(ProgramError::NotEnoughAccountKeys)?;
     let payload = instruction_data.get(1..).unwrap_or(&[]);
     let action_hash = bound_action_hash(accounts, payload)?;
@@ -152,9 +141,5 @@ fn bound_action_hash(accounts: &[AccountInfo], payload: &[u8]) -> Result<[u8; 32
     if accounts.is_empty() || accounts.len() > MAX_BOUND_ACCOUNTS {
         return Err(ProgramError::InvalidInstructionData);
     }
-    Ok(hash_action_account_infos(
-        &[IX_EXECUTE_ATOMIC_ACTION],
-        accounts,
-        payload,
-    ))
+    Ok(hash_action_account_infos(&[IX_EXECUTE_ATOMIC_ACTION], accounts, payload))
 }

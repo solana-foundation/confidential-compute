@@ -25,14 +25,9 @@ async fn test_nvidia_h100_simulated_attestation() {
         .expect("Attestation request should succeed in simulation mode");
 
     match report {
-        AttestationReport::NvidiaH100 {
-            composite_report,
-            gpu_measurement,
-            spdm_report,
-        } => {
+        AttestationReport::NvidiaH100 { composite_report, gpu_measurement, spdm_report } => {
             assert_eq!(gpu_measurement, DEFAULT_H100_GOLDEN_RIM);
-            let expected_nonce =
-                compute_composite_nonce(&workload_signer, &DEFAULT_H100_GOLDEN_RIM, &slot_hash);
+            let expected_nonce = compute_composite_nonce(&workload_signer, &DEFAULT_H100_GOLDEN_RIM, &slot_hash);
             assert_eq!(composite_report, expected_nonce.to_vec());
             assert!(spdm_report.starts_with(b"NVIDIA-SPDM-v1.2"));
         }
@@ -49,10 +44,7 @@ async fn test_nvidia_h100_live_path_fails_closed() {
         .request_attestation(&workload_signer, &slot_hash)
         .await
         .expect_err("non-simulated appraisal must fail closed");
-    assert!(matches!(
-        err,
-        solana_confidential_compute_sidecar::SidecarError::GpuAttestationFailed
-    ));
+    assert!(matches!(err, solana_confidential_compute_sidecar::SidecarError::GpuAttestationFailed));
 }
 
 #[test]
@@ -67,34 +59,19 @@ fn test_composite_nonce_binding_properties() {
     let nonce_base = compute_composite_nonce(&signer_a, &gpu_rim_a, &slot_hash_1);
 
     // Nonce must be deterministic
-    assert_eq!(
-        nonce_base,
-        compute_composite_nonce(&signer_a, &gpu_rim_a, &slot_hash_1)
-    );
+    assert_eq!(nonce_base, compute_composite_nonce(&signer_a, &gpu_rim_a, &slot_hash_1));
 
     // Any change to signer, GPU measurement, or slot hash must yield a distinct nonce
-    assert_ne!(
-        nonce_base,
-        compute_composite_nonce(&signer_b, &gpu_rim_a, &slot_hash_1)
-    );
-    assert_ne!(
-        nonce_base,
-        compute_composite_nonce(&signer_a, &gpu_rim_b, &slot_hash_1)
-    );
-    assert_ne!(
-        nonce_base,
-        compute_composite_nonce(&signer_a, &gpu_rim_a, &slot_hash_2)
-    );
+    assert_ne!(nonce_base, compute_composite_nonce(&signer_b, &gpu_rim_a, &slot_hash_1));
+    assert_ne!(nonce_base, compute_composite_nonce(&signer_a, &gpu_rim_b, &slot_hash_1));
+    assert_ne!(nonce_base, compute_composite_nonce(&signer_a, &gpu_rim_a, &slot_hash_2));
 }
 
 #[test]
 fn nvidia_gpu_mode_is_selectable_and_simulated_live_is_rejected() {
-    let by_name = SidecarConfig::try_parse_from([
-        "solana-confidential-compute-sidecar",
-        "--enclave-mode",
-        "nvidia-gpu",
-    ])
-    .expect("nvidia-gpu");
+    let by_name =
+        SidecarConfig::try_parse_from(["solana-confidential-compute-sidecar", "--enclave-mode", "nvidia-gpu"])
+            .expect("nvidia-gpu");
     assert_eq!(by_name.enclave_mode, EnclaveMode::NvidiaGpu);
     assert!(by_name.dry_run);
     assert!(by_name.fail_closed_live_mock().is_ok());
@@ -112,9 +89,7 @@ fn nvidia_gpu_mode_is_selectable_and_simulated_live_is_rejected() {
     assert!(by_alias.fail_closed_live_mock().is_ok());
 
     let simulated = NvidiaH100Provider::new(None, true);
-    let err = simulated
-        .reject_simulated_live(false)
-        .expect_err("simulated evidence is not a live provider");
+    let err = simulated.reject_simulated_live(false).expect_err("simulated evidence is not a live provider");
     assert!(matches!(err, SidecarError::InvalidConfig(_)));
     assert!(simulated.reject_simulated_live(true).is_ok());
 
@@ -127,21 +102,14 @@ fn nvidia_gpu_mode_is_selectable_and_simulated_live_is_rejected() {
 #[tokio::test]
 async fn daemon_provider_follows_dry_run() {
     let live = NvidiaH100Provider::for_daemon(false).expect("live");
-    let err = live
-        .request_attestation(&Pubkey::new_unique(), &[0x5a; 32])
-        .await
-        .expect_err("live appraisal fails closed");
+    let err =
+        live.request_attestation(&Pubkey::new_unique(), &[0x5a; 32]).await.expect_err("live appraisal fails closed");
     assert!(matches!(err, SidecarError::GpuAttestationFailed));
 
     let dry = NvidiaH100Provider::for_daemon(true).expect("dry-run");
-    let report = dry
-        .request_attestation(&Pubkey::new_unique(), &[0x5a; 32])
-        .await
-        .expect("dry-run construction");
+    let report = dry.request_attestation(&Pubkey::new_unique(), &[0x5a; 32]).await.expect("dry-run construction");
     match report {
-        AttestationReport::NvidiaH100 {
-            gpu_measurement, ..
-        } => assert_eq!(gpu_measurement, DEFAULT_H100_GOLDEN_RIM),
+        AttestationReport::NvidiaH100 { gpu_measurement, .. } => assert_eq!(gpu_measurement, DEFAULT_H100_GOLDEN_RIM),
         _ => panic!("Expected NvidiaH100 report variant"),
     }
 }

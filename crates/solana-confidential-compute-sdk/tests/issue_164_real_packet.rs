@@ -1,7 +1,5 @@
 use solana_confidential_compute_sdk::PACKET_DATA_SIZE;
-use solana_confidential_compute_verifier::payload::{
-    REGISTER_VCEK_DISCRIMINATOR, REGISTER_VCEK_HEADER_SIZE,
-};
+use solana_confidential_compute_verifier::payload::{REGISTER_VCEK_DISCRIMINATOR, REGISTER_VCEK_HEADER_SIZE};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     message::Message,
@@ -20,17 +18,10 @@ fn real_milan_chain_cannot_fit_inline_registration() {
     data.extend(ask);
     data.extend(leaf);
     let instruction_len = data.len();
-    assert_eq!(
-        instruction_len,
-        8 + REGISTER_VCEK_HEADER_SIZE + ask.len() + leaf.len()
-    );
+    assert_eq!(instruction_len, 8 + REGISTER_VCEK_HEADER_SIZE + ask.len() + leaf.len());
     // Even a minimal account set is too large; real registration adds accounts.
     let payer = Pubkey::new_unique();
-    let ix = Instruction {
-        program_id: Pubkey::new_unique(),
-        accounts: vec![AccountMeta::new(payer, true)],
-        data,
-    };
+    let ix = Instruction { program_id: Pubkey::new_unique(), accounts: vec![AccountMeta::new(payer, true)], data };
     let tx = Transaction::new_unsigned(Message::new(&[ix], Some(&payer)));
     let size = bincode::serialize(&tx).unwrap().len();
     eprintln!(
@@ -45,11 +36,7 @@ fn real_milan_chain_cannot_fit_inline_registration() {
     assert!(instruction_len > PACKET_DATA_SIZE);
     assert!(size > PACKET_DATA_SIZE);
     let control = Transaction::new_unsigned(Message::new(
-        &[Instruction {
-            program_id: Pubkey::new_unique(),
-            accounts: vec![],
-            data: vec![0; 16],
-        }],
+        &[Instruction { program_id: Pubkey::new_unique(), accounts: vec![], data: vec![0; 16] }],
         Some(&payer),
     ));
     assert!(bincode::serialize(&control).unwrap().len() < PACKET_DATA_SIZE);
@@ -74,11 +61,7 @@ fn authentic_milan_stages_into_bounded_signed_packets() {
             AccountMeta::new_readonly(Pubkey::new_unique(), false),
             AccountMeta::new(
                 Pubkey::find_program_address(
-                    &[
-                        b"vcek_v2",
-                        &solana_sdk::hash::hash(&[0; 64]).to_bytes(),
-                        &0u64.to_le_bytes(),
-                    ],
+                    &[b"vcek_v2", &solana_sdk::hash::hash(&[0; 64]).to_bytes(), &0u64.to_le_bytes()],
                     &solana_confidential_compute_verifier::id(),
                 )
                 .0,
@@ -89,25 +72,16 @@ fn authentic_milan_stages_into_bounded_signed_packets() {
         data: data.clone(),
     };
     let plan = stage_vcek_registration(ix.clone(), payer, 100, 150).unwrap();
-    let recovered = plan
-        .uploads
-        .iter()
-        .flat_map(|i| i.data[12..].iter().copied())
-        .collect::<Vec<_>>();
+    let recovered = plan.uploads.iter().flat_map(|i| i.data[12..].iter().copied()).collect::<Vec<_>>();
     assert_eq!(recovered, data);
-    for i in std::iter::once(&plan.begin)
-        .chain(plan.uploads.iter())
-        .chain([&plan.seal, &plan.consume, &plan.close])
-    {
+    for i in std::iter::once(&plan.begin).chain(plan.uploads.iter()).chain([&plan.seal, &plan.consume, &plan.close]) {
         let tx = Transaction::new_unsigned(Message::new(std::slice::from_ref(i), Some(&payer)));
         let bytes = bincode::serialize(&tx).unwrap();
         assert!(bytes.len() <= PACKET_DATA_SIZE);
         assert_eq!(tx.signatures.len(), 1);
         eprintln!("staged packet {}", bytes.len());
     }
-    let budgeted = plan
-        .consume_transaction(solana_sdk::hash::Hash::new_unique(), 1_400_000)
-        .unwrap();
+    let budgeted = plan.consume_transaction(solana_sdk::hash::Hash::new_unique(), 1_400_000).unwrap();
     assert!(bincode::serialize(&budgeted).unwrap().len() <= PACKET_DATA_SIZE);
     assert!(matches!(
         plan.consume_transaction(solana_sdk::hash::Hash::new_unique(), 0),
@@ -126,20 +100,11 @@ fn authentic_milan_stages_into_bounded_signed_packets() {
             false
         ))
     );
-    assert!(matches!(
-        stage_vcek_registration(ix.clone(), payer, 100, 251),
-        Err(StageError::InvalidDeadline)
-    ));
+    assert!(matches!(stage_vcek_registration(ix.clone(), payer, 100, 251), Err(StageError::InvalidDeadline)));
     let mut huge = ix.clone();
     huge.data.resize(MAX_PAYLOAD + 1, 0);
-    assert!(matches!(
-        stage_vcek_registration(huge, payer, 100, 150),
-        Err(StageError::InvalidSize)
-    ));
+    assert!(matches!(stage_vcek_registration(huge, payer, 100, 150), Err(StageError::InvalidSize)));
     let mut foreign = ix;
     foreign.accounts[0].is_signer = false;
-    assert!(matches!(
-        stage_vcek_registration(foreign, payer, 100, 150),
-        Err(StageError::InvalidAuthority)
-    ));
+    assert!(matches!(stage_vcek_registration(foreign, payer, 100, 150), Err(StageError::InvalidAuthority)));
 }

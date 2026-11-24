@@ -14,8 +14,8 @@ use crate::error::SidecarError;
 
 /// Dry-run placeholder RIM. It is not a VBIOS, driver, or model digest.
 pub const DEFAULT_H100_GOLDEN_RIM: [u8; 32] = [
-    0x4e, 0x56, 0x49, 0x44, 0x49, 0x41, 0x5f, 0x48, 0x31, 0x30, 0x30, 0x5f, 0x43, 0x43, 0x5f, 0x52,
-    0x49, 0x4d, 0x5f, 0x56, 0x42, 0x49, 0x4f, 0x53, 0x5f, 0x44, 0x52, 0x49, 0x56, 0x45, 0x52, 0x31,
+    0x4e, 0x56, 0x49, 0x44, 0x49, 0x41, 0x5f, 0x48, 0x31, 0x30, 0x30, 0x5f, 0x43, 0x43, 0x5f, 0x52, 0x49, 0x4d, 0x5f,
+    0x56, 0x42, 0x49, 0x4f, 0x53, 0x5f, 0x44, 0x52, 0x49, 0x56, 0x45, 0x52, 0x31,
 ];
 
 /// Prefix on the SPDM buffer this provider fabricates for dry-run construction.
@@ -29,11 +29,7 @@ pub fn synthetic_spdm_evidence(spdm_report: &[u8]) -> bool {
 
 /// Computes the dual CPU+GPU composite nonce.
 /// @spec SCC-NVIDIA-002
-pub fn compute_composite_nonce(
-    workload_signer: &Pubkey,
-    gpu_measurement: &[u8; 32],
-    slot_hash: &[u8; 32],
-) -> [u8; 32] {
+pub fn compute_composite_nonce(workload_signer: &Pubkey, gpu_measurement: &[u8; 32], slot_hash: &[u8; 32]) -> [u8; 32] {
     hashv(&[workload_signer.as_ref(), gpu_measurement, slot_hash]).to_bytes()
 }
 
@@ -44,10 +40,7 @@ pub struct NvidiaH100Provider {
 
 impl NvidiaH100Provider {
     pub fn new(expected_gpu_measurement: Option<[u8; 32]>, simulated: bool) -> Self {
-        Self {
-            expected_gpu_measurement: expected_gpu_measurement.unwrap_or(DEFAULT_H100_GOLDEN_RIM),
-            simulated,
-        }
+        Self { expected_gpu_measurement: expected_gpu_measurement.unwrap_or(DEFAULT_H100_GOLDEN_RIM), simulated }
     }
 
     /// Daemon constructor.
@@ -102,8 +95,7 @@ impl AttestationProvider for NvidiaH100Provider {
     ) -> Pin<Box<dyn Future<Output = Result<AttestationReport, SidecarError>> + Send + 'a>> {
         Box::pin(async move {
             let gpu_measurement = self.query_gpu_measurement()?;
-            let composite_nonce =
-                compute_composite_nonce(workload_signer, &gpu_measurement, slot_hash);
+            let composite_nonce = compute_composite_nonce(workload_signer, &gpu_measurement, slot_hash);
 
             // Dry-run construction evidence. Live appraisal never reaches here.
             let mut spdm_report = Vec::with_capacity(128);

@@ -1,9 +1,7 @@
 //! Native production-processor regression for authoritative backend admission.
 //! Uses a signed JWT fixture; no automatic global-to-backend policy fixture.
 use borsh::BorshDeserialize;
-use solana_confidential_compute_verifier::{
-    error::VerifierError, payload::*, processor::Processor, state::*,
-};
+use solana_confidential_compute_verifier::{error::VerifierError, payload::*, processor::Processor, state::*};
 use solana_program::{
     account_info::AccountInfo,
     clock::Clock,
@@ -18,17 +16,9 @@ const MODE_B_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRldG9uLXRlc3QiLCJ0eXAiOi
 struct ClockStub;
 impl SyscallStubs for ClockStub {
     fn sol_get_clock_sysvar(&self, dst: *mut u8) -> u64 {
-        let clock = Clock {
-            slot: 520,
-            unix_timestamp: 1_700_000_100,
-            ..Clock::default()
-        };
+        let clock = Clock { slot: 520, unix_timestamp: 1_700_000_100, ..Clock::default() };
         unsafe {
-            std::ptr::copy_nonoverlapping(
-                (&clock as *const Clock).cast::<u8>(),
-                dst,
-                std::mem::size_of::<Clock>(),
-            );
+            std::ptr::copy_nonoverlapping((&clock as *const Clock).cast::<u8>(), dst, std::mem::size_of::<Clock>());
         }
         0
     }
@@ -39,13 +29,7 @@ impl Drop for Guard {
         set_syscall_stubs(self.0.take().unwrap());
     }
 }
-fn account(
-    key: Pubkey,
-    owner: Pubkey,
-    data: Vec<u8>,
-    signer: bool,
-    writable: bool,
-) -> AccountInfo<'static> {
+fn account(key: Pubkey, owner: Pubkey, data: Vec<u8>, signer: bool, writable: bool) -> AccountInfo<'static> {
     AccountInfo::new(
         Box::leak(Box::new(key)),
         signer,
@@ -76,23 +60,15 @@ fn halt_resume_case(mode: u8) {
     let (tenant, tb) = Pubkey::find_program_address(&[GcpTenantPolicy::SEED], &pid);
     let kh = solana_confidential_compute_crypto::jwt::kid_hash(b"teton-test");
     let (jwks, jb) = Pubkey::find_program_address(&[b"jwks", &kh], &pid);
-    let (signer, _) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", workload.as_ref()], &pid);
+    let (signer, _) = Pubkey::find_program_address(&[b"attested_signer_v2", workload.as_ref()], &pid);
     // Match the signed V3 JWT fixture to the complete consumer instruction.
     let consumer_data = [0x99; 11];
-    let action = solana_confidential_compute_core::action::hash_action_parts(
-        &[],
-        0,
-        core::iter::empty(),
-        &consumer_data,
-    );
+    let action =
+        solana_confidential_compute_core::action::hash_action_parts(&[], 0, core::iter::empty(), &consumer_data);
     let consumer = Pubkey::new_from_array([0x33; 32]);
     let slot_hash = if mode_a { [b'n'; 32] } else { [0x11; 32] };
-    let commitment = solana_confidential_compute_core::types::compute_action_commitment(
-        &slot_hash,
-        &action,
-        &consumer.to_bytes(),
-    );
+    let commitment =
+        solana_confidential_compute_core::types::compute_action_commitment(&slot_hash, &action, &consumer.to_bytes());
     let nonce_seed = solana_confidential_compute_crypto::jwt::eat_nonce_tombstone_seed(if mode_a {
         &[b'n'; 64]
     } else {
@@ -115,35 +91,16 @@ fn halt_resume_case(mode: u8) {
     };
     let global_acc = account(registry, pid, borsh::to_vec(&global).unwrap(), false, true);
     let auth = account(authority, pid, vec![], true, true);
-    let system = account(
-        solana_sdk_ids::system_program::ID,
-        solana_sdk_ids::system_program::ID,
-        vec![],
-        false,
-        false,
-    );
+    let system = account(solana_sdk_ids::system_program::ID, solana_sdk_ids::system_program::ID, vec![], false, false);
     let backend_acc = account(backend, pid, vec![0; BackendPolicy::SIZE], false, true);
-    let governance = [
-        auth.clone(),
-        global_acc.clone(),
-        backend_acc.clone(),
-        auth.clone(),
-        system.clone(),
-    ];
+    let governance = [auth.clone(), global_acc.clone(), backend_acc.clone(), auth.clone(), system.clone()];
     let set_backend = |count| {
         ix(
             SET_BACKEND_POLICY_DISCRIMINATOR,
-            &SetBackendPolicyArgs {
-                source: 3,
-                measurement_count: count,
-                measurements: [measurement; 8],
-            },
+            &SetBackendPolicyArgs { source: 3, measurement_count: count, measurements: [measurement; 8] },
         )
     };
-    assert_eq!(
-        Processor::process(&pid, &governance, &set_backend(1)),
-        Ok(())
-    );
+    assert_eq!(Processor::process(&pid, &governance, &set_backend(1)), Ok(()));
     let saved = BackendPolicy::try_from_slice(&backend_acc.try_borrow_data().unwrap()).unwrap();
     assert_eq!(saved.bump, bb);
     let clear_global = ix(
@@ -157,33 +114,17 @@ fn halt_resume_case(mode: u8) {
             measurements: [[0; 48]; 8],
         },
     );
-    assert_eq!(
-        Processor::process(&pid, &governance[..2], &clear_global),
-        Ok(())
-    );
+    assert_eq!(Processor::process(&pid, &governance[..2], &clear_global), Ok(()));
     assert_eq!(global_acc.data_len(), 529); // Account ABI is unchanged.
     let cleared = PolicyRegistry::try_from_slice(&global_acc.try_borrow_data().unwrap()).unwrap();
     assert_eq!(cleared.measurement_count, 0);
     assert_eq!(
-        [
-            cleared.min_tcb_boot_loader,
-            cleared.min_tcb_tee,
-            cleared.min_tcb_snp,
-            cleared.min_tcb_microcode
-        ],
+        [cleared.min_tcb_boot_loader, cleared.min_tcb_tee, cleared.min_tcb_snp, cleared.min_tcb_microcode],
         [1, 2, 3, 4]
     );
-    assert_eq!(
-        BackendPolicy::try_from_slice(&backend_acc.try_borrow_data().unwrap()).unwrap(),
-        saved
-    );
-    let modulus_hex = if mode_a {
-        MODULUS_HEX
-    } else {
-        MODE_B_MODULUS_HEX
-    };
-    let modulus: [u8; 256] =
-        std::array::from_fn(|i| u8::from_str_radix(&modulus_hex[i * 2..i * 2 + 2], 16).unwrap());
+    assert_eq!(BackendPolicy::try_from_slice(&backend_acc.try_borrow_data().unwrap()).unwrap(), saved);
+    let modulus_hex = if mode_a { MODULUS_HEX } else { MODE_B_MODULUS_HEX };
+    let modulus: [u8; 256] = std::array::from_fn(|i| u8::from_str_radix(&modulus_hex[i * 2..i * 2 + 2], 16).unwrap());
     let (n0, r2) = solana_confidential_compute_crypto::jwt::compute_n0_and_r2(&modulus).unwrap();
     let jwks_acc = account(
         jwks,
@@ -222,23 +163,12 @@ fn halt_resume_case(mode: u8) {
         false,
     );
     // SlotHashes bincode sequence: one slot/hash entry.
-    let hashes = [
-        1u64.to_le_bytes().as_slice(),
-        500u64.to_le_bytes().as_slice(),
-        slot_hash.as_slice(),
-    ]
-    .concat();
+    let hashes = [1u64.to_le_bytes().as_slice(), 500u64.to_le_bytes().as_slice(), slot_hash.as_slice()].concat();
     let sh_acc = account(sysvar::slot_hashes::ID, sysvar::ID, hashes, false, false);
     // Explicit empty legacy tombstone proves this nonce was not consumed before
     // backend-scoped nonce namespaces; no fixture injects admission policy.
     let legacy_nonce = Pubkey::find_program_address(&[b"nonce", &nonce_seed], &pid).0;
-    let legacy_acc = account(
-        legacy_nonce,
-        solana_sdk_ids::system_program::ID,
-        vec![],
-        false,
-        false,
-    );
+    let legacy_acc = account(legacy_nonce, solana_sdk_ids::system_program::ID, vec![], false, false);
     let verify = ix(
         VERIFY_GOOGLE_JWT_DISCRIMINATOR,
         &VerifyGoogleJwtArgs {
@@ -248,13 +178,7 @@ fn halt_resume_case(mode: u8) {
             jwt: if mode_a { VALID_JWT } else { MODE_B_JWT }.into(),
         },
     );
-    let signer_acc = account(
-        signer,
-        pid,
-        vec![0; AttestedSignerAccount::SIZE],
-        false,
-        true,
-    );
+    let signer_acc = account(signer, pid, vec![0; AttestedSignerAccount::SIZE], false, true);
     let nonce_acc = account(nonce, pid, vec![0; UsedNonceAccount::SIZE], false, true);
     let mut accounts = vec![
         signer_acc.clone(),
@@ -281,18 +205,9 @@ fn halt_resume_case(mode: u8) {
             accounts: vec![],
             data: &verify,
         };
-        let data = solana_program::sysvar::instructions::construct_instructions_data(&[
-            verifier_ix,
-            consumer_ix,
-        ])
-        .unwrap();
-        accounts.push(account(
-            sysvar::instructions::ID,
-            sysvar::ID,
-            data,
-            false,
-            false,
-        ));
+        let data =
+            solana_program::sysvar::instructions::construct_instructions_data(&[verifier_ix, consumer_ix]).unwrap();
+        accounts.push(account(sysvar::instructions::ID, sysvar::ID, data, false, false));
     }
     // The same untouched signer/nonce accounts are used for halt and resume.
     for allow in [false, true] {
@@ -305,10 +220,7 @@ fn halt_resume_case(mode: u8) {
             Err(solana_program::program_error::ProgramError::MissingRequiredSignature)
         );
         assert_eq!(*backend_acc.try_borrow_data().unwrap(), policy_before);
-        assert_eq!(
-            Processor::process(&pid, &governance, &set_backend(u32::from(allow))),
-            Ok(())
-        );
+        assert_eq!(Processor::process(&pid, &governance, &set_backend(u32::from(allow))), Ok(()));
         let result = Processor::process(&pid, &accounts, &verify);
         if allow {
             assert_eq!(
@@ -317,29 +229,18 @@ fn halt_resume_case(mode: u8) {
                 "restoring the backend policy must resume admission even with an empty global list"
             );
             if mode_a {
-                let saved =
-                    AttestedSignerAccount::try_from_slice(&signer_acc.try_borrow_data().unwrap())
-                        .unwrap();
+                let saved = AttestedSignerAccount::try_from_slice(&signer_acc.try_borrow_data().unwrap()).unwrap();
                 assert_eq!(saved.record.signer_pubkey, workload.to_bytes());
                 assert_eq!(saved.record.measurement.0, measurement);
             } else {
-                assert!(signer_acc
-                    .try_borrow_data()
-                    .unwrap()
-                    .iter()
-                    .all(|b| *b == 0));
+                assert!(signer_acc.try_borrow_data().unwrap().iter().all(|b| *b == 0));
             }
-            let consumed =
-                UsedNonceAccount::try_from_slice(&nonce_acc.try_borrow_data().unwrap()).unwrap();
+            let consumed = UsedNonceAccount::try_from_slice(&nonce_acc.try_borrow_data().unwrap()).unwrap();
             assert_eq!(consumed.discriminator, USED_NONCE_DISCRIMINATOR);
             assert_eq!(consumed.slot, 520);
         } else {
             assert_eq!(result, Err(VerifierError::DisallowedMeasurement.into()));
-            assert!(signer_acc
-                .try_borrow_data()
-                .unwrap()
-                .iter()
-                .all(|b| *b == 0));
+            assert!(signer_acc.try_borrow_data().unwrap().iter().all(|b| *b == 0));
             assert!(nonce_acc.try_borrow_data().unwrap().iter().all(|b| *b == 0));
         }
     }

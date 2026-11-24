@@ -38,13 +38,7 @@ struct ControlledProvider {
 }
 impl ControlledProvider {
     fn new(block: bool, fail: bool) -> Self {
-        Self {
-            calls: AtomicUsize::new(0),
-            entered: Semaphore::new(0),
-            release: Semaphore::new(0),
-            block,
-            fail,
-        }
+        Self { calls: AtomicUsize::new(0), entered: Semaphore::new(0), release: Semaphore::new(0), block, fail }
     }
 }
 impl AttestationProvider for ControlledProvider {
@@ -55,9 +49,7 @@ impl AttestationProvider for ControlledProvider {
         &'a self,
         key: &'a Pubkey,
         hash: &'a [u8; 32],
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<AttestationReport, SidecarError>> + Send + 'a>,
-    > {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AttestationReport, SidecarError>> + Send + 'a>> {
         Box::pin(async move {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.entered.add_permits(1);
@@ -65,20 +57,15 @@ impl AttestationProvider for ControlledProvider {
                 self.release.acquire().await.unwrap().forget();
             }
             if self.fail {
-                return Err(SidecarError::AttestationError(
-                    "controlled provider failure".into(),
-                ));
+                return Err(SidecarError::AttestationError("controlled provider failure".into()));
             }
-            MockAttestationProvider::default()
-                .request_attestation(key, hash)
-                .await
+            MockAttestationProvider::default().request_attestation(key, hash).await
         })
     }
 }
 fn state(provider: Arc<ControlledProvider>, authorized: bool, payer: bool) -> Arc<SidecarAppState> {
     Arc::new(SidecarAppState {
-        enrollment: EnrollmentControl::new(authorized.then(|| Zeroizing::new(TOKEN.into())), 300)
-            .unwrap(),
+        enrollment: EnrollmentControl::new(authorized.then(|| Zeroizing::new(TOKEN.into())), 300).unwrap(),
         enclave_mode: EnclaveMode::Mock,
         keys: RwLock::new(EphemeralKeyManager::new()),
         provider,
@@ -99,15 +86,11 @@ fn state(provider: Arc<ControlledProvider>, authorized: bool, payer: bool) -> Ar
 async fn serve(state: Arc<SidecarAppState>) -> (String, tokio::task::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
-    let task =
-        tokio::spawn(async move { axum::serve(listener, create_router(state)).await.unwrap() });
+    let task = tokio::spawn(async move { axum::serve(listener, create_router(state)).await.unwrap() });
     (url, task)
 }
 async fn snapshot(state: &SidecarAppState) -> (Pubkey, Value) {
-    (
-        state.keys.read().await.pubkey(),
-        serde_json::to_value(state.status.read().await.clone()).unwrap(),
-    )
+    (state.keys.read().await.pubkey(), serde_json::to_value(state.status.read().await.clone()).unwrap())
 }
 
 #[tokio::test]
@@ -118,12 +101,7 @@ async fn enrollment_denies_missing_wrong_malformed_and_duplicate_tokens_without_
         let before = snapshot(&state).await;
         let (url, task) = serve(state.clone()).await;
         for route in ["attest", "renew"] {
-            for token in [
-                None,
-                Some("Bearer wrong"),
-                Some(TOKEN),
-                Some("Basic ignored"),
-            ] {
+            for token in [None, Some("Bearer wrong"), Some(TOKEN), Some("Basic ignored")] {
                 let mut request = Client::new().post(format!("{url}/v1/{route}"));
                 if let Some(value) = token {
                     request = request.header("Authorization", value);
@@ -131,11 +109,7 @@ async fn enrollment_denies_missing_wrong_malformed_and_duplicate_tokens_without_
                 let response = request.send().await.unwrap();
                 assert_eq!(
                     response.status(),
-                    if authorized {
-                        StatusCode::UNAUTHORIZED
-                    } else {
-                        StatusCode::FORBIDDEN
-                    }
+                    if authorized { StatusCode::UNAUTHORIZED } else { StatusCode::FORBIDDEN }
                 );
                 if authorized {
                     assert_eq!(response.headers()["www-authenticate"], "Bearer");
@@ -154,15 +128,7 @@ async fn enrollment_denies_missing_wrong_malformed_and_duplicate_tokens_without_
         assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
         assert!(state.onchain.mock_cluster().unwrap().submitted().is_empty());
         // Unauthenticated status remains available and doesn't invoke enrollment.
-        assert_eq!(
-            Client::new()
-                .get(format!("{url}/v1/status"))
-                .send()
-                .await
-                .unwrap()
-                .status(),
-            200
-        );
+        assert_eq!(Client::new().get(format!("{url}/v1/status")).send().await.unwrap().status(), 200);
         task.abort();
     }
 }
@@ -175,33 +141,15 @@ async fn successful_attest_and_renew_share_one_cooldown_and_submit_once() {
         let before = state.keys.read().await.pubkey();
         let (url, task) = serve(state.clone()).await;
         assert_eq!(
-            Client::new()
-                .post(format!("{url}/v1/{first}"))
-                .bearer_auth(TOKEN)
-                .send()
-                .await
-                .unwrap()
-                .status(),
+            Client::new().post(format!("{url}/v1/{first}")).bearer_auth(TOKEN).send().await.unwrap().status(),
             200
         );
         let after = snapshot(&state).await;
         assert_eq!(before == after.0, first == "attest");
         for route in ["attest", "renew", "renew", "attest"] {
-            let response = Client::new()
-                .post(format!("{url}/v1/{route}"))
-                .bearer_auth(TOKEN)
-                .send()
-                .await
-                .unwrap();
+            let response = Client::new().post(format!("{url}/v1/{route}")).bearer_auth(TOKEN).send().await.unwrap();
             assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
-            assert!(
-                response.headers()["retry-after"]
-                    .to_str()
-                    .unwrap()
-                    .parse::<u64>()
-                    .unwrap()
-                    > 0
-            );
+            assert!(response.headers()["retry-after"].to_str().unwrap().parse::<u64>().unwrap() > 0);
         }
         assert_eq!(snapshot(&state).await, after);
         assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
@@ -218,26 +166,14 @@ async fn failed_rotation_retains_key_and_all_deadlines_and_still_charges_cooldow
         let state = state(provider.clone(), true, payer);
         let before = snapshot(&state).await;
         let (url, task) = serve(state.clone()).await;
-        let response = Client::new()
-            .post(format!("{url}/v1/renew"))
-            .bearer_auth(TOKEN)
-            .send()
-            .await
-            .unwrap();
+        let response = Client::new().post(format!("{url}/v1/renew")).bearer_auth(TOKEN).send().await.unwrap();
         assert_eq!(response.status(), 500);
         assert_eq!(snapshot(&state).await, before);
         let keys = state.keys.read().await;
-        assert!(Signature::from(keys.sign_message(b"retained session"))
-            .verify(before.0.as_ref(), b"retained session"));
+        assert!(Signature::from(keys.sign_message(b"retained session")).verify(before.0.as_ref(), b"retained session"));
         drop(keys);
         assert_eq!(
-            Client::new()
-                .post(format!("{url}/v1/attest"))
-                .bearer_auth(TOKEN)
-                .send()
-                .await
-                .unwrap()
-                .status(),
+            Client::new().post(format!("{url}/v1/attest")).bearer_auth(TOKEN).send().await.unwrap().status(),
             429
         );
         assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
@@ -251,42 +187,21 @@ async fn in_flight_rotation_keeps_old_session_and_rejects_concurrent_http_attemp
     let state = state(provider.clone(), true, true);
     let before = snapshot(&state).await;
     let (url, task) = serve(state.clone()).await;
-    let request = Client::new()
-        .post(format!("{url}/v1/renew"))
-        .bearer_auth(TOKEN);
+    let request = Client::new().post(format!("{url}/v1/renew")).bearer_auth(TOKEN);
     let pending = tokio::spawn(async move { request.send().await.unwrap() });
-    tokio::time::timeout(Duration::from_secs(5), provider.entered.acquire())
-        .await
-        .unwrap()
-        .unwrap()
-        .forget();
+    tokio::time::timeout(Duration::from_secs(5), provider.entered.acquire()).await.unwrap().unwrap().forget();
     assert_eq!(snapshot(&state).await, before);
     let keys = state.keys.read().await;
-    assert!(
-        Signature::from(keys.sign_message(b"in flight")).verify(before.0.as_ref(), b"in flight")
-    );
+    assert!(Signature::from(keys.sign_message(b"in flight")).verify(before.0.as_ref(), b"in flight"));
     drop(keys);
     for route in ["attest", "renew"] {
         assert_eq!(
-            Client::new()
-                .post(format!("{url}/v1/{route}"))
-                .bearer_auth(TOKEN)
-                .send()
-                .await
-                .unwrap()
-                .status(),
+            Client::new().post(format!("{url}/v1/{route}")).bearer_auth(TOKEN).send().await.unwrap().status(),
             429
         );
     }
     provider.release.add_permits(1);
-    assert_eq!(
-        tokio::time::timeout(Duration::from_secs(5), pending)
-            .await
-            .unwrap()
-            .unwrap()
-            .status(),
-        200
-    );
+    assert_eq!(tokio::time::timeout(Duration::from_secs(5), pending).await.unwrap().unwrap().status(), 200);
     assert_ne!(snapshot(&state).await.0, before.0);
     assert_eq!(state.onchain.mock_cluster().unwrap().submitted().len(), 1);
     task.abort();
@@ -362,21 +277,12 @@ async fn live_rotation_publishes_only_after_valid_confirmed_candidate_deadlines(
         let rpc_task = tokio::spawn(async move { axum::serve(listener, rpc).await.unwrap() });
         let mut state = state(Arc::new(ControlledProvider::new(false, false)), true, true);
         let owned = Arc::get_mut(&mut state).unwrap();
-        owned.onchain = Arc::new(OnchainAttestor::new(
-            &format!("http://{rpc_addr}"),
-            None,
-            Some(Keypair::new()),
-            false,
-        ));
+        owned.onchain =
+            Arc::new(OnchainAttestor::new(&format!("http://{rpc_addr}"), None, Some(Keypair::new()), false));
         owned.provider = Arc::new(MockAttestationProvider::new_gcp(None));
         let before = snapshot(&state).await;
         let (url, task) = serve(state.clone()).await;
-        let response = Client::new()
-            .post(format!("{url}/v1/renew"))
-            .bearer_auth(TOKEN)
-            .send()
-            .await
-            .unwrap();
+        let response = Client::new().post(format!("{url}/v1/renew")).bearer_auth(TOKEN).send().await.unwrap();
         assert_eq!(submissions.load(Ordering::SeqCst), 1);
         if mode == "valid" {
             assert_eq!(response.status(), 200);
@@ -389,13 +295,7 @@ async fn live_rotation_publishes_only_after_valid_confirmed_candidate_deadlines(
             assert_eq!(response.status(), 500);
             assert_eq!(snapshot(&state).await, before);
             assert_eq!(
-                Client::new()
-                    .post(format!("{url}/v1/renew"))
-                    .bearer_auth(TOKEN)
-                    .send()
-                    .await
-                    .unwrap()
-                    .status(),
+                Client::new().post(format!("{url}/v1/renew")).bearer_auth(TOKEN).send().await.unwrap().status(),
                 429
             );
         }
@@ -410,28 +310,14 @@ async fn cancelled_candidate_preserves_session_and_releases_enrollment_lock() {
     let state = state(provider.clone(), true, true);
     let before = snapshot(&state).await;
     let shared = state.clone();
-    let operation = tokio::spawn(async move {
-        solana_confidential_compute_sidecar::rotate_zeroize_and_attest(&shared).await
-    });
-    tokio::time::timeout(Duration::from_secs(5), provider.entered.acquire())
-        .await
-        .unwrap()
-        .unwrap()
-        .forget();
+    let operation =
+        tokio::spawn(async move { solana_confidential_compute_sidecar::rotate_zeroize_and_attest(&shared).await });
+    tokio::time::timeout(Duration::from_secs(5), provider.entered.acquire()).await.unwrap().unwrap().forget();
     operation.abort();
     assert!(operation.await.unwrap_err().is_cancelled());
     assert_eq!(snapshot(&state).await, before);
     let (url, task) = serve(state.clone()).await;
     provider.release.add_permits(1);
-    assert_eq!(
-        Client::new()
-            .post(format!("{url}/v1/attest"))
-            .bearer_auth(TOKEN)
-            .send()
-            .await
-            .unwrap()
-            .status(),
-        200
-    );
+    assert_eq!(Client::new().post(format!("{url}/v1/attest")).bearer_auth(TOKEN).send().await.unwrap().status(), 200);
     task.abort();
 }

@@ -8,34 +8,19 @@ pub struct TestProcessor;
 fn legacy_address(pid: &Pubkey, data: &[u8]) -> Option<Pubkey> {
     let disc = data.get(..8)?;
     if disc == VERIFY_AND_REGISTER_DISCRIMINATOR || disc == VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR {
-        let offset = if disc == VERIFY_AND_REGISTER_DISCRIMINATOR {
-            16
-        } else {
-            80
-        };
-        let view = solana_confidential_compute_core::SnpReportView::try_from_slice(
-            data.get(offset..offset + 1184)?,
-        )
-        .ok()?;
-        return Some(
-            Pubkey::find_program_address(&[b"nonce", &view.pubkey(), &view.nonce()], pid).0,
-        );
+        let offset = if disc == VERIFY_AND_REGISTER_DISCRIMINATOR { 16 } else { 80 };
+        let view =
+            solana_confidential_compute_core::SnpReportView::try_from_slice(data.get(offset..offset + 1184)?).ok()?;
+        return Some(Pubkey::find_program_address(&[b"nonce", &view.pubkey(), &view.nonce()], pid).0);
     }
     if disc == VERIFY_NITRO_ATTESTATION_DISCRIMINATOR {
-        let (_, view) =
-            solana_confidential_compute_crypto::parse_nitro_attestation(data.get(53..)?).ok()?;
-        return Some(
-            Pubkey::find_program_address(&[b"nonce", &view.user_data, &view.nonce], pid).0,
-        );
+        let (_, view) = solana_confidential_compute_crypto::parse_nitro_attestation(data.get(53..)?).ok()?;
+        return Some(Pubkey::find_program_address(&[b"nonce", &view.user_data, &view.nonce], pid).0);
     }
     if disc == VERIFY_GOOGLE_JWT_DISCRIMINATOR {
-        let view = solana_confidential_compute_crypto::jwt::JwtView::parse(
-            core::str::from_utf8(data.get(53..)?).ok()?,
-        )
-        .ok()?;
-        let claims =
-            solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64)
-                .ok()?;
+        let view = solana_confidential_compute_crypto::jwt::JwtView::parse(core::str::from_utf8(data.get(53..)?).ok()?)
+            .ok()?;
+        let claims = solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64).ok()?;
         let raw = if *data.get(8)? == 0 {
             claims.decode_mode_a_binding().ok()?.to_vec()
         } else {
@@ -74,12 +59,7 @@ impl TestProcessor {
         original: &[AccountInfo],
         data: &[u8],
     ) -> ProgramResult {
-        source_policy_fixture::TestProcessor::process_with(
-            v,
-            pid,
-            &accounts(pid, original, data),
-            data,
-        )
+        source_policy_fixture::TestProcessor::process_with(v, pid, &accounts(pid, original, data), data)
     }
     pub fn verify_recent_slot_hash(
         a: &AccountInfo,
@@ -87,8 +67,6 @@ impl TestProcessor {
         nonce: u64,
         hash: &[u8; 32],
     ) -> Result<(), solana_confidential_compute_verifier::error::VerifierError> {
-        solana_confidential_compute_verifier::processor::Processor::verify_recent_slot_hash(
-            a, now, nonce, hash,
-        )
+        solana_confidential_compute_verifier::processor::Processor::verify_recent_slot_hash(a, now, nonce, hash)
     }
 }

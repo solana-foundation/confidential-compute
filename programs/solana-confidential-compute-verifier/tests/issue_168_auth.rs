@@ -7,13 +7,7 @@ use solana_confidential_compute_verifier::{
 };
 use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 
-fn account(
-    key: Pubkey,
-    owner: Pubkey,
-    signer: bool,
-    writable: bool,
-    data: Vec<u8>,
-) -> AccountInfo<'static> {
+fn account(key: Pubkey, owner: Pubkey, signer: bool, writable: bool, data: Vec<u8>) -> AccountInfo<'static> {
     AccountInfo::new(
         Box::leak(Box::new(key)),
         signer,
@@ -78,13 +72,7 @@ fn init_accounts(pid: Pubkey, authority: Pubkey) -> Vec<AccountInfo<'static>> {
     vec![
         account(authority, pid, true, true, vec![]),
         account(reg, pid, false, true, vec![0; PolicyRegistry::SIZE]),
-        account(
-            solana_sdk_ids::system_program::id(),
-            pid,
-            false,
-            false,
-            vec![],
-        ),
+        account(solana_sdk_ids::system_program::id(), pid, false, false, vec![]),
         account(pd, loader, false, false, data),
     ]
 }

@@ -27,8 +27,7 @@ use sha2::{Digest, Sha384};
 use solana_confidential_compute_core::SNP_REPORT_SIZE;
 use solana_confidential_compute_verifier::error::VerifierError;
 use solana_confidential_compute_verifier::payload::{
-    RegisterVcekArgs, VerifyAndRegisterArgs, REGISTER_VCEK_DISCRIMINATOR,
-    VERIFY_AND_REGISTER_DISCRIMINATOR,
+    RegisterVcekArgs, VerifyAndRegisterArgs, REGISTER_VCEK_DISCRIMINATOR, VERIFY_AND_REGISTER_DISCRIMINATOR,
 };
 use solana_program::{
     account_info::AccountInfo,
@@ -51,8 +50,8 @@ mod sbf;
 mod legacy_nonce_fixture;
 use legacy_nonce_fixture::TestProcessor as Processor;
 use solana_confidential_compute_verifier::state::{
-    AttestedSignerAccount, PolicyRegistry, UsedNonceAccount, VcekAccount,
-    POLICY_REGISTRY_DISCRIMINATOR, VCEK_ACCOUNT_DISCRIMINATOR,
+    AttestedSignerAccount, PolicyRegistry, UsedNonceAccount, VcekAccount, POLICY_REGISTRY_DISCRIMINATOR,
+    VCEK_ACCOUNT_DISCRIMINATOR,
 };
 
 const OID_TCB_VERSION: &[u8] = &[0x2B, 0x06, 0x01, 0x04, 0x01, 0x9C, 0x78, 0x01, 0x01];
@@ -130,10 +129,7 @@ fn identity_extensions(chip_id: &[u8; 64], tcb_version: u64) -> Vec<u8> {
     }
     let tcb_int = tlv(0x02, &tcb_be);
     let mut extensions = Vec::new();
-    for (oid, inner) in [
-        (OID_HWID, hwid_inner.as_slice()),
-        (OID_TCB_VERSION, tcb_int.as_slice()),
-    ] {
+    for (oid, inner) in [(OID_HWID, hwid_inner.as_slice()), (OID_TCB_VERSION, tcb_int.as_slice())] {
         let mut body = Vec::new();
         body.extend(tlv(0x06, oid));
         body.extend(tlv(0x04, inner));
@@ -142,12 +138,7 @@ fn identity_extensions(chip_id: &[u8; 64], tcb_version: u64) -> Vec<u8> {
     extensions
 }
 
-fn encode_cert(
-    subject_xy: &[u8; 96],
-    issuer: &SigningKey,
-    subject_rdns: &[u8],
-    extensions: &[u8],
-) -> Vec<u8> {
+fn encode_cert(subject_xy: &[u8; 96], issuer: &SigningKey, subject_rdns: &[u8], extensions: &[u8]) -> Vec<u8> {
     let mut spki_alg = Vec::new();
     spki_alg.extend(tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01]));
     spki_alg.extend(tlv(0x06, &[0x2B, 0x81, 0x04, 0x00, 0x22]));
@@ -158,10 +149,7 @@ fn encode_cert(
     spki_body.extend(tlv(0x03, &key_bit));
     let spki = tlv(0x30, &spki_body);
 
-    let sigalg = tlv(
-        0x30,
-        &tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03]),
-    );
+    let sigalg = tlv(0x30, &tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03]));
     let mut validity_body = Vec::new();
     validity_body.extend(tlv(0x17, b"250101000000Z"));
     validity_body.extend(tlv(0x17, b"350101000000Z"));
@@ -212,21 +200,11 @@ fn sign_report(report: &mut [u8; SNP_REPORT_SIZE], signing_key: &SigningKey) {
     report[0x2E8..0x330].copy_from_slice(&s_le);
 }
 
-fn system_program_account<'a>(
-    key: &'a Pubkey,
-    lamports: &'a mut u64,
-    data: &'a mut [u8],
-) -> AccountInfo<'a> {
+fn system_program_account<'a>(key: &'a Pubkey, lamports: &'a mut u64, data: &'a mut [u8]) -> AccountInfo<'a> {
     AccountInfo::new(key, false, false, lamports, data, key, false)
 }
 
-fn register_ix(
-    chip_id: [u8; 64],
-    tcb_version: u64,
-    vcek_xy: [u8; 96],
-    ask: &[u8],
-    vcek: &[u8],
-) -> Vec<u8> {
+fn register_ix(chip_id: [u8; 64], tcb_version: u64, vcek_xy: [u8; 96], ask: &[u8], vcek: &[u8]) -> Vec<u8> {
     let mut ix = Vec::new();
     ix.extend_from_slice(&REGISTER_VCEK_DISCRIMINATOR);
     RegisterVcekArgs {
@@ -255,13 +233,7 @@ async fn reject_synthetic_registration(
     let mut pt = sbf::verifier_program_test(pid);
     pt.add_account(
         registry_pda,
-        Account {
-            lamports: 10_000_000,
-            data: registry_data.to_vec(),
-            owner: pid,
-            executable: false,
-            rent_epoch: 0,
-        },
+        Account { lamports: 10_000_000, data: registry_data.to_vec(), owner: pid, executable: false, rent_epoch: 0 },
     );
     pt.add_account(
         candidate,
@@ -274,11 +246,7 @@ async fn reject_synthetic_registration(
         },
     );
     let ctx = pt.start_with_context().await;
-    ctx.set_sysvar(&Clock {
-        slot: 520,
-        unix_timestamp: NOW_UNIX,
-        ..Clock::default()
-    });
+    ctx.set_sysvar(&Clock { slot: 520, unix_timestamp: NOW_UNIX, ..Clock::default() });
 
     let instruction = Instruction {
         program_id: pid,
@@ -291,31 +259,11 @@ async fn reject_synthetic_registration(
         data: ix.to_vec(),
     };
     let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
-    let tx = Transaction::new_signed_with_payer(
-        &[instruction],
-        Some(&ctx.payer.pubkey()),
-        &[&ctx.payer],
-        blockhash,
-    );
-    let err = ctx
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .expect_err("synthetic AMD chain must not register");
-    assert_eq!(
-        instruction_error(err),
-        InstructionError::Custom(VerifierError::VerificationFailed as u32),
-    );
-    let after = ctx
-        .banks_client
-        .get_account(candidate)
-        .await
-        .unwrap()
-        .expect("candidate cache account");
-    assert!(
-        after.data.iter().all(|b| *b == 0),
-        "rejected registration wrote the cache account"
-    );
+    let tx = Transaction::new_signed_with_payer(&[instruction], Some(&ctx.payer.pubkey()), &[&ctx.payer], blockhash);
+    let err = ctx.banks_client.process_transaction(tx).await.expect_err("synthetic AMD chain must not register");
+    assert_eq!(instruction_error(err), InstructionError::Custom(VerifierError::VerificationFailed as u32),);
+    let after = ctx.banks_client.get_account(candidate).await.unwrap().expect("candidate cache account");
+    assert!(after.data.iter().all(|b| *b == 0), "rejected registration wrote the cache account");
 }
 
 /// Reject unsupported registration and exercise V2 cache lookup separately.
@@ -354,32 +302,17 @@ async fn reject_synthetic_registration_then_verify_cached_key(vlek: bool) {
     let tcb_version = u64::from_le_bytes(report[0x180..0x188].try_into().unwrap());
     sign_report(&mut report, &vcek_sk);
 
-    let subject = if vlek {
-        &b"SEV-VLEK"[..]
-    } else {
-        &b"SEV-VCEK"[..]
-    };
+    let subject = if vlek { &b"SEV-VLEK"[..] } else { &b"SEV-VCEK"[..] };
     let ask_cert = encode_cert(&ask_xy, &ark_sk, &[], &[]);
-    let vcek_cert = encode_cert(
-        &vcek_xy,
-        &ask_sk,
-        &common_name(subject),
-        &identity_extensions(&chip_id, tcb_version),
-    );
+    let vcek_cert = encode_cert(&vcek_xy, &ask_sk, &common_name(subject), &identity_extensions(&chip_id, tcb_version));
     let ix = register_ix(chip_id, tcb_version, vcek_xy, &ask_cert, &vcek_cert);
 
     let pubkey_hash = hashv(&[&vcek_xy]).to_bytes();
     let chip_hash = hashv(&[&chip_id]).to_bytes();
-    let (right_hash, wrong_hash) = if vlek {
-        (pubkey_hash, chip_hash)
-    } else {
-        (chip_hash, pubkey_hash)
-    };
+    let (right_hash, wrong_hash) = if vlek { (pubkey_hash, chip_hash) } else { (chip_hash, pubkey_hash) };
     let tcb_bytes = tcb_version.to_le_bytes();
-    let (wrong_pda, _) =
-        Pubkey::find_program_address(&[VcekAccount::SEED, &wrong_hash, &tcb_bytes], &pid);
-    let (vcek_pda, vcek_bump) =
-        Pubkey::find_program_address(&[VcekAccount::SEED, &right_hash, &tcb_bytes], &pid);
+    let (wrong_pda, _) = Pubkey::find_program_address(&[VcekAccount::SEED, &wrong_hash, &tcb_bytes], &pid);
+    let (vcek_pda, vcek_bump) = Pubkey::find_program_address(&[VcekAccount::SEED, &right_hash, &tcb_bytes], &pid);
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
 
     let mut registry_data = vec![0u8; PolicyRegistry::SIZE];
@@ -440,16 +373,12 @@ async fn reject_synthetic_registration_then_verify_cached_key(vlek: bool) {
     assert_eq!(saved.valid_until_unix, VALID_UNTIL_UNIX);
     assert!(!saved.is_revoked);
 
-    let (signer_pda, signer_bump) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", &workload_pubkey], &pid);
-    let (nonce_pda, nonce_bump) =
-        Pubkey::find_program_address(&[b"nonce", &[1], &workload_pubkey, &slot_hash], &pid);
+    let (signer_pda, signer_bump) = Pubkey::find_program_address(&[b"attested_signer_v2", &workload_pubkey], &pid);
+    let (nonce_pda, nonce_bump) = Pubkey::find_program_address(&[b"nonce", &[1], &workload_pubkey, &slot_hash], &pid);
 
     let mut verify_ix = Vec::new();
     verify_ix.extend_from_slice(&VERIFY_AND_REGISTER_DISCRIMINATOR);
-    VerifyAndRegisterArgs { nonce_slot, report }
-        .serialize(&mut verify_ix)
-        .unwrap();
+    VerifyAndRegisterArgs { nonce_slot, report }.serialize(&mut verify_ix).unwrap();
     verify_ix.push(nonce_bump);
     verify_ix.push(signer_bump);
 
@@ -475,51 +404,11 @@ async fn reject_synthetic_registration_then_verify_cached_key(vlek: bool) {
     let mut workload_lamports = 1;
     let mut workload_data = [];
     let accounts = [
-        AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut payer_lamports,
-            &mut payer_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &registry_pda,
-            false,
-            false,
-            &mut reg_lamports,
-            &mut registry_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &vcek_pda,
-            false,
-            false,
-            &mut vcek_lamports,
-            &mut vcek_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &signer_pda,
-            false,
-            true,
-            &mut signer_lamports,
-            &mut signer_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &nonce_pda,
-            false,
-            true,
-            &mut nonce_lamports,
-            &mut nonce_data,
-            &pid,
-            false,
-        ),
+        AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false),
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false),
+        AccountInfo::new(&vcek_pda, false, false, &mut vcek_lamports, &mut vcek_data, &pid, false),
+        AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false),
+        AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false),
         AccountInfo::new(
             &slot_hashes_key,
             false,
@@ -539,15 +428,7 @@ async fn reject_synthetic_registration_then_verify_cached_key(vlek: bool) {
             false,
         ),
         system_program_account(&sys_key, &mut sys_lamports, &mut sys_data),
-        AccountInfo::new(
-            &workload_key,
-            true,
-            false,
-            &mut workload_lamports,
-            &mut workload_data,
-            &pid,
-            false,
-        ),
+        AccountInfo::new(&workload_key, true, false, &mut workload_lamports, &mut workload_data, &pid, false),
     ];
     let trusted_cache = accounts[2].try_borrow_data().unwrap().to_vec();
     for invalid in ["expired", "revoked", "profile", "negative_clock"] {
@@ -557,22 +438,14 @@ async fn reject_synthetic_registration_then_verify_cached_key(vlek: bool) {
             "revoked" => cache.is_revoked = true,
             "profile" => cache.trust_profile[0] ^= 1,
             "negative_clock" => {
-                accounts[6].try_borrow_mut_data().unwrap()[32..40]
-                    .copy_from_slice(&(-1i64).to_le_bytes());
+                accounts[6].try_borrow_mut_data().unwrap()[32..40].copy_from_slice(&(-1i64).to_le_bytes());
             }
             _ => unreachable!(),
         }
-        cache
-            .serialize(&mut &mut accounts[2].try_borrow_mut_data().unwrap()[..])
-            .unwrap();
+        cache.serialize(&mut &mut accounts[2].try_borrow_mut_data().unwrap()[..]).unwrap();
         let before: Vec<_> = accounts
             .iter()
-            .map(|a| {
-                (
-                    **a.try_borrow_lamports().unwrap(),
-                    a.try_borrow_data().unwrap().to_vec(),
-                )
-            })
+            .map(|a| (**a.try_borrow_lamports().unwrap(), a.try_borrow_data().unwrap().to_vec()))
             .collect();
         assert_eq!(
             Processor::process(&pid, &accounts, &verify_ix),
@@ -580,26 +453,15 @@ async fn reject_synthetic_registration_then_verify_cached_key(vlek: bool) {
             "{invalid}"
         );
         for (account, (lamports, data)) in accounts.iter().zip(before) {
-            assert_eq!(
-                **account.try_borrow_lamports().unwrap(),
-                lamports,
-                "{invalid}"
-            );
+            assert_eq!(**account.try_borrow_lamports().unwrap(), lamports, "{invalid}");
             assert_eq!(&account.try_borrow_data().unwrap()[..], data, "{invalid}");
         }
         accounts[6].try_borrow_mut_data().unwrap()[32..40].copy_from_slice(&NOW_UNIX.to_le_bytes());
     }
-    accounts[2]
-        .try_borrow_mut_data()
-        .unwrap()
-        .copy_from_slice(&trusted_cache);
+    accounts[2].try_borrow_mut_data().unwrap().copy_from_slice(&trusted_cache);
     let verified = Processor::process(&pid, &accounts, &verify_ix);
     assert_ne!(verified, Err(VerifierError::InvalidAccountAddress.into()));
-    assert_eq!(
-        verified,
-        Ok(()),
-        "VLEK={vlek} report should resolve the valid V2 cache fixture"
-    );
+    assert_eq!(verified, Ok(()), "VLEK={vlek} report should resolve the valid V2 cache fixture");
 }
 
 #[tokio::test]

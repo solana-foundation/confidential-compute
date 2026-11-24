@@ -29,9 +29,7 @@ use {
 pub fn so_path(program_name: &str) -> std::path::PathBuf {
     let dir = std::env::var("SBF_OUT_DIR")
         .or_else(|_| std::env::var("BPF_OUT_DIR"))
-        .unwrap_or_else(|_| {
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy").to_string()
-        });
+        .unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy").to_string());
     std::path::Path::new(&dir).join(format!("{program_name}.so"))
 }
 

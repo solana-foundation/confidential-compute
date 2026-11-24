@@ -4,12 +4,8 @@
 use borsh::BorshDeserialize;
 use solana_confidential_compute_verifier::{
     error::VerifierError,
-    payload::{
-        VerifyNitroAttestationArgs, VERIFY_NITRO_ATTESTATION_DISCRIMINATOR, VERIFY_NITRO_MODE_A,
-    },
-    state::{
-        AttestedSignerAccount, PolicyRegistry, UsedNonceAccount, POLICY_REGISTRY_DISCRIMINATOR,
-    },
+    payload::{VerifyNitroAttestationArgs, VERIFY_NITRO_ATTESTATION_DISCRIMINATOR, VERIFY_NITRO_MODE_A},
+    state::{AttestedSignerAccount, PolicyRegistry, UsedNonceAccount, POLICY_REGISTRY_DISCRIMINATOR},
     DirectCryptoVerifier, MockVerifier,
 };
 use solana_program::{
@@ -27,13 +23,7 @@ const SLOT: u64 = 520;
 const NONCE_SLOT: u64 = 500;
 // Certificate validity instant from the committed fixture's existing crypto test.
 const UNIX_TIME: i64 = 1_790_375_400;
-fn account(
-    key: Pubkey,
-    owner: Pubkey,
-    signer: bool,
-    writable: bool,
-    data: Vec<u8>,
-) -> AccountInfo<'static> {
+fn account(key: Pubkey, owner: Pubkey, signer: bool, writable: bool, data: Vec<u8>) -> AccountInfo<'static> {
     AccountInfo::new(
         Box::leak(Box::new(key)),
         signer,
@@ -45,11 +35,8 @@ fn account(
     )
 }
 fn replace_claim(document: &mut [u8], key: &[u8], value: [u8; 32]) {
-    let positions: Vec<_> = document
-        .windows(key.len())
-        .enumerate()
-        .filter_map(|(i, w)| (w == key).then_some(i))
-        .collect();
+    let positions: Vec<_> =
+        document.windows(key.len()).enumerate().filter_map(|(i, w)| (w == key).then_some(i)).collect();
     assert_eq!(positions.len(), 1, "fixture field must be unambiguous");
     let offset = positions[0] + key.len();
     assert_eq!(&document[offset..offset + 2], &[0x58, 0x20]);
@@ -115,28 +102,10 @@ fn fixture(document: &[u8]) -> (Pubkey, Vec<AccountInfo<'static>>) {
         vec![
             account(Pubkey::new_unique(), sys, true, true, vec![]),
             account(registry, pid, false, false, borsh::to_vec(&policy).unwrap()),
-            account(
-                record,
-                pid,
-                false,
-                true,
-                vec![0; AttestedSignerAccount::SIZE],
-            ),
+            account(record, pid, false, true, vec![0; AttestedSignerAccount::SIZE]),
             account(nonce, pid, false, true, vec![0; UsedNonceAccount::SIZE]),
-            account(
-                slot_hashes::ID,
-                solana_program::sysvar::ID,
-                false,
-                false,
-                hashes,
-            ),
-            account(
-                clock::ID,
-                solana_program::sysvar::ID,
-                false,
-                false,
-                clock_data,
-            ),
+            account(slot_hashes::ID, solana_program::sysvar::ID, false, false, hashes),
+            account(clock::ID, solana_program::sysvar::ID, false, false, clock_data),
             account(sys, sys, false, false, vec![]),
         ],
     )
@@ -150,49 +119,21 @@ fn forged_registration_requires_consent_before_writes_even_with_accepting_crypto
     let empty_record = accounts[2].try_borrow_data().unwrap().to_vec();
     let empty_nonce = accounts[3].try_borrow_data().unwrap().to_vec();
     assert!(Processor::process_with(&DirectCryptoVerifier, &pid, &accounts, &ix).is_err());
-    assert_eq!(
-        accounts[2].try_borrow_data().unwrap().to_vec(),
-        empty_record
-    );
+    assert_eq!(accounts[2].try_borrow_data().unwrap().to_vec(), empty_record);
     assert_eq!(accounts[3].try_borrow_data().unwrap().to_vec(), empty_nonce);
     let verifier = MockVerifier::succeeding();
-    assert_eq!(
-        Processor::process_with(&verifier, &pid, &accounts, &ix),
-        Err(VerifierError::SignerMismatch.into())
-    );
-    assert_eq!(
-        accounts[2].try_borrow_data().unwrap().to_vec(),
-        empty_record
-    );
+    assert_eq!(Processor::process_with(&verifier, &pid, &accounts, &ix), Err(VerifierError::SignerMismatch.into()));
+    assert_eq!(accounts[2].try_borrow_data().unwrap().to_vec(), empty_record);
     assert_eq!(accounts[3].try_borrow_data().unwrap().to_vec(), empty_nonce);
-    accounts.push(account(
-        Pubkey::new_from_array(VICTIM),
-        pid,
-        false,
-        false,
-        vec![],
-    ));
-    assert_eq!(
-        Processor::process_with(&verifier, &pid, &accounts, &ix),
-        Err(ProgramError::MissingRequiredSignature)
-    );
-    assert_eq!(
-        accounts[2].try_borrow_data().unwrap().to_vec(),
-        empty_record
-    );
+    accounts.push(account(Pubkey::new_from_array(VICTIM), pid, false, false, vec![]));
+    assert_eq!(Processor::process_with(&verifier, &pid, &accounts, &ix), Err(ProgramError::MissingRequiredSignature));
+    assert_eq!(accounts[2].try_borrow_data().unwrap().to_vec(), empty_record);
     assert_eq!(accounts[3].try_borrow_data().unwrap().to_vec(), empty_nonce);
     accounts.last_mut().unwrap().is_signer = true;
-    assert_eq!(
-        Processor::process_with(&verifier, &pid, &accounts, &ix),
-        Ok(())
-    );
-    let saved =
-        AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap();
+    assert_eq!(Processor::process_with(&verifier, &pid, &accounts, &ix), Ok(()));
+    let saved = AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap();
     assert_eq!(saved.record.signer_pubkey, VICTIM);
-    assert_eq!(
-        Processor::process_with(&verifier, &pid, &accounts, &ix),
-        Err(VerifierError::NonceAlreadyUsed.into())
-    );
+    assert_eq!(Processor::process_with(&verifier, &pid, &accounts, &ix), Err(VerifierError::NonceAlreadyUsed.into()));
     // Narrow the audit's TTL-squat claim: same-source registration is refreshable
     // before expiry if the authorized workload supplies a fresh nonce.
     let fresh = Hash::new_unique().to_bytes();
@@ -200,15 +141,6 @@ fn forged_registration_requires_consent_before_writes_even_with_accepting_crypto
     let fresh_ix = instruction(forged_document(fresh));
     accounts[4].try_borrow_mut_data().unwrap()[16..48].copy_from_slice(&fresh);
     let (fresh_nonce, _) = Pubkey::find_program_address(&[b"nonce", &[2], &VICTIM, &fresh], &pid);
-    accounts[3] = account(
-        fresh_nonce,
-        pid,
-        false,
-        true,
-        vec![0; UsedNonceAccount::SIZE],
-    );
-    assert_eq!(
-        Processor::process_with(&verifier, &pid, &accounts, &fresh_ix),
-        Ok(())
-    );
+    accounts[3] = account(fresh_nonce, pid, false, true, vec![0; UsedNonceAccount::SIZE]);
+    assert_eq!(Processor::process_with(&verifier, &pid, &accounts, &fresh_ix), Ok(()));
 }

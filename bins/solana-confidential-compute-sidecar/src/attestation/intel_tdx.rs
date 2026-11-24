@@ -160,14 +160,8 @@ pub fn report_data_commitment(
     model_digest: &[u8; 32],
     challenge_nonce: &[u8; 32],
 ) -> [u8; 64] {
-    let preimage = report_data_preimage(
-        workload_signer,
-        composite,
-        slot_challenge,
-        gpu_rim_digest,
-        model_digest,
-        challenge_nonce,
-    );
+    let preimage =
+        report_data_preimage(workload_signer, composite, slot_challenge, gpu_rim_digest, model_digest, challenge_nonce);
     let digest = Sha512::digest(&preimage);
     let mut out = [0u8; 64];
     out.copy_from_slice(&digest);
@@ -182,35 +176,19 @@ struct ParsedQuote {
 
 /// Quote source used by [`IntelTdxProvider`]. Tests supply a scripted backend.
 trait TdxQuoteBackend: Send + Sync {
-    fn read_guest_report(
-        &self,
-        path: &str,
-        report_data: &[u8; 64],
-    ) -> Result<Vec<u8>, SidecarError>;
+    fn read_guest_report(&self, path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, SidecarError>;
 
-    fn read_dstack_quote(
-        &self,
-        socket_path: &str,
-        report_data: &[u8; 64],
-    ) -> Result<Vec<u8>, SidecarError>;
+    fn read_dstack_quote(&self, socket_path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, SidecarError>;
 }
 
 struct SystemQuoteBackend;
 
 impl TdxQuoteBackend for SystemQuoteBackend {
-    fn read_guest_report(
-        &self,
-        path: &str,
-        report_data: &[u8; 64],
-    ) -> Result<Vec<u8>, SidecarError> {
+    fn read_guest_report(&self, path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, SidecarError> {
         read_tdx_report0(path, report_data)
     }
 
-    fn read_dstack_quote(
-        &self,
-        socket_path: &str,
-        report_data: &[u8; 64],
-    ) -> Result<Vec<u8>, SidecarError> {
+    fn read_dstack_quote(&self, socket_path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, SidecarError> {
         read_dstack_quote(socket_path, report_data)
     }
 }
@@ -228,11 +206,7 @@ pub struct IntelTdxProvider {
 
 impl IntelTdxProvider {
     /// `simulated` selects the dry-run quote. Live mode keeps the hardware probe.
-    pub fn new(
-        gpu_rim_digest: Option<[u8; 32]>,
-        model_digest: Option<[u8; 32]>,
-        simulated: bool,
-    ) -> Self {
+    pub fn new(gpu_rim_digest: Option<[u8; 32]>, model_digest: Option<[u8; 32]>, simulated: bool) -> Self {
         Self {
             primary_device: TDX_GUEST_DEVICE.to_string(),
             secondary_device: TDX_GUEST_DEVICE_ALT.to_string(),
@@ -328,10 +302,7 @@ impl IntelTdxProvider {
     /// header before it is accepted, so this returns a quote or nothing
     /// regardless of which source answered.
     fn first_quote(&self, report_data: &[u8; 64]) -> Result<Vec<u8>, SidecarError> {
-        match self
-            .backend
-            .read_dstack_quote(&self.dstack_socket, report_data)
-        {
+        match self.backend.read_dstack_quote(&self.dstack_socket, report_data) {
             Ok(quote) if looks_like_quote_v4(&quote) => return Ok(quote),
             Ok(_) => {
                 tracing::debug!(path = %self.dstack_socket, "dstack returned a non-quote payload");
@@ -369,14 +340,8 @@ impl IntelTdxProvider {
     ) -> Result<AttestationReport, SidecarError> {
         let (gpu_rim, model) = self.binding_digests()?;
         let composite = composite_challenge(workload_signer, slot_hash, &gpu_rim, &model);
-        let report_data = report_data_commitment(
-            workload_signer,
-            &composite,
-            slot_hash,
-            &gpu_rim,
-            &model,
-            challenge_nonce,
-        );
+        let report_data =
+            report_data_commitment(workload_signer, &composite, slot_hash, &gpu_rim, &model, challenge_nonce);
         let quote = if self.simulated {
             synthetic_quote(&report_data)
         } else {
@@ -444,22 +409,12 @@ fn synthetic_quote(report_data: &[u8; 64]) -> Vec<u8> {
     quote
 }
 
-fn parse_measurements(
-    quote: &[u8],
-    expected_report_data: &[u8; 64],
-) -> Result<ParsedQuote, SidecarError> {
+fn parse_measurements(quote: &[u8], expected_report_data: &[u8; 64]) -> Result<ParsedQuote, SidecarError> {
     if synthetic_tdx_evidence(quote) {
         return parse_synthetic(quote, expected_report_data);
     }
     if looks_like_quote_v4(quote) {
-        return parse_at(
-            quote,
-            QUOTE_MR_TD,
-            QUOTE_MR_CONFIG_ID,
-            QUOTE_RTMR0,
-            QUOTE_REPORTDATA,
-            expected_report_data,
-        );
+        return parse_at(quote, QUOTE_MR_TD, QUOTE_MR_CONFIG_ID, QUOTE_RTMR0, QUOTE_REPORTDATA, expected_report_data);
     }
     if quote.len() >= TDX_REPORT_LEN {
         return parse_at(
@@ -471,25 +426,18 @@ fn parse_measurements(
             expected_report_data,
         );
     }
-    Err(SidecarError::AttestationError(
-        "TDX quote layout is not recognized".to_string(),
-    ))
+    Err(SidecarError::AttestationError("TDX quote layout is not recognized".to_string()))
 }
 
 fn looks_like_quote_v4(quote: &[u8]) -> bool {
     quote.len() >= QUOTE_MIN_LEN
+        && quote.get(..2).is_some_and(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) == QUOTE_V4_VERSION)
         && quote
-            .get(..2)
-            .is_some_and(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) == QUOTE_V4_VERSION)
-        && quote.get(4..8).is_some_and(|bytes| {
-            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) == QUOTE_TDX_TEE_TYPE
-        })
+            .get(4..8)
+            .is_some_and(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) == QUOTE_TDX_TEE_TYPE)
 }
 
-fn parse_synthetic(
-    quote: &[u8],
-    expected_report_data: &[u8; 64],
-) -> Result<ParsedQuote, SidecarError> {
+fn parse_synthetic(quote: &[u8], expected_report_data: &[u8; 64]) -> Result<ParsedQuote, SidecarError> {
     let mut offset = SYNTHETIC_TDX_PREFIX.len();
     let mr_td = take_array(quote, &mut offset)?;
     let mr_config_id = take_array(quote, &mut offset)?;
@@ -499,15 +447,9 @@ fn parse_synthetic(
     }
     let report_data: [u8; 64] = take_array(quote, &mut offset)?;
     if offset != quote.len() || report_data != *expected_report_data {
-        return Err(SidecarError::AttestationError(
-            "synthetic TDX quote does not bind REPORTDATA".to_string(),
-        ));
+        return Err(SidecarError::AttestationError("synthetic TDX quote does not bind REPORTDATA".to_string()));
     }
-    Ok(ParsedQuote {
-        mr_td,
-        mr_config_id,
-        rtmrs_hash: hash_rtmrs(&rtmrs),
-    })
+    Ok(ParsedQuote { mr_td, mr_config_id, rtmrs_hash: hash_rtmrs(&rtmrs) })
 }
 
 fn parse_at(
@@ -522,9 +464,7 @@ fn parse_at(
     let mr_config_id = copy_at(quote, mr_config_at)?;
     let mut rtmrs = [[0u8; 48]; 4];
     for (index, rtmr) in rtmrs.iter_mut().enumerate() {
-        let at = rtmr_at
-            .checked_add(index.checked_mul(48).ok_or_else(truncated)?)
-            .ok_or_else(truncated)?;
+        let at = rtmr_at.checked_add(index.checked_mul(48).ok_or_else(truncated)?).ok_or_else(truncated)?;
         *rtmr = copy_at(quote, at)?;
     }
     let report_data: [u8; 64] = copy_at(quote, report_data_at)?;
@@ -533,11 +473,7 @@ fn parse_at(
             "TDX REPORTDATA does not match the composite challenge".to_string(),
         ));
     }
-    Ok(ParsedQuote {
-        mr_td,
-        mr_config_id,
-        rtmrs_hash: hash_rtmrs(&rtmrs),
-    })
+    Ok(ParsedQuote { mr_td, mr_config_id, rtmrs_hash: hash_rtmrs(&rtmrs) })
 }
 
 fn truncated() -> SidecarError {
@@ -582,9 +518,7 @@ fn read_tdx_report0(path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, Sidec
     #[cfg(not(target_os = "linux"))]
     {
         let _ = (path, report_data);
-        Err(SidecarError::IoctlError(
-            "TDX_CMD_GET_REPORT0 requires a Linux TDX guest".to_string(),
-        ))
+        Err(SidecarError::IoctlError("TDX_CMD_GET_REPORT0 requires a Linux TDX guest".to_string()))
     }
 }
 
@@ -608,20 +542,14 @@ fn linux_get_report0(path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, Side
         }
     }
 
-    let c_path = CString::new(path)
-        .map_err(|_| SidecarError::IoctlError(format!("{path} is not a valid device path")))?;
+    let c_path =
+        CString::new(path).map_err(|_| SidecarError::IoctlError(format!("{path} is not a valid device path")))?;
     let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDWR | libc::O_CLOEXEC) };
     if fd < 0 {
-        return Err(SidecarError::IoctlError(format!(
-            "open {path}: {}",
-            std::io::Error::last_os_error()
-        )));
+        return Err(SidecarError::IoctlError(format!("open {path}: {}", std::io::Error::last_os_error())));
     }
     let _owned = OwnedFd(fd);
-    let mut req = Box::new(TdxReportReq {
-        reportdata: *report_data,
-        tdreport: [0; TDX_REPORT_LEN],
-    });
+    let mut req = Box::new(TdxReportReq { reportdata: *report_data, tdreport: [0; TDX_REPORT_LEN] });
     loop {
         let rc = unsafe { libc::ioctl(fd, TDX_CMD_GET_REPORT0 as libc::Ioctl, req.as_mut()) };
         if rc == 0 {
@@ -631,9 +559,7 @@ fn linux_get_report0(path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, Side
         if error.kind() == ErrorKind::Interrupted {
             continue;
         }
-        return Err(SidecarError::IoctlError(format!(
-            "TDX_CMD_GET_REPORT0 on {path}: {error}"
-        )));
+        return Err(SidecarError::IoctlError(format!("TDX_CMD_GET_REPORT0 on {path}: {error}")));
     }
 }
 
@@ -657,22 +583,17 @@ fn read_dstack_quote(socket_path: &str, report_data: &[u8; 64]) -> Result<Vec<u8
 }
 
 fn quote_from_json(bytes: &[u8]) -> Result<Vec<u8>, SidecarError> {
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|_| {
-        SidecarError::AttestationError("dstack quote response is not JSON".to_string())
-    })?;
+    let value: serde_json::Value = serde_json::from_slice(bytes)
+        .map_err(|_| SidecarError::AttestationError("dstack quote response is not JSON".to_string()))?;
     let text = value
         .get("quote")
         .or_else(|| value.pointer("/result/quote"))
         .or_else(|| value.pointer("/data/quote"))
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            SidecarError::AttestationError("dstack response has no quote".to_string())
-        })?;
+        .ok_or_else(|| SidecarError::AttestationError("dstack response has no quote".to_string()))?;
     let quote = decode_quote_text(text)?;
     if quote.is_empty() {
-        return Err(SidecarError::AttestationError(
-            "dstack quote is empty".to_string(),
-        ));
+        return Err(SidecarError::AttestationError("dstack quote is empty".to_string()));
     }
     Ok(quote)
 }
@@ -680,9 +601,7 @@ fn quote_from_json(bytes: &[u8]) -> Result<Vec<u8>, SidecarError> {
 fn decode_quote_text(text: &str) -> Result<Vec<u8>, SidecarError> {
     let trimmed = text.trim();
     let hex_text = trimmed.strip_prefix("0x").unwrap_or(trimmed);
-    if hex_text.len() >= 2
-        && hex_text.len().is_multiple_of(2)
-        && hex_text.bytes().all(|byte| byte.is_ascii_hexdigit())
+    if hex_text.len() >= 2 && hex_text.len().is_multiple_of(2) && hex_text.bytes().all(|byte| byte.is_ascii_hexdigit())
     {
         return decode_hex(hex_text);
     }
@@ -691,9 +610,8 @@ fn decode_quote_text(text: &str) -> Result<Vec<u8>, SidecarError> {
         return Ok(bytes);
     }
     let url = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    base64::Engine::decode(&url, trimmed).map_err(|_| {
-        SidecarError::AttestationError("dstack quote is not hex or base64".to_string())
-    })
+    base64::Engine::decode(&url, trimmed)
+        .map_err(|_| SidecarError::AttestationError("dstack quote is not hex or base64".to_string()))
 }
 
 fn unix_http(socket_path: &str, path: &str, json_body: &str) -> Result<Vec<u8>, SidecarError> {
@@ -701,13 +619,10 @@ fn unix_http(socket_path: &str, path: &str, json_body: &str) -> Result<Vec<u8>, 
     use std::os::unix::net::UnixStream;
 
     if path.contains(['\r', '\n', ' ']) {
-        return Err(SidecarError::AttestationError(
-            "dstack HTTP path is not accepted".to_string(),
-        ));
+        return Err(SidecarError::AttestationError("dstack HTTP path is not accepted".to_string()));
     }
-    let mut stream = UnixStream::connect(socket_path).map_err(|error| {
-        SidecarError::AttestationError(format!("dstack socket {socket_path}: {error}"))
-    })?;
+    let mut stream = UnixStream::connect(socket_path)
+        .map_err(|error| SidecarError::AttestationError(format!("dstack socket {socket_path}: {error}")))?;
     stream
         .set_read_timeout(Some(Duration::from_millis(750)))
         .map_err(|error| SidecarError::AttestationError(format!("dstack timeout: {error}")))?;
@@ -725,28 +640,20 @@ fn unix_http(socket_path: &str, path: &str, json_body: &str) -> Result<Vec<u8>, 
     let mut tmp = [0u8; 4096];
     loop {
         if raw.len() >= MAX_DSTACK_RESPONSE {
-            return Err(SidecarError::AttestationError(
-                "dstack response exceeds 256 KiB".to_string(),
-            ));
+            return Err(SidecarError::AttestationError("dstack response exceeds 256 KiB".to_string()));
         }
         match stream.read(&mut tmp) {
             Ok(0) => break,
             Ok(count) => raw.extend_from_slice(&tmp[..count]),
             Err(error) if error.kind() == ErrorKind::Interrupted => continue,
-            Err(error)
-                if error.kind() == ErrorKind::TimedOut || error.kind() == ErrorKind::WouldBlock =>
-            {
+            Err(error) if error.kind() == ErrorKind::TimedOut || error.kind() == ErrorKind::WouldBlock => {
                 if raw.is_empty() {
-                    return Err(SidecarError::AttestationError(
-                        "dstack response timed out".to_string(),
-                    ));
+                    return Err(SidecarError::AttestationError("dstack response timed out".to_string()));
                 }
                 break;
             }
             Err(error) => {
-                return Err(SidecarError::AttestationError(format!(
-                    "dstack read failed: {error}"
-                )));
+                return Err(SidecarError::AttestationError(format!("dstack read failed: {error}")));
             }
         }
         if http_body_complete(&raw) {
@@ -772,30 +679,22 @@ fn split_http(raw: &[u8]) -> Result<(u16, Vec<u8>), SidecarError> {
     let split = raw
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
-        .ok_or_else(|| {
-            SidecarError::AttestationError("dstack HTTP response has no header end".to_string())
-        })?;
+        .ok_or_else(|| SidecarError::AttestationError("dstack HTTP response has no header end".to_string()))?;
     let header = String::from_utf8_lossy(&raw[..split]);
     let mut body = raw[split + 4..].to_vec();
     let status = header
         .lines()
         .next()
         .and_then(parse_status)
-        .ok_or_else(|| {
-            SidecarError::AttestationError("dstack HTTP status is missing".to_string())
-        })?;
+        .ok_or_else(|| SidecarError::AttestationError("dstack HTTP status is missing".to_string()))?;
     if let Some(length) = content_length(&header) {
         if body.len() < length {
-            return Err(SidecarError::AttestationError(
-                "dstack HTTP body is short".to_string(),
-            ));
+            return Err(SidecarError::AttestationError("dstack HTTP body is short".to_string()));
         }
         body.truncate(length);
     }
     if status != 200 {
-        return Err(SidecarError::AttestationError(format!(
-            "dstack HTTP status {status}"
-        )));
+        return Err(SidecarError::AttestationError(format!("dstack HTTP status {status}")));
     }
     Ok((status, body))
 }
@@ -846,9 +745,7 @@ fn hex_val(byte: u8) -> Result<u8, SidecarError> {
         b'0'..=b'9' => Ok(byte - b'0'),
         b'a'..=b'f' => Ok(byte - b'a' + 10),
         b'A'..=b'F' => Ok(byte - b'A' + 10),
-        _ => Err(SidecarError::AttestationError(
-            "dstack quote hex is malformed".to_string(),
-        )),
+        _ => Err(SidecarError::AttestationError("dstack quote hex is malformed".to_string())),
     }
 }
 
@@ -864,11 +761,7 @@ mod tests {
     }
 
     impl TdxQuoteBackend for ScriptedBackend {
-        fn read_guest_report(
-            &self,
-            path: &str,
-            report_data: &[u8; 64],
-        ) -> Result<Vec<u8>, SidecarError> {
+        fn read_guest_report(&self, path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, SidecarError> {
             self.calls.lock().expect("probe log").push(path.to_string());
             if self.succeed.as_deref() == Some(path) {
                 return Ok((self.quote_for)(report_data));
@@ -876,21 +769,12 @@ mod tests {
             Err(SidecarError::IoctlError(format!("{path} missed")))
         }
 
-        fn read_dstack_quote(
-            &self,
-            socket_path: &str,
-            report_data: &[u8; 64],
-        ) -> Result<Vec<u8>, SidecarError> {
-            self.calls
-                .lock()
-                .expect("probe log")
-                .push(socket_path.to_string());
+        fn read_dstack_quote(&self, socket_path: &str, report_data: &[u8; 64]) -> Result<Vec<u8>, SidecarError> {
+            self.calls.lock().expect("probe log").push(socket_path.to_string());
             if self.succeed.as_deref() == Some(socket_path) {
                 return Ok((self.quote_for)(report_data));
             }
-            Err(SidecarError::AttestationError(format!(
-                "{socket_path} missed"
-            )))
+            Err(SidecarError::AttestationError(format!("{socket_path} missed")))
         }
     }
 
@@ -952,18 +836,9 @@ mod tests {
         let signer = Pubkey::new_from_array([0x40; 32]);
         let composite = composite_challenge(&signer, &slot, &gpu, &model);
         assert_eq!(composite, composite_challenge(&signer, &slot, &gpu, &model));
-        assert_ne!(
-            composite,
-            composite_challenge(&signer, &[0x11; 32], &gpu, &model)
-        );
-        assert_ne!(
-            composite,
-            composite_challenge(&signer, &slot, &[0x21; 32], &model)
-        );
-        assert_ne!(
-            composite,
-            composite_challenge(&signer, &slot, &gpu, &[0x31; 32])
-        );
+        assert_ne!(composite, composite_challenge(&signer, &[0x11; 32], &gpu, &model));
+        assert_ne!(composite, composite_challenge(&signer, &slot, &[0x21; 32], &model));
+        assert_ne!(composite, composite_challenge(&signer, &slot, &gpu, &[0x31; 32]));
         let report = report_data_commitment(&signer, &composite, &slot, &gpu, &model, &slot);
         assert_eq!(report.len(), 64);
         let other = report_data_commitment(&signer, &composite, &slot, &gpu, &[0x31; 32], &slot);
@@ -990,14 +865,9 @@ mod tests {
         let attacker_composite = composite_challenge(&attacker, &slot, &gpu, &model);
         assert_ne!(honest_composite, attacker_composite);
 
-        let honest_report =
-            report_data_commitment(&honest, &honest_composite, &slot, &gpu, &model, &slot);
-        let attacker_report =
-            report_data_commitment(&attacker, &attacker_composite, &slot, &gpu, &model, &slot);
-        assert_ne!(
-            honest_report, attacker_report,
-            "a quote issued for one signer must not validate for another"
-        );
+        let honest_report = report_data_commitment(&honest, &honest_composite, &slot, &gpu, &model, &slot);
+        let attacker_report = report_data_commitment(&attacker, &attacker_composite, &slot, &gpu, &model, &slot);
+        assert_ne!(honest_report, attacker_report, "a quote issued for one signer must not validate for another");
     }
 
     #[tokio::test]
@@ -1006,32 +876,18 @@ mod tests {
         let slot = [0x44; 32];
         let (provider, _backend) = provider(true, Some("/dev/tdx-guest"), blank_tdreport);
 
-        let report = provider
-            .request_attestation(&signer, &slot)
-            .await
-            .expect("dry-run attestation");
-        let AttestationReport::IntelTdx {
-            report_data,
-            composite_challenge: composite,
-            ..
-        } = report
-        else {
+        let report = provider.request_attestation(&signer, &slot).await.expect("dry-run attestation");
+        let AttestationReport::IntelTdx { report_data, composite_challenge: composite, .. } = report else {
             panic!("expected an Intel TDX report");
         };
 
         let (gpu, model) = provider.binding_digests().expect("binding digests");
         assert_eq!(composite, composite_challenge(&signer, &slot, &gpu, &model));
-        assert_eq!(
-            report_data,
-            report_data_commitment(&signer, &composite, &slot, &gpu, &model, &slot)
-        );
+        assert_eq!(report_data, report_data_commitment(&signer, &composite, &slot, &gpu, &model, &slot));
 
         let other = Pubkey::new_from_array([0x45; 32]);
         let other_composite = composite_challenge(&other, &slot, &gpu, &model);
-        assert_ne!(
-            report_data,
-            report_data_commitment(&other, &other_composite, &slot, &gpu, &model, &slot)
-        );
+        assert_ne!(report_data, report_data_commitment(&other, &other_composite, &slot, &gpu, &model, &slot));
     }
 
     #[tokio::test]
@@ -1041,19 +897,14 @@ mod tests {
         let (provider, backend) = provider(false, Some("/var/run/dstack.sock"), quote_v4);
         let mut commitments = Vec::new();
         for nonce in [[0x55; 32], [0x56; 32]] {
-            let report = provider
-                .request_attestation_for_challenge(&signer, &slot, &nonce)
-                .await
-                .expect("scripted attestation");
+            let report =
+                provider.request_attestation_for_challenge(&signer, &slot, &nonce).await.expect("scripted attestation");
             let AttestationReport::IntelTdx { report_data, .. } = report else {
                 panic!("expected an Intel TDX report");
             };
             let (gpu, model) = provider.binding_digests().unwrap();
             let composite = composite_challenge(&signer, &slot, &gpu, &model);
-            assert_eq!(
-                report_data,
-                report_data_commitment(&signer, &composite, &slot, &gpu, &model, &nonce),
-            );
+            assert_eq!(report_data, report_data_commitment(&signer, &composite, &slot, &gpu, &model, &nonce),);
             commitments.push(report_data);
         }
         assert_eq!(backend.calls.lock().unwrap().len(), 2);
@@ -1063,9 +914,7 @@ mod tests {
     #[test]
     fn simulated_provider_is_rejected_for_live_use() {
         let simulated = IntelTdxProvider::new(None, None, true);
-        let error = simulated
-            .reject_simulated_live(false)
-            .expect_err("simulated evidence");
+        let error = simulated.reject_simulated_live(false).expect_err("simulated evidence");
         assert!(matches!(error, SidecarError::InvalidConfig(_)));
         assert!(simulated.reject_simulated_live(true).is_ok());
         let live = IntelTdxProvider::for_daemon(false).expect("live");
@@ -1078,10 +927,7 @@ mod tests {
     async fn dry_run_returns_synthetic_quote_without_probing() {
         let (provider, backend) = provider(true, Some("/dev/tdx-guest"), blank_tdreport);
         let signer = Pubkey::new_unique();
-        let report = provider
-            .request_attestation(&signer, &[0x5a; 32])
-            .await
-            .expect("dry-run");
+        let report = provider.request_attestation(&signer, &[0x5a; 32]).await.expect("dry-run");
         assert!(backend.calls.lock().expect("log").is_empty());
         match report {
             AttestationReport::IntelTdx {
@@ -1099,14 +945,7 @@ mod tests {
                 let model = [0x42; 32];
                 let expected = composite_challenge(&signer, &[0x5a; 32], &gpu, &model);
                 assert_eq!(composite, expected);
-                let committed = report_data_commitment(
-                    &signer,
-                    &expected,
-                    &[0x5a; 32],
-                    &gpu,
-                    &model,
-                    &[0x5a; 32],
-                );
+                let committed = report_data_commitment(&signer, &expected, &[0x5a; 32], &gpu, &model, &[0x5a; 32]);
                 assert_eq!(report_data, committed);
                 assert_eq!(rtmrs_hash, hash_rtmrs(&SYNTHETIC_RTMRS));
             }
@@ -1118,21 +957,11 @@ mod tests {
     async fn daemon_dry_run_uses_placeholder_bindings() {
         let provider = IntelTdxProvider::for_daemon(true).expect("dry-run");
         let signer = Pubkey::new_unique();
-        let report = provider
-            .request_attestation(&signer, &[0x5a; 32])
-            .await
-            .expect("synthetic");
+        let report = provider.request_attestation(&signer, &[0x5a; 32]).await.expect("synthetic");
         match report {
-            AttestationReport::IntelTdx {
-                composite_challenge: composite,
-                ..
-            } => {
-                let expected = composite_challenge(
-                    &signer,
-                    &[0x5a; 32],
-                    &DEFAULT_TDX_GPU_RIM,
-                    &DEFAULT_TDX_MODEL_DIGEST,
-                );
+            AttestationReport::IntelTdx { composite_challenge: composite, .. } => {
+                let expected =
+                    composite_challenge(&signer, &[0x5a; 32], &DEFAULT_TDX_GPU_RIM, &DEFAULT_TDX_MODEL_DIGEST);
                 assert_eq!(composite, expected);
             }
             _ => panic!("expected Intel TDX report"),
@@ -1142,10 +971,8 @@ mod tests {
     #[tokio::test]
     async fn live_synthetic_prefix_from_a_probe_fails_closed() {
         let (provider, _) = provider(false, Some("/dev/tdx-guest"), synthetic_quote);
-        let error = provider
-            .request_attestation(&Pubkey::new_unique(), &[0x5a; 32])
-            .await
-            .expect_err("synthetic prefix");
+        let error =
+            provider.request_attestation(&Pubkey::new_unique(), &[0x5a; 32]).await.expect_err("synthetic prefix");
         assert!(matches!(error, SidecarError::TdxAttestationFailed));
     }
 
@@ -1157,10 +984,8 @@ mod tests {
         // TDREPORT and the socket that would have produced a real quote was
         // never reached.
         let (provider, backend) = provider(false, Some("/var/run/dstack.sock"), quote_v4);
-        let report = provider
-            .request_attestation(&Pubkey::new_unique(), &[0x5a; 32])
-            .await
-            .expect("the socket returns a quote");
+        let report =
+            provider.request_attestation(&Pubkey::new_unique(), &[0x5a; 32]).await.expect("the socket returns a quote");
         let calls = backend.calls.lock().expect("log").clone();
         assert_eq!(
             calls,
@@ -1191,11 +1016,7 @@ mod tests {
         let calls = backend.calls.lock().expect("log").clone();
         assert_eq!(
             calls,
-            vec![
-                "/var/run/dstack.sock".to_string(),
-                "/dev/tdx-guest".to_string(),
-                "/dev/tdx_guest".to_string(),
-            ],
+            vec!["/var/run/dstack.sock".to_string(), "/dev/tdx-guest".to_string(), "/dev/tdx_guest".to_string(),],
             "all three sources are tried before giving up"
         );
     }
@@ -1203,10 +1024,7 @@ mod tests {
     #[tokio::test]
     async fn live_probe_fail_closed_does_not_emit_synthetic_quote() {
         let (provider, backend) = provider(false, None, blank_tdreport);
-        let error = provider
-            .request_attestation(&Pubkey::new_unique(), &[0x5a; 32])
-            .await
-            .expect_err("miss");
+        let error = provider.request_attestation(&Pubkey::new_unique(), &[0x5a; 32]).await.expect_err("miss");
         assert!(matches!(error, SidecarError::TdxAttestationFailed));
         assert_eq!(backend.calls.lock().expect("log").len(), 3);
 
@@ -1219,10 +1037,8 @@ mod tests {
             let provider = IntelTdxProvider::new(None, None, false).with_backend(backend.clone());
             (provider, backend)
         };
-        let error = unpinned
-            .request_attestation(&Pubkey::new_unique(), &[0x5a; 32])
-            .await
-            .expect_err("unpinned live binding");
+        let error =
+            unpinned.request_attestation(&Pubkey::new_unique(), &[0x5a; 32]).await.expect_err("unpinned live binding");
         assert!(matches!(error, SidecarError::TdxAttestationFailed));
         assert!(backend.calls.lock().expect("log").is_empty());
     }
@@ -1231,13 +1047,8 @@ mod tests {
     async fn mismatched_report_data_fails_closed() {
         // A structurally valid quote that commits to someone else's
         // REPORTDATA. It parses, and must still be refused.
-        let (provider, _) = provider(false, Some("/var/run/dstack.sock"), |_| {
-            quote_v4(&[0x11; 64])
-        });
-        let error = provider
-            .request_attestation(&Pubkey::new_unique(), &[0x5a; 32])
-            .await
-            .expect_err("unbound report");
+        let (provider, _) = provider(false, Some("/var/run/dstack.sock"), |_| quote_v4(&[0x11; 64]));
+        let error = provider.request_attestation(&Pubkey::new_unique(), &[0x5a; 32]).await.expect_err("unbound report");
         assert!(matches!(error, SidecarError::AttestationError(_)));
     }
 
