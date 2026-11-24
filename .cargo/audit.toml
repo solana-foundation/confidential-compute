@@ -7,19 +7,13 @@
 # - Every ignored advisory has a comment above it: what the advisory is, why it is
 #   accepted today, and which follow-up removes it. Delete the entry when that follow-up
 #   lands. An ignore without a written reason must not be merged.
-# - A yanked crate has no advisory ID, so it cannot be listed here. yoke-derive 0.8.3 is
-#   yanked: it is printed as a warning and does not fail the job. The lockfile refresh
-#   below moves it to 0.8.4.
+# - A yanked crate has no advisory ID, so it cannot be listed here. It is printed as a
+#   warning and does not fail the job.
 # - Last reviewed 2026-11-24 with cargo-audit 0.23.0 against the RustSec advisory-db.
 #
 # Follow-ups named in the entries
 # - PR 3: the Solana 5 crate upgrade.
 # - PR 4: the RustCrypto upgrade (p256/p384 0.14, rand 0.10).
-# - Lockfile refresh: a `cargo update` that only moves crates to patch releases already
-#   allowed by the current version requirements: url 2.5.9, quinn-proto 0.11.19,
-#   quinn-udp 0.5.16, zstd 0.13.6, zstd-safe 7.4.2, zstd-sys 2.2.0, rustix 1.1.6,
-#   yoke-derive 0.8.4 (checked with `cargo update --dry-run`). It is deferred only because
-#   PR 3 and PR 4 own Cargo.lock right now. It is not opened yet: open it after PR 3 merges.
 # - Upstream: no fix this repository can apply; an upstream crate has to move first.
 #
 # "Dev-only" below means `cargo metadata` shows no path from any workspace member to the
@@ -62,33 +56,6 @@ ignore = [
     # Removed by: PR 3 (expected), same as RUSTSEC-2024-0344.
     "RUSTSEC-2022-0093",
 
-    # RUSTSEC-2026-0523, quinn-proto 0.11.18: a MAX_STREAM_DATA frame can open streams
-    # beyond the stream limit, a QUIC denial of service (patched 0.11.19).
-    # Why accepted: not compiled. Cargo.lock lists quinn 0.11.12 and quinn-proto 0.11.18
-    # only as reqwest 0.12's optional dependency, which reqwest's `http3` feature turns on
-    # and this workspace does not enable. `cargo build --all-targets --all-features
-    # --unit-graph` contains neither crate. The QUIC stack that is built is Anza's fork
-    # (anza-quinn-proto, via solana-client); cargo audit does not match it by name, so its
-    # patch status is decided by Agave, not by this entry.
-    # Removed by: lockfile refresh (`cargo update -p quinn-proto` gives 0.11.19).
-    "RUSTSEC-2026-0523",
-
-    # RUSTSEC-2026-0524, quinn-proto 0.11.18: a long Retry token can panic or exhaust memory
-    # in a QUIC client (patched 0.11.19).
-    # Why accepted: not compiled, same reason as RUSTSEC-2026-0523.
-    # Removed by: lockfile refresh (`cargo update -p quinn-proto` gives 0.11.19).
-    "RUSTSEC-2026-0524",
-
-    # RUSTSEC-2026-0538, quinn-udp 0.5.15: the receive loop can spin after a truncated
-    # datagram, a denial of service (patched 0.5.16).
-    # Why accepted: transitive, sidecar -> solana-client -> solana-quic-client -> anza-quinn
-    # -> quinn-udp. The advisory limits the bug to targets that read one datagram per
-    # recvmsg (Apple without fast-apple-datapath, OpenBSD, NetBSD, Solaris, illumos) and says
-    # Linux, Android, FreeBSD and Windows are not affected. The sidecar ships as a Linux
-    # container (bins/solana-confidential-compute-sidecar/Dockerfile).
-    # Removed by: lockfile refresh (`cargo update -p quinn-udp` gives 0.5.16).
-    "RUSTSEC-2026-0538",
-
     # RUSTSEC-2023-0071, rsa 0.9.10: Marvin attack, a timing side channel in RSA private-key
     # operations (patched 0.10.0).
     # Why accepted: dev-only. `rsa` is a dev-dependency of the sdk crate, used by
@@ -98,45 +65,6 @@ ignore = [
     # Removed by: PR 4, provided it also moves the sdk dev-dependency `rsa` to 0.10 (0.10.0 is
     # released and needs crypto-bigint ^0.7.11). PR 4 scope must include it.
     "RUSTSEC-2023-0071",
-
-    # RUSTSEC-2026-0592, url 2.5.8: Url::origin() recurses without limit on nested `blob:`
-    # URLs and overflows the stack, which aborts the process (patched 2.5.9).
-    # Why accepted: transitive, sidecar -> reqwest 0.12 and solana-rpc-client -> url. The
-    # trigger is Url::origin() on an untrusted URL. The sidecar never parses URLs itself,
-    # its Solana RPC URL is operator configuration (onchain.rs), and its GCP OIDC client
-    # disables redirects (attestation/gcp_oidc.rs).
-    # Removed by: lockfile refresh (`cargo update -p url` gives 2.5.9).
-    "RUSTSEC-2026-0592",
-
-    # RUSTSEC-2026-0391, zstd 0.13.3: data from an abandoned stream leaks into the next
-    # stream when a context is reused through `with_context` (patched 0.13.4 and later).
-    # Why accepted: transitive, sidecar -> solana-client -> solana-pubsub-client ->
-    # solana-account-decoder-client-types -> zstd, where it decodes base64+zstd RPC account
-    # data with zstd::stream::read::Decoder. This repository calls no zstd API itself.
-    # Removed by: lockfile refresh (`cargo update -p zstd` gives 0.13.6).
-    "RUSTSEC-2026-0391",
-
-    # RUSTSEC-2026-0403, zstd-safe 7.3.0: uninitialized memory is exposed when streaming
-    # decompression of a legacy frame fails (patched 7.4.0).
-    # Why accepted: transitive through zstd, same path as RUSTSEC-2026-0391. The advisory
-    # says `zstd::stream::read::Decoder`, the entry point used there, is not affected.
-    # Removed by: lockfile refresh (`cargo update -p zstd-safe` gives 7.4.2).
-    "RUSTSEC-2026-0403",
-
-    # RUSTSEC-2026-0398, zstd-safe 7.3.0: Seekable::decompress sets a Vec length beyond its
-    # capacity for offsets past the end (patched 7.4.0). Needs the `seekable` feature.
-    # Why accepted: transitive through zstd, same path as RUSTSEC-2026-0391. This repository
-    # calls no zstd API.
-    # Removed by: lockfile refresh (`cargo update -p zstd-safe` gives 7.4.2).
-    "RUSTSEC-2026-0398",
-
-    # RUSTSEC-2026-0410, zstd-sys 2.1.0: on wasm32 the allocator shim corrupts memory on
-    # allocation failure (patched 2.1.2).
-    # Why accepted: wasm32 only. Transitive through zstd-safe, same path as
-    # RUSTSEC-2026-0391; the sidecar builds for Linux and no Rust target in this repository
-    # builds for wasm32.
-    # Removed by: lockfile refresh (`cargo update -p zstd-sys` gives 2.2.0).
-    "RUSTSEC-2026-0410",
 
     # ---------------------------------------------------------------------------------
     # Unmaintained (warnings, listed so each one has a written reason)
@@ -208,66 +136,4 @@ ignore = [
     # dependency (an sdk dev-dependency) resolves to 0.8.8, which is patched.
     # Removed by: PR 3 (expected), when ed25519-dalek 1.0.1 leaves the graph.
     "RUSTSEC-2026-0097",
-
-    # RUSTSEC-2026-0486, rustix 1.1.5: the xattr functions mark unwritten bytes as
-    # initialized for a zero-length buffer (patched 1.1.6).
-    # Why accepted: transitive, sidecar -> solana-client -> solana-connection-cache ->
-    # solana-metrics -> gethostname -> rustix, which uses it for the hostname, not xattr.
-    # This repository calls no xattr function.
-    # Removed by: lockfile refresh (`cargo update -p rustix` gives 1.1.6).
-    "RUSTSEC-2026-0486",
-
-    # The ten zstd-safe 7.3.0 entries below are unsound APIs, all patched in 7.4.0. Each has
-    # the same path as RUSTSEC-2026-0391 (sidecar -> solana-client -> solana-pubsub-client ->
-    # solana-account-decoder-client-types -> zstd -> zstd-safe). This repository calls no
-    # zstd API; the only caller is that decoder's zstd::stream::read::Decoder. The fix for
-    # every one is the lockfile refresh (`cargo update -p zstd-safe` gives 7.4.2).
-
-    # RUSTSEC-2026-0395, zstd-safe 7.3.0: use-after-free with CParameter::StableInBuffer
-    # (needs the `experimental` feature).
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0395",
-
-    # RUSTSEC-2026-0402, zstd-safe 7.3.0: heap buffer overflow in CCtx::try_clone on a
-    # multithreaded context.
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0402",
-
-    # RUSTSEC-2026-0406, zstd-safe 7.3.0: use-after-free when changing a multithreaded
-    # context that has an unfinished frame.
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0406",
-
-    # RUSTSEC-2026-0404, zstd-safe 7.3.0: double free in DCtx::try_clone.
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0404",
-
-    # RUSTSEC-2026-0400, zstd-safe 7.3.0: use-after-free of a dictionary after a one-shot
-    # call on a context with an open stream.
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0400",
-
-    # RUSTSEC-2026-0399, zstd-safe 7.3.0: use-after-free through init_using_cdict and
-    # init_using_ddict.
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0399",
-
-    # RUSTSEC-2026-0401, zstd-safe 7.3.0: out-of-bounds read in train_from_buffer when
-    # sample sizes overflow.
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0401",
-
-    # RUSTSEC-2026-0405, zstd-safe 7.3.0: out-of-bounds read with an out-of-range
-    # InBuffer::pos.
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0405",
-
-    # RUSTSEC-2026-0397, zstd-safe 7.3.0: OutBuffer::around_pos exposes uninitialized memory.
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0397",
-
-    # RUSTSEC-2026-0396, zstd-safe 7.3.0: Seekable reads a NULL or out-of-bounds seek table
-    # (needs the `seekable` feature).
-    # Why accepted: see the block comment above. Removed by: lockfile refresh.
-    "RUSTSEC-2026-0396",
 ]
