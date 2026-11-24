@@ -11,7 +11,39 @@ updates:
       - dependency-name: '*'
         update-types:
           - version-update:semver-patch
+      - dependency-name: bincode
+        update-types:
+          - version-update:semver-major
     groups:
+      solana:
+        applies-to: version-updates
+        patterns:
+          - 'solana-*'
+          - 'anchor-*'
+        exclude-patterns:
+          - 'solana-confidential-compute-*'
+        update-types:
+          - minor
+          - major
+      rustcrypto:
+        applies-to: version-updates
+        patterns:
+          - p256
+          - p384
+          - rsa
+          - crypto-bigint
+          - rand
+          - rand_core
+          - sha2
+          - subtle
+          - zeroize
+          - ecdsa
+          - elliptic-curve
+          - signature
+          - digest
+        update-types:
+          - minor
+          - major
       cargo-non-major:
         applies-to: version-updates
         update-types:
@@ -52,7 +84,9 @@ updates:
           - minor
 
   - package-ecosystem: github-actions
-    directory: '/'
+    directories:
+      - '/'
+      - '/.github/actions/setup'
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
