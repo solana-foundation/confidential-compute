@@ -1,0 +1,6 @@
+# Commits that only change formatting. `git blame` skips them when you run
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub's blame view reads this file automatically.
+
+# chore: adopt SDLC rustfmt.toml and workspace lints (#15)
+93f2a30b0850c3b6c473091b37bc4836e31eb45d
