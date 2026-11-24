@@ -16,8 +16,7 @@ use borsh::BorshDeserialize;
 use solana_confidential_compute_core::types::EnclaveType;
 use solana_confidential_compute_verifier::error::VerifierError;
 use solana_confidential_compute_verifier::payload::{
-    TDX_ATTESTATION_SOURCE, VERIFY_TDX_MODE_A, VERIFY_TDX_QE_REPORT_DISCRIMINATOR,
-    VERIFY_TDX_QUOTE_DISCRIMINATOR,
+    TDX_ATTESTATION_SOURCE, VERIFY_TDX_MODE_A, VERIFY_TDX_QE_REPORT_DISCRIMINATOR, VERIFY_TDX_QUOTE_DISCRIMINATOR,
 };
 use solana_confidential_compute_verifier::processor::Processor;
 use solana_confidential_compute_verifier::state::{
@@ -25,8 +24,7 @@ use solana_confidential_compute_verifier::state::{
     ATTESTED_SIGNER_DISCRIMINATOR,
 };
 use solana_confidential_compute_verifier::tdx::{
-    compress_p256, expected_report_data, qe_identity_digest, td_platform_digest, TdxQuote,
-    SECP256R1_PROGRAM_ID,
+    compress_p256, expected_report_data, qe_identity_digest, td_platform_digest, TdxQuote, SECP256R1_PROGRAM_ID,
 };
 use solana_program::account_info::AccountInfo;
 use solana_program::program_error::ProgramError;
@@ -42,13 +40,7 @@ const GPU_RIM: [u8; 32] = [0x33; 32];
 const MODEL: [u8; 32] = [0x44; 32];
 const PCK_PUBKEY: [u8; 33] = [0x02; 33];
 
-fn account(
-    key: Pubkey,
-    owner: Pubkey,
-    signer: bool,
-    writable: bool,
-    data: Vec<u8>,
-) -> AccountInfo<'static> {
+fn account(key: Pubkey, owner: Pubkey, signer: bool, writable: bool, data: Vec<u8>) -> AccountInfo<'static> {
     AccountInfo::new(
         Box::leak(Box::new(key)),
         signer,
@@ -97,18 +89,11 @@ fn instructions_sysvar(ixs: &[(Pubkey, &[u8])], current_index: u16) -> AccountIn
         data.extend_from_slice(ix_data);
     }
     data.extend_from_slice(&current_index.to_le_bytes());
-    account(
-        instructions::ID,
-        solana_program::sysvar::ID,
-        false,
-        false,
-        data,
-    )
+    account(instructions::ID, solana_program::sysvar::ID, false, false, data)
 }
 
 fn policy(pid: &Pubkey, measurements: Vec<[u8; 48]>) -> AccountInfo<'static> {
-    let (key, bump) =
-        Pubkey::find_program_address(&[BackendPolicy::SEED, &[TDX_ATTESTATION_SOURCE]], pid);
+    let (key, bump) = Pubkey::find_program_address(&[BackendPolicy::SEED, &[TDX_ATTESTATION_SOURCE]], pid);
     let mut slots = [[0u8; 48]; 8];
     for (i, m) in measurements.iter().take(8).enumerate() {
         slots[i] = *m;
@@ -199,13 +184,8 @@ fn run_qe(opts: &QeOpts) -> (Pubkey, Result<(), ProgramError>, Vec<AccountInfo<'
     let sysvar = instructions_sysvar(&[(SECP256R1_PROGRAM_ID, &precompile), (pid, &data)], 1);
 
     let compressed = compress_p256(quote.attestation_pubkey_xy());
-    let (session_key, _) = Pubkey::find_program_address(
-        &[
-            TdxSessionAccount::SEED,
-            &TdxSessionAccount::seed_for(&compressed),
-        ],
-        &pid,
-    );
+    let (session_key, _) =
+        Pubkey::find_program_address(&[TdxSessionAccount::SEED, &TdxSessionAccount::seed_for(&compressed)], &pid);
 
     let mut measurements = Vec::new();
     if opts.pck_on_policy {
@@ -218,35 +198,11 @@ fn run_qe(opts: &QeOpts) -> (Pubkey, Result<(), ProgramError>, Vec<AccountInfo<'
     }
 
     let accounts = vec![
-        account(
-            session_key,
-            pid,
-            false,
-            true,
-            vec![0; TdxSessionAccount::SIZE],
-        ),
+        account(session_key, pid, false, true, vec![0; TdxSessionAccount::SIZE]),
         policy(&pid, measurements),
-        account(
-            Pubkey::new_unique(),
-            solana_sdk_ids::system_program::ID,
-            true,
-            true,
-            vec![],
-        ),
-        account(
-            solana_sdk_ids::system_program::ID,
-            solana_sdk_ids::system_program::ID,
-            false,
-            false,
-            vec![],
-        ),
-        account(
-            clock::ID,
-            solana_program::sysvar::ID,
-            false,
-            false,
-            clock_data(CLOCK_SLOT),
-        ),
+        account(Pubkey::new_unique(), solana_sdk_ids::system_program::ID, true, true, vec![]),
+        account(solana_sdk_ids::system_program::ID, solana_sdk_ids::system_program::ID, false, false, vec![]),
+        account(clock::ID, solana_program::sysvar::ID, false, false, clock_data(CLOCK_SLOT)),
         sysvar,
     ];
     let result = Processor::process(&pid, &accounts, &data);
@@ -271,10 +227,7 @@ fn a_genuine_qe_report_certifies_the_attestation_key() {
 /// Without the allowlist, a self-signed QE report certifies any key at all.
 #[test]
 fn an_unlisted_platform_key_certifies_nothing() {
-    let (_, result, _) = run_qe(&QeOpts {
-        pck_on_policy: false,
-        ..QeOpts::default()
-    });
+    let (_, result, _) = run_qe(&QeOpts { pck_on_policy: false, ..QeOpts::default() });
     assert_eq!(result, Err(VerifierError::DisallowedMeasurement.into()));
 }
 
@@ -283,10 +236,7 @@ fn an_unlisted_platform_key_certifies_nothing() {
 /// signing key to platform-vouched hardware.
 #[test]
 fn a_substituted_attestation_key_is_refused() {
-    let (_, result, _) = run_qe(&QeOpts {
-        tamper_attestation_key: true,
-        ..QeOpts::default()
-    });
+    let (_, result, _) = run_qe(&QeOpts { tamper_attestation_key: true, ..QeOpts::default() });
     assert_eq!(result, Err(VerifierError::InvalidSignature.into()));
 }
 
@@ -297,10 +247,7 @@ fn a_substituted_attestation_key_is_refused() {
 /// checks pass over different keys.
 #[test]
 fn naming_an_allowlisted_key_the_precompile_did_not_verify_is_refused() {
-    let (_, result, _) = run_qe(&QeOpts {
-        precompile_key_differs: true,
-        ..QeOpts::default()
-    });
+    let (_, result, _) = run_qe(&QeOpts { precompile_key_differs: true, ..QeOpts::default() });
     assert_eq!(
         result,
         Err(VerifierError::InvalidSignature.into()),
@@ -313,15 +260,8 @@ fn naming_an_allowlisted_key_the_precompile_did_not_verify_is_refused() {
 /// an attacker running their own enclave there could certify any key.
 #[test]
 fn an_enclave_that_is_not_the_approved_qe_is_refused() {
-    let (_, result, _) = run_qe(&QeOpts {
-        qe_identity_on_policy: false,
-        ..QeOpts::default()
-    });
-    assert_eq!(
-        result,
-        Err(VerifierError::DisallowedMeasurement.into()),
-        "governance must pin which enclave is the QE",
-    );
+    let (_, result, _) = run_qe(&QeOpts { qe_identity_on_policy: false, ..QeOpts::default() });
+    assert_eq!(result, Err(VerifierError::DisallowedMeasurement.into()), "governance must pin which enclave is the QE",);
 }
 
 /// A debug enclave can be single-stepped and have its memory read, so a QE
@@ -329,19 +269,13 @@ fn an_enclave_that_is_not_the_approved_qe_is_refused() {
 /// the quote distinguishes it from the production QE.
 #[test]
 fn a_debug_quoting_enclave_is_refused() {
-    let (_, result, _) = run_qe(&QeOpts {
-        debug_qe: true,
-        ..QeOpts::default()
-    });
+    let (_, result, _) = run_qe(&QeOpts { debug_qe: true, ..QeOpts::default() });
     assert_eq!(result, Err(VerifierError::DisallowedMeasurement.into()));
 }
 
 #[test]
 fn altered_auth_data_is_refused() {
-    let (_, result, _) = run_qe(&QeOpts {
-        tamper_auth_data: true,
-        ..QeOpts::default()
-    });
+    let (_, result, _) = run_qe(&QeOpts { tamper_auth_data: true, ..QeOpts::default() });
     assert_eq!(result, Err(VerifierError::InvalidSignature.into()));
 }
 
@@ -381,13 +315,7 @@ fn body_for(signer: &Pubkey, correct: bool, debug_td: bool) -> Vec<u8> {
         body[48 + 120] |= 0x01; // TD_ATTRIBUTES TUD.DEBUG
     }
     let report_data = if correct {
-        expected_report_data(
-            &signer.to_bytes(),
-            &SLOT_HASH,
-            &GPU_RIM,
-            &MODEL,
-            &CHALLENGE_NONCE,
-        )
+        expected_report_data(&signer.to_bytes(), &SLOT_HASH, &GPU_RIM, &MODEL, &CHALLENGE_NONCE)
     } else {
         [0u8; 64]
     };
@@ -403,9 +331,7 @@ fn run_quote(opts: &QuoteOpts) -> (Result<(), ProgramError>, Vec<AccountInfo<'st
 /// Same as [`run_quote`] but hands back the instruction data so a test can
 /// submit the identical transaction a second time.
 #[allow(clippy::type_complexity)]
-fn run_quote_replayable(
-    opts: &QuoteOpts,
-) -> (Result<(), ProgramError>, Vec<AccountInfo<'static>>, Vec<u8>) {
+fn run_quote_replayable(opts: &QuoteOpts) -> (Result<(), ProgramError>, Vec<AccountInfo<'static>>, Vec<u8>) {
     let pid = Pubkey::new_unique();
     let quote = TdxQuote::parse(QUOTE).unwrap();
     let workload = Pubkey::new_unique();
@@ -433,13 +359,8 @@ fn run_quote_replayable(
     // `session_key_matches` is false the precompile verifies a different key,
     // so the program derives a different session address and finds nothing --
     // which is the whole point: a key nobody certified must not be usable.
-    let (session_key, session_bump) = Pubkey::find_program_address(
-        &[
-            TdxSessionAccount::SEED,
-            &TdxSessionAccount::seed_for(&attestation_key),
-        ],
-        &pid,
-    );
+    let (session_key, session_bump) =
+        Pubkey::find_program_address(&[TdxSessionAccount::SEED, &TdxSessionAccount::seed_for(&attestation_key)], &pid);
     let session_data = if opts.session_present {
         borsh::to_vec(&TdxSessionAccount {
             discriminator: TdxSessionAccount::DISCRIMINATOR,
@@ -467,14 +388,8 @@ fn run_quote_replayable(
         measurements.push(pad32(&GPU_RIM));
     }
 
-    let (challenge_key, challenge_bump) = Pubkey::find_program_address(
-        &[
-            ChallengeAccount::SEED,
-            &[TDX_ATTESTATION_SOURCE],
-            &CHALLENGE_NONCE,
-        ],
-        &pid,
-    );
+    let (challenge_key, challenge_bump) =
+        Pubkey::find_program_address(&[ChallengeAccount::SEED, &[TDX_ATTESTATION_SOURCE], &CHALLENGE_NONCE], &pid);
     let challenge = ChallengeAccount {
         discriminator: ChallengeAccount::DISCRIMINATOR,
         source: TDX_ATTESTATION_SOURCE,
@@ -485,8 +400,7 @@ fn run_quote_replayable(
         bump: challenge_bump,
     };
 
-    let (signer_pda, _) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", &workload.to_bytes()], &pid);
+    let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &workload.to_bytes()], &pid);
     let quote_body_digest = solana_program::hash::hashv(&[body.as_slice()]).to_bytes();
     let seed = solana_confidential_compute_verifier::payload::tdx_nonce_seed(
         &workload.to_bytes(),
@@ -494,49 +408,18 @@ fn run_quote_replayable(
         &SLOT_HASH,
         &CHALLENGE_NONCE,
     );
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[TDX_ATTESTATION_SOURCE], &seed], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[TDX_ATTESTATION_SOURCE], &seed], &pid);
 
     let accounts = vec![
-        account(
-            signer_pda,
-            pid,
-            false,
-            true,
-            vec![0; AttestedSignerAccount::SIZE],
-        ),
+        account(signer_pda, pid, false, true, vec![0; AttestedSignerAccount::SIZE]),
         account(session_key, pid, false, false, session_data),
         policy(&pid, measurements),
         account(nonce_pda, pid, false, true, vec![0; UsedNonceAccount::SIZE]),
-        account(
-            Pubkey::new_unique(),
-            solana_sdk_ids::system_program::ID,
-            true,
-            true,
-            vec![],
-        ),
-        account(
-            solana_sdk_ids::system_program::ID,
-            solana_sdk_ids::system_program::ID,
-            false,
-            false,
-            vec![],
-        ),
-        account(
-            clock::ID,
-            solana_program::sysvar::ID,
-            false,
-            false,
-            clock_data(CLOCK_SLOT),
-        ),
+        account(Pubkey::new_unique(), solana_sdk_ids::system_program::ID, true, true, vec![]),
+        account(solana_sdk_ids::system_program::ID, solana_sdk_ids::system_program::ID, false, false, vec![]),
+        account(clock::ID, solana_program::sysvar::ID, false, false, clock_data(CLOCK_SLOT)),
         // Writable: acceptance retires the challenge in place.
-        account(
-            challenge_key,
-            pid,
-            false,
-            true,
-            borsh::to_vec(&challenge).unwrap(),
-        ),
+        account(challenge_key, pid, false, true, borsh::to_vec(&challenge).unwrap()),
         account(workload, pid, opts.workload_signs, false, vec![]),
         sysvar,
     ];
@@ -561,22 +444,13 @@ fn a_certified_quote_admits_the_workload_signer() {
 /// hardware. The precompile will happily verify an attacker's own signature.
 #[test]
 fn a_quote_with_no_certified_session_is_refused() {
-    let (result, _) = run_quote(&QuoteOpts {
-        session_present: false,
-        ..QuoteOpts::default()
-    });
-    assert!(
-        result.is_err(),
-        "an uncertified key must not admit a signer"
-    );
+    let (result, _) = run_quote(&QuoteOpts { session_present: false, ..QuoteOpts::default() });
+    assert!(result.is_err(), "an uncertified key must not admit a signer");
 }
 
 #[test]
 fn a_session_for_a_different_key_is_refused() {
-    let (result, _) = run_quote(&QuoteOpts {
-        session_key_matches: false,
-        ..QuoteOpts::default()
-    });
+    let (result, _) = run_quote(&QuoteOpts { session_key_matches: false, ..QuoteOpts::default() });
     assert!(result.is_err());
 }
 
@@ -593,10 +467,7 @@ fn a_stale_session_is_refused() {
 
 #[test]
 fn unlisted_measurements_are_refused() {
-    let (result, _) = run_quote(&QuoteOpts {
-        measurements_on_policy: false,
-        ..QuoteOpts::default()
-    });
+    let (result, _) = run_quote(&QuoteOpts { measurements_on_policy: false, ..QuoteOpts::default() });
     assert_eq!(result, Err(VerifierError::DisallowedMeasurement.into()));
 }
 
@@ -604,10 +475,7 @@ fn unlisted_measurements_are_refused() {
 /// too -- but only if governance approved that RIM.
 #[test]
 fn an_unlisted_gpu_rim_is_refused() {
-    let (result, _) = run_quote(&QuoteOpts {
-        gpu_rim_on_policy: false,
-        ..QuoteOpts::default()
-    });
+    let (result, _) = run_quote(&QuoteOpts { gpu_rim_on_policy: false, ..QuoteOpts::default() });
     assert_eq!(result, Err(VerifierError::DisallowedMeasurement.into()));
 }
 
@@ -616,10 +484,7 @@ fn an_unlisted_gpu_rim_is_refused() {
 /// vouched for this key.
 #[test]
 fn a_quote_that_does_not_bind_the_signer_is_refused() {
-    let (result, _) = run_quote(&QuoteOpts {
-        correct_report_data: false,
-        ..QuoteOpts::default()
-    });
+    let (result, _) = run_quote(&QuoteOpts { correct_report_data: false, ..QuoteOpts::default() });
     assert_eq!(result, Err(VerifierError::InvalidSignature.into()));
 }
 
@@ -629,24 +494,14 @@ fn a_quote_that_does_not_bind_the_signer_is_refused() {
 /// workload's keys straight out of memory.
 #[test]
 fn a_debug_trust_domain_is_refused() {
-    let (result, _) = run_quote(&QuoteOpts {
-        debug_td: true,
-        ..QuoteOpts::default()
-    });
-    assert_eq!(
-        result,
-        Err(VerifierError::DisallowedMeasurement.into()),
-        "a debug TD must never be admitted",
-    );
+    let (result, _) = run_quote(&QuoteOpts { debug_td: true, ..QuoteOpts::default() });
+    assert_eq!(result, Err(VerifierError::DisallowedMeasurement.into()), "a debug TD must never be admitted",);
 }
 
 /// Mode A enrols a key into an account the holder is expected to control.
 #[test]
 fn an_unsigned_workload_key_cannot_be_enrolled() {
-    let (result, _) = run_quote(&QuoteOpts {
-        workload_signs: false,
-        ..QuoteOpts::default()
-    });
+    let (result, _) = run_quote(&QuoteOpts { workload_signs: false, ..QuoteOpts::default() });
     assert_eq!(result, Err(ProgramError::MissingRequiredSignature));
 }
 
@@ -661,10 +516,7 @@ fn the_same_quote_cannot_be_consumed_twice() {
     assert_eq!(nonce.slot, CLOCK_SLOT, "the tombstone records the slot");
 
     // Submitting the identical instruction again must fail.
-    assert!(
-        Processor::process(&pid, &accounts, &data).is_err(),
-        "the same signed quote was accepted twice"
-    );
+    assert!(Processor::process(&pid, &accounts, &data).is_err(), "the same signed quote was accepted twice");
 }
 
 /// Distinct nonces may pin the same slot hash. Refreshing the public QE
@@ -679,26 +531,17 @@ fn a_quote_cannot_be_replayed_against_another_challenge_with_the_same_hash() {
     assert!(challenge_a.is_consumed());
 
     let nonce_b = [0x43; 32];
-    let (challenge_b_key, _) = Pubkey::find_program_address(
-        &[ChallengeAccount::SEED, &[TDX_ATTESTATION_SOURCE], &nonce_b],
-        &pid,
-    );
+    let (challenge_b_key, _) =
+        Pubkey::find_program_address(&[ChallengeAccount::SEED, &[TDX_ATTESTATION_SOURCE], &nonce_b], &pid);
     assert_ne!(*accounts[7].key, challenge_b_key);
     let issue_accounts = vec![
-        account(
-            challenge_b_key,
-            pid,
-            false,
-            true,
-            vec![0; ChallengeAccount::SIZE],
-        ),
+        account(challenge_b_key, pid, false, true, vec![0; ChallengeAccount::SIZE]),
         accounts[4].clone(),
         accounts[5].clone(),
         accounts[6].clone(),
         slot_hashes_sysvar(&[(SLOT, SLOT_HASH)]),
     ];
-    let mut issue_data =
-        solana_confidential_compute_verifier::payload::ISSUE_TDX_CHALLENGE_DISCRIMINATOR.to_vec();
+    let mut issue_data = solana_confidential_compute_verifier::payload::ISSUE_TDX_CHALLENGE_DISCRIMINATOR.to_vec();
     issue_data.extend_from_slice(&nonce_b);
     issue_data.extend_from_slice(&SLOT.to_le_bytes());
     Processor::process(&pid, &issue_accounts, &issue_data).expect("issue challenge B");
@@ -712,14 +555,8 @@ fn a_quote_cannot_be_replayed_against_another_challenge_with_the_same_hash() {
     assert!(challenge_b.is_live_at(replay_slot));
     let mut session = TdxSessionAccount::try_from_slice(&accounts[1].data.borrow()).unwrap();
     session.slot = replay_slot;
-    accounts[1]
-        .data
-        .borrow_mut()
-        .copy_from_slice(&borsh::to_vec(&session).unwrap());
-    accounts[6]
-        .data
-        .borrow_mut()
-        .copy_from_slice(&clock_data(replay_slot));
+    accounts[1].data.borrow_mut().copy_from_slice(&borsh::to_vec(&session).unwrap());
+    accounts[6].data.borrow_mut().copy_from_slice(&clock_data(replay_slot));
 
     let quote_body = body_for(accounts[8].key, true, false);
     let quote_digest = solana_program::hash::hashv(&[&quote_body]).to_bytes();
@@ -729,16 +566,9 @@ fn a_quote_cannot_be_replayed_against_another_challenge_with_the_same_hash() {
         &SLOT_HASH,
         &nonce_b,
     );
-    let (nonce_b_key, _) =
-        Pubkey::find_program_address(&[b"nonce", &[TDX_ATTESTATION_SOURCE], &seed_b], &pid);
+    let (nonce_b_key, _) = Pubkey::find_program_address(&[b"nonce", &[TDX_ATTESTATION_SOURCE], &seed_b], &pid);
     assert_ne!(*accounts[3].key, nonce_b_key);
-    accounts[3] = account(
-        nonce_b_key,
-        pid,
-        false,
-        true,
-        vec![0; UsedNonceAccount::SIZE],
-    );
+    accounts[3] = account(nonce_b_key, pid, false, true, vec![0; UsedNonceAccount::SIZE]);
     accounts[7] = issue_accounts[0].clone();
     let instructions_before = accounts[9].data.borrow().to_vec();
 
@@ -750,11 +580,7 @@ fn a_quote_cannot_be_replayed_against_another_challenge_with_the_same_hash() {
     assert_eq!(*accounts[9].data.borrow(), instructions_before.as_slice());
     assert_eq!(*accounts[0].data.borrow(), original_signer.as_slice());
     assert!(accounts[3].data.borrow().iter().all(|byte| *byte == 0));
-    assert!(
-        !ChallengeAccount::try_from_slice(&accounts[7].data.borrow())
-            .unwrap()
-            .is_consumed()
-    );
+    assert!(!ChallengeAccount::try_from_slice(&accounts[7].data.borrow()).unwrap().is_consumed());
 }
 
 /// The replay that the nonce tombstone alone does not stop.
@@ -776,16 +602,9 @@ fn a_cleaned_up_nonce_does_not_reopen_a_spent_challenge() {
 
     // Simulate permissionless cleanup: the nonce PDA is emptied.
     accounts[3].data.borrow_mut().fill(0);
-    let challenge =
-        ChallengeAccount::try_from_slice(&accounts[7].data.borrow()).expect("challenge decodes");
-    assert!(
-        challenge.is_consumed(),
-        "acceptance must retire the challenge"
-    );
-    assert!(
-        !challenge.is_live_at(CLOCK_SLOT),
-        "a consumed challenge is never live, even inside its original window"
-    );
+    let challenge = ChallengeAccount::try_from_slice(&accounts[7].data.borrow()).expect("challenge decodes");
+    assert!(challenge.is_consumed(), "acceptance must retire the challenge");
+    assert!(!challenge.is_live_at(CLOCK_SLOT), "a consumed challenge is never live, even inside its original window");
 
     assert!(
         Processor::process(&pid, &accounts, &data).is_err(),
@@ -802,13 +621,7 @@ fn slot_hashes_sysvar(entries: &[(u64, [u8; 32])]) -> AccountInfo<'static> {
         data.extend_from_slice(&slot.to_le_bytes());
         data.extend_from_slice(hash);
     }
-    account(
-        solana_program::sysvar::slot_hashes::ID,
-        solana_program::sysvar::ID,
-        false,
-        false,
-        data,
-    )
+    account(solana_program::sysvar::slot_hashes::ID, solana_program::sysvar::ID, false, false, data)
 }
 
 /// Runs `issue_tdx_challenge` against an account in the given starting state.
@@ -818,14 +631,8 @@ fn run_issue(
     clock_slot: u64,
 ) -> (Result<(), ProgramError>, Vec<AccountInfo<'static>>) {
     let pid = Pubkey::new_unique();
-    let (challenge_key, _bump) = Pubkey::find_program_address(
-        &[
-            ChallengeAccount::SEED,
-            &[TDX_ATTESTATION_SOURCE],
-            &CHALLENGE_NONCE,
-        ],
-        &pid,
-    );
+    let (challenge_key, _bump) =
+        Pubkey::find_program_address(&[ChallengeAccount::SEED, &[TDX_ATTESTATION_SOURCE], &CHALLENGE_NONCE], &pid);
     // Pre-allocated at the exact size so `create_pda_if_needed` takes the
     // no-CPI path; an all-zero buffer stands in for "never issued".
     let data = match existing {
@@ -833,28 +640,15 @@ fn run_issue(
         None => vec![0u8; ChallengeAccount::SIZE],
     };
 
-    let mut ix =
-        solana_confidential_compute_verifier::payload::ISSUE_TDX_CHALLENGE_DISCRIMINATOR.to_vec();
+    let mut ix = solana_confidential_compute_verifier::payload::ISSUE_TDX_CHALLENGE_DISCRIMINATOR.to_vec();
     ix.extend_from_slice(&CHALLENGE_NONCE);
     ix.extend_from_slice(&nonce_slot.to_le_bytes());
 
     let accounts = vec![
         account(challenge_key, pid, false, true, data),
         account(Pubkey::new_unique(), pid, true, true, vec![]),
-        account(
-            solana_sdk_ids::system_program::ID,
-            solana_sdk_ids::system_program::ID,
-            false,
-            false,
-            vec![],
-        ),
-        account(
-            clock::ID,
-            solana_program::sysvar::ID,
-            false,
-            false,
-            clock_data(clock_slot),
-        ),
+        account(solana_sdk_ids::system_program::ID, solana_sdk_ids::system_program::ID, false, false, vec![]),
+        account(clock::ID, solana_program::sysvar::ID, false, false, clock_data(clock_slot)),
         slot_hashes_sysvar(&[(nonce_slot, SLOT_HASH)]),
     ];
     let result = Processor::process(&pid, &accounts, &ix);
@@ -873,15 +667,8 @@ fn a_challenge_can_be_issued_from_an_uninitialized_account() {
     assert_eq!(record.source, TDX_ATTESTATION_SOURCE);
     assert_eq!(record.nonce, CHALLENGE_NONCE);
     assert_eq!(record.challenge_slot, SLOT);
-    assert_eq!(
-        record.slot_hash, SLOT_HASH,
-        "the hash must come from the sysvar, not from the caller"
-    );
-    assert_eq!(
-        record.expires_slot,
-        CLOCK_SLOT + ChallengeAccount::TTL_SLOTS,
-        "expiry is bounded by TTL_SLOTS"
-    );
+    assert_eq!(record.slot_hash, SLOT_HASH, "the hash must come from the sysvar, not from the caller");
+    assert_eq!(record.expires_slot, CLOCK_SLOT + ChallengeAccount::TTL_SLOTS, "expiry is bounded by TTL_SLOTS");
     assert!(record.is_live_at(CLOCK_SLOT));
     assert!(!record.is_live_at(record.expires_slot + 1));
 }
@@ -962,14 +749,8 @@ fn a_live_session_cannot_have_its_digests_rewritten() {
     assert!(result.is_err(), "a live session's bindings were rewritten");
 
     let after = TdxSessionAccount::try_from_slice(&accounts[0].data.borrow()).unwrap();
-    assert_eq!(
-        after.gpu_rim_digest, GPU_RIM,
-        "the stored GPU digest must be untouched"
-    );
-    assert_eq!(
-        after.model_digest, MODEL,
-        "the stored model digest must be untouched"
-    );
+    assert_eq!(after.gpu_rim_digest, GPU_RIM, "the stored GPU digest must be untouched");
+    assert_eq!(after.model_digest, MODEL, "the stored model digest must be untouched");
 }
 
 /// An honest retry after a dropped transaction still works.

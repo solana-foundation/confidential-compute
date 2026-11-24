@@ -46,13 +46,11 @@ use solana_confidential_compute_crypto::jwt::{eat_nonce_tombstone_seed, kid_hash
 use solana_confidential_compute_verifier::error::VerifierError;
 use solana_confidential_compute_verifier::payload::{
     RegisterJwksKeyArgs, RevokeJwksKeyArgs, VerifyGoogleJwtArgs, REGISTER_JWKS_KEY_DISCRIMINATOR,
-    REVOKE_JWKS_KEY_DISCRIMINATOR, VERIFY_GOOGLE_JWT_DISCRIMINATOR, VERIFY_GOOGLE_JWT_MODE_A,
-    VERIFY_GOOGLE_JWT_MODE_B,
+    REVOKE_JWKS_KEY_DISCRIMINATOR, VERIFY_GOOGLE_JWT_DISCRIMINATOR, VERIFY_GOOGLE_JWT_MODE_A, VERIFY_GOOGLE_JWT_MODE_B,
 };
 use solana_confidential_compute_verifier::state::{
-    AttestedSignerAccount, BackendPolicy, GcpTenantPolicy, JwksAccount, PolicyRegistry,
-    UsedNonceAccount, ATTESTED_SIGNER_DISCRIMINATOR, JWKS_ACCOUNT_DISCRIMINATOR,
-    POLICY_REGISTRY_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR,
+    AttestedSignerAccount, BackendPolicy, GcpTenantPolicy, JwksAccount, PolicyRegistry, UsedNonceAccount,
+    ATTESTED_SIGNER_DISCRIMINATOR, JWKS_ACCOUNT_DISCRIMINATOR, POLICY_REGISTRY_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR,
 };
 use solana_program_test::ProgramTestContext;
 use solana_sdk::{
@@ -96,8 +94,7 @@ const UNIX_NOW: i64 = 1_700_000_100;
 const ATTESTATION_TTL_SLOTS: u64 = 216_000;
 const MODE_A_SLOT_HASH: [u8; 32] = [b'n'; 32];
 const EXPECTED_AUDIENCE: &[u8] = b"teton-verifier";
-const EXPECTED_SUBJECT: &[u8] =
-    b"https://www.googleapis.com/compute/v1/projects/teton/zones/us/instances/vm";
+const EXPECTED_SUBJECT: &[u8] = b"https://www.googleapis.com/compute/v1/projects/teton/zones/us/instances/vm";
 /// The verifier recomputes the mode B commitment over this consumer program id.
 const CONSUMER_ID: Pubkey = Pubkey::new_from_array([0x33; 32]);
 /// RSA verification plus PDA creation does not fit the 200k default.
@@ -122,12 +119,7 @@ fn measurement() -> [u8; 48] {
 }
 
 fn funded(owner: Pubkey, data: Vec<u8>) -> Account {
-    Account {
-        lamports: 100_000_000,
-        owner,
-        data,
-        ..Account::default()
-    }
+    Account { lamports: 100_000_000, owner, data, ..Account::default() }
 }
 
 fn registry_bytes(authority: [u8; 32], bump: u8) -> Vec<u8> {
@@ -152,26 +144,13 @@ fn registry_bytes(authority: [u8; 32], bump: u8) -> Vec<u8> {
 
 fn register_data(kid: &[u8], modulus: [u8; 256]) -> Vec<u8> {
     let mut data = REGISTER_JWKS_KEY_DISCRIMINATOR.to_vec();
-    RegisterJwksKeyArgs {
-        kid: kid.to_vec(),
-        modulus,
-        exponent: RSA_EXPONENT,
-    }
-    .serialize(&mut data)
-    .unwrap();
+    RegisterJwksKeyArgs { kid: kid.to_vec(), modulus, exponent: RSA_EXPONENT }.serialize(&mut data).unwrap();
     data
 }
 
 fn verify_data(mode: u8, jwt: &str, nonce_slot: u64, expected_action_hash: [u8; 32]) -> Vec<u8> {
     let mut data = VERIFY_GOOGLE_JWT_DISCRIMINATOR.to_vec();
-    VerifyGoogleJwtArgs {
-        mode,
-        nonce_slot,
-        expected_action_hash,
-        jwt: jwt.to_string(),
-    }
-    .serialize(&mut data)
-    .unwrap();
+    VerifyGoogleJwtArgs { mode, nonce_slot, expected_action_hash, jwt: jwt.to_string() }.serialize(&mut data).unwrap();
     data
 }
 
@@ -201,30 +180,15 @@ struct Env {
 async fn boot(pid: Pubkey, tenant: Option<(&[u8], &[u8])>, preload: Vec<(Pubkey, Account)>) -> Env {
     let authority = Keypair::new();
     let (registry, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
-    let (jwks, _) = Pubkey::find_program_address(
-        &[
-            solana_confidential_compute_crypto::jwt::JWKS_SEED,
-            &kid_hash(KID),
-        ],
-        &pid,
-    );
+    let (jwks, _) =
+        Pubkey::find_program_address(&[solana_confidential_compute_crypto::jwt::JWKS_SEED, &kid_hash(KID)], &pid);
     let (backend, backend_bump) = Pubkey::find_program_address(&[BackendPolicy::SEED, &[3]], &pid);
     let (tenant_key, tenant_bump) = Pubkey::find_program_address(&[GcpTenantPolicy::SEED], &pid);
 
     let mut pt = sbf::verifier_program_test(pid);
-    pt.add_program(
-        "confidential_compute_jwt_consumer",
-        CONSUMER_ID,
-        solana_program_test::processor!(consumer),
-    );
+    pt.add_program("confidential_compute_jwt_consumer", CONSUMER_ID, solana_program_test::processor!(consumer));
     pt.add_account(authority.pubkey(), funded(system_program::ID, vec![]));
-    pt.add_account(
-        registry,
-        funded(
-            pid,
-            registry_bytes(authority.pubkey().to_bytes(), registry_bump),
-        ),
-    );
+    pt.add_account(registry, funded(pid, registry_bytes(authority.pubkey().to_bytes(), registry_bump)));
     let mut measurements = [[0u8; 48]; 8];
     measurements[0] = measurement();
     pt.add_account(
@@ -244,10 +208,7 @@ async fn boot(pid: Pubkey, tenant: Option<(&[u8], &[u8])>, preload: Vec<(Pubkey,
     if let Some((aud, sub)) = tenant {
         pt.add_account(
             tenant_key,
-            funded(
-                pid,
-                borsh::to_vec(&GcpTenantPolicy::new(aud, sub, tenant_bump).unwrap()).unwrap(),
-            ),
+            funded(pid, borsh::to_vec(&GcpTenantPolicy::new(aud, sub, tenant_bump).unwrap()).unwrap()),
         );
     }
     for (key, account) in preload {
@@ -293,12 +254,7 @@ impl Outcome {
             ProgramError::Custom(c) => InstructionError::Custom(c),
             other => InstructionError::from(u64::from(other)),
         };
-        assert_eq!(
-            self.result,
-            Err(TransactionError::InstructionError(1, expected)),
-            "{:#?}",
-            self.logs
-        );
+        assert_eq!(self.result, Err(TransactionError::InstructionError(1, expected)), "{:#?}", self.logs);
     }
     /// `sol_log_data` fields become one space-separated base64 token each.
     fn registrations(&self) -> Vec<Vec<Vec<u8>>> {
@@ -306,33 +262,21 @@ impl Outcome {
             .iter()
             .filter_map(|line| line.strip_prefix("Program data: "))
             .map(|rest| {
-                rest.split_whitespace()
-                    .map(|token| STANDARD.decode(token).expect("base64"))
-                    .collect::<Vec<Vec<u8>>>()
+                rest.split_whitespace().map(|token| STANDARD.decode(token).expect("base64")).collect::<Vec<Vec<u8>>>()
             })
             .filter(|fields| {
-                fields.first().map(Vec::as_slice)
-                    == Some(b"solana-confidential-compute:registration:v1".as_slice())
+                fields.first().map(Vec::as_slice) == Some(b"solana-confidential-compute:registration:v1".as_slice())
             })
             .collect()
     }
     fn assert_no_registration(&self) {
-        assert!(
-            self.registrations().is_empty(),
-            "failed call emitted a registration event"
-        );
+        assert!(self.registrations().is_empty(), "failed call emitted a registration event");
     }
 }
 
 impl Env {
     fn pin(&mut self, slot: u64, unix_timestamp: i64, nonce_slot: u64, hash: [u8; 32]) {
-        self.clock = Clock {
-            slot,
-            epoch_start_timestamp: 0,
-            epoch: 0,
-            leader_schedule_epoch: 0,
-            unix_timestamp,
-        };
+        self.clock = Clock { slot, epoch_start_timestamp: 0, epoch: 0, leader_schedule_epoch: 0, unix_timestamp };
         self.slots = SlotHashes::new(&[(nonce_slot, Hash::new_from_array(hash))]);
         self.apply();
     }
@@ -361,12 +305,7 @@ impl Env {
         self.submit(ixs, None, false).await
     }
 
-    async fn submit(
-        &mut self,
-        ixs: &[Instruction],
-        extra: Option<&Keypair>,
-        authority: bool,
-    ) -> Outcome {
+    async fn submit(&mut self, ixs: &[Instruction], extra: Option<&Keypair>, authority: bool) -> Outcome {
         self.ctx.last_blockhash = self.ctx.get_new_latest_blockhash().await.unwrap();
         self.apply();
         let mut all = vec![ComputeBudgetInstruction::set_compute_unit_limit(CU_LIMIT)];
@@ -378,16 +317,8 @@ impl Env {
         }
         signers.extend(extra);
         tx.partial_sign(&signers, self.ctx.last_blockhash);
-        let done = self
-            .ctx
-            .banks_client
-            .process_transaction_with_metadata(tx)
-            .await
-            .unwrap();
-        Outcome {
-            result: done.result,
-            logs: done.metadata.map(|m| m.log_messages).unwrap_or_default(),
-        }
+        let done = self.ctx.banks_client.process_transaction_with_metadata(tx).await.unwrap();
+        Outcome { result: done.result, logs: done.metadata.map(|m| m.log_messages).unwrap_or_default() }
     }
 
     async fn account(&self, key: Pubkey) -> Option<Account> {
@@ -404,10 +335,7 @@ impl Env {
 
     fn register_ix_as(&self, authority: &Pubkey, kid: &[u8], modulus: [u8; 256]) -> Instruction {
         let (jwks, _) = Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_crypto::jwt::JWKS_SEED,
-                &kid_hash(kid),
-            ],
+            &[solana_confidential_compute_crypto::jwt::JWKS_SEED, &kid_hash(kid)],
             &self.pid,
         );
         Instruction {
@@ -441,12 +369,7 @@ impl Env {
     /// slot_hashes, workload|instructions, tenant, backend(3), legacy_nonce]`.
     /// The last three replace what `source_policy.rs` / `legacy_nonce.rs` /
     /// `process_with_tenant` used to inject behind the test's back.
-    fn verify_metas(
-        &self,
-        signer: Pubkey,
-        seed: &[u8; 32],
-        ninth: AccountMeta,
-    ) -> Vec<AccountMeta> {
+    fn verify_metas(&self, signer: Pubkey, seed: &[u8; 32], ninth: AccountMeta) -> Vec<AccountMeta> {
         let (used, _) = Pubkey::find_program_address(&[b"nonce", &[3], seed], &self.pid);
         let legacy = Pubkey::find_program_address(&[b"nonce", seed], &self.pid).0;
         vec![
@@ -459,28 +382,15 @@ impl Env {
             AccountMeta::new_readonly(clock::ID, false),
             AccountMeta::new_readonly(slot_hashes::ID, false),
             ninth,
-            AccountMeta::new_readonly(
-                Pubkey::find_program_address(&[GcpTenantPolicy::SEED], &self.pid).0,
-                false,
-            ),
-            AccountMeta::new_readonly(
-                Pubkey::find_program_address(&[BackendPolicy::SEED, &[3]], &self.pid).0,
-                false,
-            ),
+            AccountMeta::new_readonly(Pubkey::find_program_address(&[GcpTenantPolicy::SEED], &self.pid).0, false),
+            AccountMeta::new_readonly(Pubkey::find_program_address(&[BackendPolicy::SEED, &[3]], &self.pid).0, false),
             AccountMeta::new_readonly(legacy, false),
         ]
     }
 
     /// Mode A verify against a workload key the test cannot sign for.
-    fn mode_a_ix(
-        &self,
-        jwt: &str,
-        nonce_slot: u64,
-        workload: Pubkey,
-        seed: &[u8; 32],
-    ) -> Instruction {
-        let (signer, _) =
-            Pubkey::find_program_address(&[b"attested_signer_v2", workload.as_ref()], &self.pid);
+    fn mode_a_ix(&self, jwt: &str, nonce_slot: u64, workload: Pubkey, seed: &[u8; 32]) -> Instruction {
+        let (signer, _) = Pubkey::find_program_address(&[b"attested_signer_v2", workload.as_ref()], &self.pid);
         Instruction {
             program_id: self.pid,
             accounts: self.verify_metas(signer, seed, AccountMeta::new_readonly(workload, true)),
@@ -491,11 +401,7 @@ impl Env {
     fn mode_b_ix(&self, nonce_slot: u64, action: [u8; 32], seed: &[u8; 32]) -> Instruction {
         Instruction {
             program_id: self.pid,
-            accounts: self.verify_metas(
-                Pubkey::new_unique(),
-                seed,
-                AccountMeta::new_readonly(instructions::ID, false),
-            ),
+            accounts: self.verify_metas(Pubkey::new_unique(), seed, AccountMeta::new_readonly(instructions::ID, false)),
             data: verify_data(VERIFY_GOOGLE_JWT_MODE_B, MODE_B_JWT, nonce_slot, action),
         }
     }
@@ -551,9 +457,7 @@ async fn mode_a_tenant_case(aud: &[u8], sub: &[u8], present: bool, accepted: boo
     let workload = Pubkey::new_from_array(MODE_A_SLOT_HASH);
     let mut env = boot(pid, present.then_some((aud, sub)), vec![]).await;
 
-    env.send_authority(env.register_ix(KID, modulus()))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus())).await.ok();
     let saved_jwks = JwksAccount::try_from_slice(&env.data(env.jwks).await).unwrap();
     assert_eq!(saved_jwks.discriminator, JWKS_ACCOUNT_DISCRIMINATOR);
     assert_eq!(saved_jwks.kid_hash, kid_hash(KID));
@@ -571,10 +475,7 @@ async fn mode_a_tenant_case(aud: &[u8], sub: &[u8], present: bool, accepted: boo
     let nonce = env.used_nonce(&seed);
     let out = env.send(ix.clone()).await;
     if !accepted {
-        assert!(
-            out.result.is_err(),
-            "wrong/missing configured tenant accepted"
-        );
+        assert!(out.result.is_err(), "wrong/missing configured tenant accepted");
         out.assert_no_registration();
         assert!(env.account(signer).await.is_none());
         assert!(env.account(nonce).await.is_none());
@@ -587,16 +488,10 @@ async fn mode_a_tenant_case(aud: &[u8], sub: &[u8], present: bool, accepted: boo
     let saved_signer = AttestedSignerAccount::try_from_slice(&signer_data).unwrap();
     assert_eq!(saved_signer.discriminator, ATTESTED_SIGNER_DISCRIMINATOR);
     assert_eq!(saved_signer.record.signer_pubkey, workload.to_bytes());
-    assert_eq!(
-        saved_signer.record.enclave_type,
-        EnclaveType::GcpConfidentialSpace
-    );
+    assert_eq!(saved_signer.record.enclave_type, EnclaveType::GcpConfidentialSpace);
     assert_eq!(saved_signer.record.measurement.0, measurement());
     assert_eq!(saved_signer.record.registered_slot, CURRENT_SLOT);
-    assert_eq!(
-        saved_signer.record.expires_slot,
-        CURRENT_SLOT + ATTESTATION_TTL_SLOTS
-    );
+    assert_eq!(saved_signer.record.expires_slot, CURRENT_SLOT + ATTESTATION_TTL_SLOTS);
 
     let saved_nonce = UsedNonceAccount::try_from_slice(&env.data(nonce).await).unwrap();
     assert_eq!(saved_nonce.discriminator, USED_NONCE_DISCRIMINATOR);
@@ -613,9 +508,7 @@ async fn test_rejects_non_authority_registering_jwks() {
     let attacker = Keypair::new();
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
     let ix = env.register_ix_as(&attacker.pubkey(), KID, modulus());
-    env.send_signed(ix, &attacker)
-        .await
-        .err(VerifierError::InvalidAuthority.into());
+    env.send_signed(ix, &attacker).await.err(VerifierError::InvalidAuthority.into());
     assert!(env.account(env.jwks).await.is_none());
 }
 
@@ -626,25 +519,15 @@ async fn test_rejects_revoked_jwks_key() {
     let pid = Pubkey::new_unique();
     let workload = Pubkey::new_from_array(MODE_A_SLOT_HASH);
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
-    env.send_authority(env.register_ix(KID, modulus()))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus())).await.ok();
 
     let jwks = env.jwks;
-    env.send_authority(env.revoke_ix(jwks, kid_hash(KID)))
-        .await
-        .ok();
-    assert!(
-        JwksAccount::try_from_slice(&env.data(jwks).await)
-            .unwrap()
-            .is_revoked
-    );
+    env.send_authority(env.revoke_ix(jwks, kid_hash(KID))).await.ok();
+    assert!(JwksAccount::try_from_slice(&env.data(jwks).await).unwrap().is_revoked);
 
     let seed = eat_nonce_tombstone_seed(EAT_NONCE);
     let ix = env.mode_a_ix(VALID_JWT, NONCE_SLOT, workload, &seed);
-    env.send(ix)
-        .await
-        .err(VerifierError::UnauthorizedPolicy.into());
+    env.send(ix).await.err(VerifierError::UnauthorizedPolicy.into());
 }
 
 /// Both halves run against the slot hash the token binds to, so the tampered
@@ -654,9 +537,7 @@ async fn test_rejects_tampered_jwt_and_stale_slot_hash() {
     let pid = Pubkey::new_unique();
     let workload = Pubkey::new_from_array(MODE_A_SLOT_HASH);
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
-    env.send_authority(env.register_ix(KID, modulus()))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus())).await.ok();
 
     let mut tampered = VALID_JWT.as_bytes().to_vec();
     let view = solana_confidential_compute_crypto::jwt::JwtView::parse(VALID_JWT).expect("parse");
@@ -664,15 +545,11 @@ async fn test_rejects_tampered_jwt_and_stale_slot_hash() {
     let tampered_jwt = std::str::from_utf8(&tampered).expect("ascii");
 
     let seed = eat_nonce_tombstone_seed(EAT_NONCE);
-    let out = env
-        .send(env.mode_a_ix(tampered_jwt, NONCE_SLOT, workload, &seed))
-        .await;
+    let out = env.send(env.mode_a_ix(tampered_jwt, NONCE_SLOT, workload, &seed)).await;
     out.err(VerifierError::InvalidSignature.into());
     out.assert_no_registration();
 
-    let stale = env
-        .send(env.mode_a_ix(VALID_JWT, CURRENT_SLOT.saturating_sub(151), workload, &seed))
-        .await;
+    let stale = env.send(env.mode_a_ix(VALID_JWT, CURRENT_SLOT.saturating_sub(151), workload, &seed)).await;
     stale.err(VerifierError::StaleNonce.into());
     stale.assert_no_registration();
     assert!(env.account(env.used_nonce(&seed)).await.is_none());
@@ -683,39 +560,22 @@ async fn test_rejects_slot_hash_mismatch_in_mode_a() {
     let pid = Pubkey::new_unique();
     let workload = Pubkey::new_from_array(MODE_A_SLOT_HASH);
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
-    env.send_authority(env.register_ix(KID, modulus()))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus())).await.ok();
 
     // The pinned hash does not match nonce 1, which decodes to [b'n'; 32].
     env.pin(CURRENT_SLOT, UNIX_NOW, NONCE_SLOT, [0x55; 32]);
     let seed = eat_nonce_tombstone_seed(EAT_NONCE);
-    env.send(env.mode_a_ix(VALID_JWT, NONCE_SLOT, workload, &seed))
-        .await
-        .err(VerifierError::SignerMismatch.into());
+    env.send(env.mode_a_ix(VALID_JWT, NONCE_SLOT, workload, &seed)).await.err(VerifierError::SignerMismatch.into());
 }
 
 #[tokio::test]
 async fn test_rejects_non_owner_revoke_jwks() {
     let pid = Pubkey::new_unique();
     let wrong_owner = Pubkey::new_unique();
-    let (jwks, bump) = Pubkey::find_program_address(
-        &[
-            solana_confidential_compute_crypto::jwt::JWKS_SEED,
-            &kid_hash(KID),
-        ],
-        &pid,
-    );
+    let (jwks, bump) =
+        Pubkey::find_program_address(&[solana_confidential_compute_crypto::jwt::JWKS_SEED, &kid_hash(KID)], &pid);
     let (n0, r2) = solana_confidential_compute_crypto::jwt::compute_n0_and_r2(&modulus()).unwrap();
-    let live = JwksAccount::new(
-        kid_hash(KID),
-        modulus(),
-        RSA_EXPONENT,
-        n0,
-        r2,
-        CURRENT_SLOT,
-        bump,
-    );
+    let live = JwksAccount::new(kid_hash(KID), modulus(), RSA_EXPONENT, n0, r2, CURRENT_SLOT, bump);
     let mut env = boot(
         pid,
         Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)),
@@ -723,13 +583,8 @@ async fn test_rejects_non_owner_revoke_jwks() {
     )
     .await;
 
-    env.send_authority(env.revoke_ix(jwks, kid_hash(KID)))
-        .await
-        .err(VerifierError::InvalidAccountAddress.into());
-    assert_eq!(
-        JwksAccount::try_from_slice(&env.data(jwks).await).unwrap(),
-        live
-    );
+    env.send_authority(env.revoke_ix(jwks, kid_hash(KID))).await.err(VerifierError::InvalidAccountAddress.into());
+    assert_eq!(JwksAccount::try_from_slice(&env.data(jwks).await).unwrap(), live);
 }
 
 /// A live SEV-SNP session cannot be re-typed by a JWT, and a governance
@@ -740,8 +595,7 @@ async fn test_rejects_non_owner_revoke_jwks() {
 async fn test_rejects_session_enclave_type_overwrite() {
     let pid = Pubkey::new_unique();
     let workload = Pubkey::new_from_array(MODE_A_SLOT_HASH);
-    let (signer, signer_bump) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", workload.as_ref()], &pid);
+    let (signer, signer_bump) = Pubkey::find_program_address(&[b"attested_signer_v2", workload.as_ref()], &pid);
     let existing = AttestedSignerAccount::new(
         solana_confidential_compute_core::types::AttestedSigner {
             signer_pubkey: MODE_A_SLOT_HASH,
@@ -760,15 +614,11 @@ async fn test_rejects_session_enclave_type_overwrite() {
         vec![(signer, funded(pid, borsh::to_vec(&existing).unwrap()))],
     )
     .await;
-    env.send_authority(env.register_ix(KID, modulus()))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus())).await.ok();
 
     let seed = eat_nonce_tombstone_seed(EAT_NONCE);
     let ix = env.mode_a_ix(VALID_JWT, NONCE_SLOT, workload, &seed);
-    env.send(ix.clone())
-        .await
-        .err(ProgramError::AccountAlreadyInitialized);
+    env.send(ix.clone()).await.err(ProgramError::AccountAlreadyInitialized);
     assert!(env.account(env.used_nonce(&seed)).await.is_none());
 
     let mut revoked = existing;
@@ -777,18 +627,10 @@ async fn test_rejects_session_enclave_type_overwrite() {
     revoked.expires_unix_timestamp = 86_400;
     env.ctx.set_account(
         &signer,
-        &solana_sdk::account::AccountSharedData::from(funded(
-            pid,
-            borsh::to_vec(&revoked).unwrap(),
-        )),
+        &solana_sdk::account::AccountSharedData::from(funded(pid, borsh::to_vec(&revoked).unwrap())),
     );
-    env.send(ix)
-        .await
-        .err(VerifierError::UnauthorizedPolicy.into());
-    assert_eq!(
-        AttestedSignerAccount::try_from_slice(&env.data(signer).await).unwrap(),
-        revoked
-    );
+    env.send(ix).await.err(VerifierError::UnauthorizedPolicy.into());
+    assert_eq!(AttestedSignerAccount::try_from_slice(&env.data(signer).await).unwrap(), revoked);
 }
 
 #[tokio::test]
@@ -797,22 +639,14 @@ async fn test_verify_google_jwt_mode_b_success_and_mismatch() {
     let slot_hash = [0x11u8; 32];
     let consumer_data = [0x99u8; 11];
     // Full-wire V3 action chosen to retain the high-bit raw commitment control.
-    let action = solana_confidential_compute_core::action::hash_action_parts(
-        &[],
-        0,
-        core::iter::empty(),
-        &consumer_data,
-    );
+    let action =
+        solana_confidential_compute_core::action::hash_action_parts(&[], 0, core::iter::empty(), &consumer_data);
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
     env.pin(CURRENT_SLOT, UNIX_NOW, NONCE_SLOT, slot_hash);
-    env.send_authority(env.register_ix(KID, modulus_from_hex(MODE_B_MODULUS_HEX)))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus_from_hex(MODE_B_MODULUS_HEX))).await.ok();
 
-    let view =
-        solana_confidential_compute_crypto::jwt::JwtView::parse(MODE_B_JWT).expect("parse view");
-    let claims = solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64)
-        .expect("claims");
+    let view = solana_confidential_compute_crypto::jwt::JwtView::parse(MODE_B_JWT).expect("parse view");
+    let claims = solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64).expect("claims");
     let raw = claims.decode_mode_b_commitment().expect("mode b nonce");
     assert_eq!(claims.eat_nonce().len(), 43);
     assert_ne!(raw[0] & 0x80, 0);
@@ -829,35 +663,23 @@ async fn test_verify_google_jwt_mode_b_success_and_mismatch() {
     let nonce = env.used_nonce(&seed);
 
     let verify = env.mode_b_ix(NONCE_SLOT, action, &seed);
-    let consume = |data: Vec<u8>| Instruction {
-        program_id: CONSUMER_ID,
-        accounts: vec![],
-        data,
-    };
+    let consume = |data: Vec<u8>| Instruction { program_id: CONSUMER_ID, accounts: vec![], data };
 
     // A substituted consumer instruction must fail before nonce writes.
     let mut substituted = consumer_data;
     substituted[0] ^= 1;
-    env.send_all(&[verify.clone(), consume(substituted.to_vec())])
-        .await
-        .err(VerifierError::ActionHashMismatch.into());
+    env.send_all(&[verify.clone(), consume(substituted.to_vec())]).await.err(VerifierError::ActionHashMismatch.into());
     assert!(env.account(nonce).await.is_none());
 
-    env.send_all(&[verify.clone(), consume(consumer_data.to_vec())])
-        .await
-        .ok();
+    env.send_all(&[verify.clone(), consume(consumer_data.to_vec())]).await.ok();
     let saved = UsedNonceAccount::try_from_slice(&env.data(nonce).await).unwrap();
     assert_eq!(saved.discriminator, USED_NONCE_DISCRIMINATOR);
     assert_eq!(saved.slot, CURRENT_SLOT);
 
-    env.send_all(&[verify, consume(consumer_data.to_vec())])
-        .await
-        .err(VerifierError::NonceAlreadyUsed.into());
+    env.send_all(&[verify, consume(consumer_data.to_vec())]).await.err(VerifierError::NonceAlreadyUsed.into());
 
     let mismatch = env.mode_b_ix(NONCE_SLOT, [0xfe; 32], &seed);
-    env.send_all(&[mismatch, consume(consumer_data.to_vec())])
-        .await
-        .err(VerifierError::ActionHashMismatch.into());
+    env.send_all(&[mismatch, consume(consumer_data.to_vec())]).await.err(VerifierError::ActionHashMismatch.into());
 }
 
 #[tokio::test]
@@ -881,25 +703,19 @@ async fn test_verify_google_jwt_rejects_foreign_jwks_owner() {
 async fn test_mode_a_accepts_high_bit_pubkey_base64url_nonces() {
     let pid = Pubkey::new_unique();
     let workload_bytes = [
-        0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
-        0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d,
-        0x1e, 0x1f,
+        0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11,
+        0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
     ];
     assert_ne!(workload_bytes[0] & 0x80, 0);
     let workload = Pubkey::new_from_array(workload_bytes);
     let slot_hash = [0x5au8; 32];
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
-    env.send_authority(env.register_ix(KID, modulus()))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus())).await.ok();
     env.pin(CURRENT_SLOT, UNIX_NOW, NONCE_SLOT, slot_hash);
 
     let seed = mode_a_seed(&workload_bytes, &slot_hash);
-    env.send(env.mode_a_ix(HIGH_BIT_JWT, NONCE_SLOT, workload, &seed))
-        .await
-        .ok();
-    let saved =
-        AttestedSignerAccount::try_from_slice(&env.data(env.signer_pda(&workload)).await).unwrap();
+    env.send(env.mode_a_ix(HIGH_BIT_JWT, NONCE_SLOT, workload, &seed)).await.ok();
+    let saved = AttestedSignerAccount::try_from_slice(&env.data(env.signer_pda(&workload)).await).unwrap();
     assert_eq!(saved.record.signer_pubkey, workload_bytes);
     assert_ne!(saved.record.signer_pubkey[0] & 0x80, 0);
     assert_eq!(saved.record.enclave_type, EnclaveType::GcpConfidentialSpace);
@@ -912,9 +728,7 @@ async fn test_rejects_nul_kid_registration_before_writes() {
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
     let ix = env.register_ix(&kid, modulus());
     let jwks = ix.accounts[2].pubkey;
-    env.send_authority(ix)
-        .await
-        .err(VerifierError::InvalidInstruction.into());
+    env.send_authority(ix).await.err(VerifierError::InvalidInstruction.into());
     assert!(env.account(jwks).await.is_none());
 }
 
@@ -924,9 +738,7 @@ async fn issue_170_jwks_freshness_boundary() {
         let pid = Pubkey::new_unique();
         let workload = Pubkey::new_from_array(MODE_A_SLOT_HASH);
         let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
-        env.send_authority(env.register_ix(KID, modulus()))
-            .await
-            .ok();
+        env.send_authority(env.register_ix(KID, modulus())).await.ok();
         let saved_jwks = JwksAccount::try_from_slice(&env.data(env.jwks).await).unwrap();
         assert_eq!(saved_jwks.discriminator, JWKS_ACCOUNT_DISCRIMINATOR);
         assert_eq!(saved_jwks.kid_hash, kid_hash(KID));
@@ -934,16 +746,9 @@ async fn issue_170_jwks_freshness_boundary() {
         assert!(!saved_jwks.is_revoked);
         assert_eq!(saved_jwks.registered_slot, CURRENT_SLOT);
 
-        env.pin(
-            CURRENT_SLOT + age,
-            UNIX_NOW,
-            NONCE_SLOT + age,
-            MODE_A_SLOT_HASH,
-        );
+        env.pin(CURRENT_SLOT + age, UNIX_NOW, NONCE_SLOT + age, MODE_A_SLOT_HASH);
         let seed = eat_nonce_tombstone_seed(EAT_NONCE);
-        let out = env
-            .send(env.mode_a_ix(VALID_JWT, NONCE_SLOT + age, workload, &seed))
-            .await;
+        let out = env.send(env.mode_a_ix(VALID_JWT, NONCE_SLOT + age, workload, &seed)).await;
         if age <= JwksAccount::MAX_AGE_SLOTS {
             out.ok();
         } else {
@@ -962,10 +767,7 @@ async fn issue_170_refresh_attempt(
     let jwks = env.jwks;
     env.ctx.set_account(
         &jwks,
-        &solana_sdk::account::AccountSharedData::from(funded(
-            env.pid,
-            borsh::to_vec(existing).unwrap(),
-        )),
+        &solana_sdk::account::AccountSharedData::from(funded(env.pid, borsh::to_vec(existing).unwrap())),
     );
     let out = env.send_authority(env.register_ix(KID, modulus)).await;
     match expected {
@@ -1001,13 +803,8 @@ async fn issue_170_governance_refresh_preserves_revocation_and_live_keys() {
         if kind == 3 {
             replacement[1] ^= 1;
         }
-        let after = issue_170_refresh_attempt(
-            &mut env,
-            replacement,
-            &old,
-            Err(ProgramError::AccountAlreadyInitialized),
-        )
-        .await;
+        let after =
+            issue_170_refresh_attempt(&mut env, replacement, &old, Err(ProgramError::AccountAlreadyInitialized)).await;
         assert_eq!(after, old, "kind {kind}");
     }
 }
@@ -1027,13 +824,8 @@ async fn issue_194_revoked_kid_accepts_different_replacement_not_compromised_key
     assert_eq!(saved.modulus, replacement);
     assert_eq!(saved.registered_slot, CURRENT_SLOT);
 
-    let after = issue_170_refresh_attempt(
-        &mut env,
-        modulus(),
-        &revoked,
-        Err(ProgramError::AccountAlreadyInitialized),
-    )
-    .await;
+    let after =
+        issue_170_refresh_attempt(&mut env, modulus(), &revoked, Err(ProgramError::AccountAlreadyInitialized)).await;
     assert_eq!(after, revoked);
 }
 
@@ -1044,16 +836,12 @@ async fn issue_183_requires_source_scoped_policy() {
     let pid = Pubkey::new_unique();
     let workload = Pubkey::new_from_array(MODE_A_SLOT_HASH);
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
-    env.send_authority(env.register_ix(KID, modulus()))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus())).await.ok();
 
     let seed = eat_nonce_tombstone_seed(EAT_NONCE);
     let mut ix = env.mode_a_ix(VALID_JWT, NONCE_SLOT, workload, &seed);
     ix.accounts.remove(10); // source-3 backend policy
-    env.send(ix)
-        .await
-        .err(VerifierError::UnauthorizedPolicy.into());
+    env.send(ix).await.err(VerifierError::UnauthorizedPolicy.into());
     assert!(env.account(env.signer_pda(&workload)).await.is_none());
 }
 
@@ -1062,18 +850,12 @@ async fn issue_182_session_cannot_outlive_jwt_in_unix_time() {
     let pid = Pubkey::new_unique();
     let workload = Pubkey::new_from_array(MODE_A_SLOT_HASH);
     let mut env = boot(pid, Some((EXPECTED_AUDIENCE, EXPECTED_SUBJECT)), vec![]).await;
-    env.send_authority(env.register_ix(KID, modulus()))
-        .await
-        .ok();
+    env.send_authority(env.register_ix(KID, modulus())).await.ok();
     env.pin(CURRENT_SLOT, 4_102_444_799, NONCE_SLOT, MODE_A_SLOT_HASH);
 
     let seed = eat_nonce_tombstone_seed(EAT_NONCE);
-    env.send(env.mode_a_ix(VALID_JWT, NONCE_SLOT, workload, &seed))
-        .await
-        .ok();
+    env.send(env.mode_a_ix(VALID_JWT, NONCE_SLOT, workload, &seed)).await.ok();
     let bytes = env.data(env.signer_pda(&workload)).await;
-    let deadline = bytes
-        .get(146..154)
-        .map(|s| i64::from_le_bytes(s.try_into().unwrap()));
+    let deadline = bytes.get(146..154).map(|s| i64::from_le_bytes(s.try_into().unwrap()));
     assert_eq!(deadline, Some(4_102_444_800)); // JWT has one second remaining
 }

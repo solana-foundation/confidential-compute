@@ -11,9 +11,7 @@
 //!
 //! @spec SCC-TDX-002
 
-use solana_confidential_compute_sidecar::attestation::intel_tdx::{
-    composite_challenge, report_data_commitment,
-};
+use solana_confidential_compute_sidecar::attestation::intel_tdx::{composite_challenge, report_data_commitment};
 use solana_confidential_compute_verifier::tdx::{expected_report_data, REPORT_DATA_DOMAIN};
 use solana_program::pubkey::Pubkey;
 
@@ -27,13 +25,7 @@ struct Vector {
 }
 
 fn vectors() -> Vec<Vector> {
-    let make = |signer, slot_hash, gpu_rim, model, nonce| Vector {
-        signer,
-        slot_hash,
-        gpu_rim,
-        model,
-        nonce,
-    };
+    let make = |signer, slot_hash, gpu_rim, model, nonce| Vector { signer, slot_hash, gpu_rim, model, nonce };
     vec![
         make([0x11; 32], [0x22; 32], [0x33; 32], [0x44; 32], [0x55; 32]),
         make([0x00; 32], [0x00; 32], [0x00; 32], [0x00; 32], [0x00; 32]),
@@ -51,28 +43,17 @@ fn vectors() -> Vec<Vector> {
 #[test]
 fn the_sidecar_and_the_verifier_agree_on_report_data() {
     for vector in vectors() {
-        let Vector {
-            signer: signer_bytes,
-            slot_hash,
-            gpu_rim,
-            model,
-            nonce,
-        } = vector;
+        let Vector { signer: signer_bytes, slot_hash, gpu_rim, model, nonce } = vector;
         let signer = Pubkey::new_from_array(signer_bytes);
 
         // What the enclave asks the hardware to sign.
         let composite = composite_challenge(&signer, &slot_hash, &gpu_rim, &model);
-        let produced =
-            report_data_commitment(&signer, &composite, &slot_hash, &gpu_rim, &model, &nonce);
+        let produced = report_data_commitment(&signer, &composite, &slot_hash, &gpu_rim, &model, &nonce);
 
         // What the on-chain verifier insists it must have been.
         let expected = expected_report_data(&signer_bytes, &slot_hash, &gpu_rim, &model, &nonce);
 
-        assert_eq!(
-            produced, expected,
-            "sidecar and verifier disagree for signer {}",
-            signer
-        );
+        assert_eq!(produced, expected, "sidecar and verifier disagree for signer {}", signer);
     }
 }
 
@@ -97,11 +78,7 @@ fn each_input_changes_the_commitment() {
 
     let mut other_slot = slot_hash;
     other_slot[31] ^= 1;
-    assert_ne!(
-        base,
-        expected_report_data(&signer, &other_slot, &gpu_rim, &model, &nonce),
-        "freshness must be bound"
-    );
+    assert_ne!(base, expected_report_data(&signer, &other_slot, &gpu_rim, &model, &nonce), "freshness must be bound");
 
     let mut other_gpu = gpu_rim;
     other_gpu[5] ^= 1;
@@ -132,10 +109,7 @@ fn each_input_changes_the_commitment() {
 /// literal 42. If someone renames the domain, that assertion fires here too.
 #[test]
 fn the_domain_string_matches_the_sidecars() {
-    assert_eq!(
-        REPORT_DATA_DOMAIN,
-        "solana-confidential-compute/v1/report-data"
-    );
+    assert_eq!(REPORT_DATA_DOMAIN, "solana-confidential-compute/v1/report-data");
     assert_eq!(REPORT_DATA_DOMAIN.len(), 42);
     assert_eq!(
         REPORT_DATA_DOMAIN,
@@ -149,9 +123,5 @@ fn the_domain_string_matches_the_sidecars() {
 fn the_commitment_is_sha512_wide() {
     let out = expected_report_data(&[1; 32], &[2; 32], &[3; 32], &[4; 32], &[5; 32]);
     assert_eq!(out.len(), 64);
-    assert_ne!(
-        out[..32],
-        out[32..],
-        "a doubled SHA-256 would look like this"
-    );
+    assert_ne!(out[..32], out[32..], "a doubled SHA-256 would look like this");
 }

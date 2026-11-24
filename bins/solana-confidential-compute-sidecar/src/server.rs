@@ -19,8 +19,8 @@ use std::{
 use tokio::sync::RwLock;
 
 use crate::{
-    attestation::AttestationProvider, config::EnclaveMode, control::EnrollmentControl,
-    error::SidecarError, keys::EphemeralKeyManager, onchain::OnchainAttestor,
+    attestation::AttestationProvider, config::EnclaveMode, control::EnrollmentControl, error::SidecarError,
+    keys::EphemeralKeyManager, onchain::OnchainAttestor,
 };
 
 pub struct SidecarAppState {
@@ -51,8 +51,7 @@ const MAX_SIGNATURES: u64 = 64;
 
 /// `RequestUnits` (deprecated), `RequestHeapFrame`, `SetComputeUnitLimit`,
 /// `SetComputeUnitPrice`, and `SetLoadedAccountsDataSizeLimit`.
-const COMPUTE_BUDGET_PROGRAM_ID: Pubkey =
-    Pubkey::from_str_const("ComputeBudget111111111111111111111111111111");
+const COMPUTE_BUDGET_PROGRAM_ID: Pubkey = Pubkey::from_str_const("ComputeBudget111111111111111111111111111111");
 
 const SYSTEM_PROGRAM_ID: Pubkey = Pubkey::from_str_const("11111111111111111111111111111111");
 
@@ -101,9 +100,7 @@ pub async fn attest_current_key(state: &SidecarAppState) -> Result<u64, SidecarE
 async fn attest_current_key_locked(state: &SidecarAppState) -> Result<u64, SidecarError> {
     let keys = state.keys.read().await;
     let status = enroll_key(state, &keys).await?;
-    let expires_slot = status
-        .expires_slot
-        .expect("successful enrollment has expiry");
+    let expires_slot = status.expires_slot.expect("successful enrollment has expiry");
     *state.status.write().await = status;
     Ok(expires_slot)
 }
@@ -122,18 +119,13 @@ async fn enroll_key(
         &slot_hash,
     )
     .await?;
-    let expires_slot = state
-        .onchain
-        .submit_attestation(keys, target_slot, &report)
-        .await?;
+    let expires_slot = state.onchain.submit_attestation(keys, target_slot, &report).await?;
     let confirmed = if state.onchain.is_dry_run() {
         None
     } else {
         let session = state.onchain.confirmed_session(&pubkey).await?;
         if !session.is_valid() {
-            return Err(SidecarError::OnchainError(
-                "confirmed enrollment is invalid or expired".into(),
-            ));
+            return Err(SidecarError::OnchainError("confirmed enrollment is invalid or expired".into()));
         }
         Some(session)
     };
@@ -148,9 +140,7 @@ async fn enroll_key(
 /// Attest a candidate, then atomically replace the key and deadlines. Dropping
 /// the replaced key zeroizes it. Failure/cancellation preserves the old session.
 /// @spec SCC-SIDECAR-001 SCC-SIDECAR-005
-pub async fn rotate_zeroize_and_attest(
-    state: &SidecarAppState,
-) -> Result<(Pubkey, Pubkey, u64), SidecarError> {
+pub async fn rotate_zeroize_and_attest(state: &SidecarAppState) -> Result<(Pubkey, Pubkey, u64), SidecarError> {
     let _operation = state.enrollment.lock().await;
     rotate_locked(state).await
 }
@@ -158,9 +148,7 @@ pub async fn rotate_zeroize_and_attest(
 async fn rotate_locked(state: &SidecarAppState) -> Result<(Pubkey, Pubkey, u64), SidecarError> {
     let candidate = EphemeralKeyManager::new();
     let status = enroll_key(state, &candidate).await?;
-    let expires_slot = status
-        .expires_slot
-        .expect("successful enrollment has expiry");
+    let expires_slot = status.expires_slot.expect("successful enrollment has expiry");
     let new_key = candidate.pubkey();
     let mut keys = state.keys.write().await;
     let mut current_status = state.status.write().await;
@@ -193,17 +181,11 @@ async fn status_handler(State(state): State<Arc<SidecarAppState>>) -> impl IntoR
     let pubkey = keys.pubkey();
     let status = state.status.read().await.clone();
     drop(keys);
-    let confirmed = if state.onchain.is_dry_run() {
-        None
-    } else {
-        state.onchain.confirmed_session(&pubkey).await.ok()
-    };
+    let confirmed = if state.onchain.is_dry_run() { None } else { state.onchain.confirmed_session(&pubkey).await.ok() };
     let current_slot = confirmed.map(|s| s.current_slot);
     let current_unix_timestamp = confirmed.map(|s| s.current_unix_timestamp);
     let expires_slot = confirmed.map(|s| s.expires_slot).or(status.expires_slot);
-    let expires_unix_timestamp = confirmed
-        .map(|s| s.expires_unix_timestamp)
-        .or(status.expires_unix_timestamp);
+    let expires_unix_timestamp = confirmed.map(|s| s.expires_unix_timestamp).or(status.expires_unix_timestamp);
     let attestation_status = if status.expires_slot.is_none() {
         "unattested"
     } else if state.onchain.is_dry_run() {
@@ -224,17 +206,12 @@ async fn status_handler(State(state): State<Arc<SidecarAppState>>) -> impl IntoR
         attestation_status,
         current_slot,
         current_unix_timestamp,
-        registered_slot: confirmed
-            .map(|s| s.registered_slot)
-            .or(status.registered_slot),
+        registered_slot: confirmed.map(|s| s.registered_slot).or(status.registered_slot),
         expires_slot,
         expires_unix_timestamp,
         remaining_slots: confirmed.map(|s| s.expires_slot.saturating_sub(s.current_slot)),
-        remaining_seconds: confirmed.map(|s| {
-            s.expires_unix_timestamp
-                .saturating_sub(s.current_unix_timestamp)
-                .max(0) as u64
-        }),
+        remaining_seconds: confirmed
+            .map(|s| s.expires_unix_timestamp.saturating_sub(s.current_unix_timestamp).max(0) as u64),
     })
 }
 
@@ -242,10 +219,7 @@ async fn status_handler(State(state): State<Arc<SidecarAppState>>) -> impl IntoR
 // POST /v1/attest
 // ---------------------------------------------------------------------------
 
-async fn attest_handler(
-    State(state): State<Arc<SidecarAppState>>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn attest_handler(State(state): State<Arc<SidecarAppState>>, headers: HeaderMap) -> impl IntoResponse {
     let _operation = match state.enrollment.begin_http(&headers) {
         Ok(operation) => operation,
         Err(error) => return error.into_response(),
@@ -267,11 +241,9 @@ async fn attest_handler(
             )
                 .into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))).into_response()
+        }
     }
 }
 
@@ -314,10 +286,7 @@ async fn sign_handler(
     let current_slot = match state.onchain.get_current_slot().await {
         Ok(slot) => slot,
         Err(e) => {
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
+            return (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({ "error": e.to_string() })))
                 .into_response();
         }
     };
@@ -333,32 +302,19 @@ async fn sign_handler(
             .into_response();
     }
 
-    let registered = match state
-        .onchain
-        .registered_session_identity(&keys.pubkey())
-        .await
-    {
+    let registered = match state.onchain.registered_session_identity(&keys.pubkey()).await {
         Ok(registered) => registered,
         Err(error) => {
-            return (
-                StatusCode::FORBIDDEN,
-                Json(serde_json::json!({"error":error.to_string()})),
-            )
-                .into_response()
+            return (StatusCode::FORBIDDEN, Json(serde_json::json!({"error":error.to_string()}))).into_response()
         }
     };
 
     // 2. Decode serialized transaction
-    let tx_bytes = match base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        payload.transaction.trim(),
-    ) {
+    let tx_bytes = match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, payload.transaction.trim())
+    {
         Ok(b) => b,
         Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": format!("Invalid base64: {e}") })),
-            )
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": format!("Invalid base64: {e}") })))
                 .into_response();
         }
     };
@@ -366,44 +322,30 @@ async fn sign_handler(
     let mut tx = match deserialize_sign_transaction(&tx_bytes) {
         Ok(t) => t,
         Err(error) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": error })),
-            )
-                .into_response();
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": error }))).into_response();
         }
     };
 
-    if let Err(error) = screen_transaction(
-        &tx,
-        &state.onchain.verifier_program_id(),
-        state.allowed_consumer_program_id.as_ref(),
-    )
-    .and_then(|()| {
-        screen_consumer_identity(
-            &tx,
-            &state.onchain.verifier_program_id(),
-            &keys.pubkey(),
-            state.enclave_mode,
-            &registered,
-        )
-    }) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": error })),
-        )
-            .into_response();
+    if let Err(error) =
+        screen_transaction(&tx, &state.onchain.verifier_program_id(), state.allowed_consumer_program_id.as_ref())
+            .and_then(|()| {
+                screen_consumer_identity(
+                    &tx,
+                    &state.onchain.verifier_program_id(),
+                    &keys.pubkey(),
+                    state.enclave_mode,
+                    &registered,
+                )
+            })
+    {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": error }))).into_response();
     }
 
     // 3. Sign with ephemeral key
     let sig = match keys.sign_transaction(&mut tx) {
         Ok(s) => s,
         Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-                .into_response();
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() }))).into_response();
         }
     };
 
@@ -419,8 +361,7 @@ async fn sign_handler(
         }
     };
 
-    let new_tx_b64 =
-        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &new_tx_bytes);
+    let new_tx_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &new_tx_bytes);
 
     (
         StatusCode::OK,
@@ -438,10 +379,7 @@ async fn sign_handler(
 /// sequence of that length.
 fn deserialize_sign_transaction(bytes: &[u8]) -> Result<VersionedTransaction, String> {
     if bytes.len() > MAX_SIGN_BODY {
-        return Err(format!(
-            "transaction bincode is {} bytes; limit is {MAX_SIGN_BODY}",
-            bytes.len()
-        ));
+        return Err(format!("transaction bincode is {} bytes; limit is {MAX_SIGN_BODY}", bytes.len()));
     }
     if bytes.len() < 8 {
         return Err("transaction bincode is shorter than a signature count".to_string());
@@ -450,9 +388,7 @@ fn deserialize_sign_transaction(bytes: &[u8]) -> Result<VersionedTransaction, St
     count_bytes.copy_from_slice(&bytes[..8]);
     let signature_count = u64::from_le_bytes(count_bytes);
     if signature_count > MAX_SIGNATURES {
-        return Err(format!(
-            "transaction declares {signature_count} signatures; limit is {MAX_SIGNATURES}"
-        ));
+        return Err(format!("transaction declares {signature_count} signatures; limit is {MAX_SIGNATURES}"));
     }
     bincode::DefaultOptions::new()
         .with_fixint_encoding()
@@ -486,14 +422,11 @@ fn screen_transaction(
     }
     let mut saw_verifier = false;
     for ix in instructions {
-        let program_id = keys.get(ix.program_id_index as usize).ok_or_else(|| {
-            "instruction program id is outside the static account keys".to_string()
-        })?;
+        let program_id = keys
+            .get(ix.program_id_index as usize)
+            .ok_or_else(|| "instruction program id is outside the static account keys".to_string())?;
         if program_id == verifier_program_id {
-            let disc_bytes = ix
-                .data
-                .get(..8)
-                .ok_or_else(|| "verifier instruction is not allowlisted".to_string())?;
+            let disc_bytes = ix.data.get(..8).ok_or_else(|| "verifier instruction is not allowlisted".to_string())?;
             let mut disc = [0u8; 8];
             disc.copy_from_slice(disc_bytes);
             if !ALLOWED_VERIFIER_DISCRIMINATORS.contains(&disc) {
@@ -519,11 +452,7 @@ fn screen_transaction(
         return Err("transaction does not call the verifier program".to_string());
     }
     // Loaded addresses are not available in the message; do not guess their identities.
-    if tx
-        .message
-        .address_table_lookups()
-        .is_some_and(|tables| !tables.is_empty())
-    {
+    if tx.message.address_table_lookups().is_some_and(|tables| !tables.is_empty()) {
         return Err("address-table lookups are not supported by the signing policy".to_string());
     }
     for (index, consumer) in instructions.iter().enumerate() {
@@ -534,18 +463,14 @@ fn screen_transaction(
         let previous = index
             .checked_sub(1)
             .and_then(|i| instructions.get(i))
-            .ok_or_else(|| {
-                "consumer must immediately follow its own Mode B verifier".to_string()
-            })?;
+            .ok_or_else(|| "consumer must immediately follow its own Mode B verifier".to_string())?;
         if keys.get(previous.program_id_index as usize) != Some(verifier_program_id) {
             return Err("consumer must immediately follow its own Mode B verifier".to_string());
         }
         let expected = mode_b_action_hash(&previous.data, program)?;
         // The SDK resolves final compiled privileges (including payer and
         // other instructions) and hashes complete wire data without a split guess.
-        if solana_confidential_compute_sdk::validate_compiled_action(&tx.message, index, &expected)
-            .is_err()
-        {
+        if solana_confidential_compute_sdk::validate_compiled_action(&tx.message, index, &expected).is_err() {
             return Err("consumer data/accounts do not match the verifier action hash".to_string());
         }
     }
@@ -564,9 +489,7 @@ fn screen_consumer_identity(
 ) -> Result<(), String> {
     let keys = tx.message.static_account_keys();
     for (index, instruction) in tx.message.instructions().iter().enumerate() {
-        let program = keys
-            .get(instruction.program_id_index as usize)
-            .ok_or("invalid instruction program index")?;
+        let program = keys.get(instruction.program_id_index as usize).ok_or("invalid instruction program index")?;
         if program == verifier_program_id || *program == COMPUTE_BUDGET_PROGRAM_ID {
             continue;
         }
@@ -586,8 +509,7 @@ fn screen_consumer_identity(
             .data;
         let discriminator = data.get(..8).ok_or("missing Mode B discriminator")?;
         let (key, measurement) = if backend == 1
-            && discriminator
-                == solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
+            && discriminator == solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
         {
             let report = solana_confidential_compute_core::SnpReportView::try_from_slice(
                 data.get(80..).ok_or("missing SNP report")?,
@@ -595,8 +517,7 @@ fn screen_consumer_identity(
             .map_err(|_| "malformed SNP report")?;
             (report.pubkey(), report.measurement())
         } else if backend == 2
-            && discriminator
-                == solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR
+            && discriminator == solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR
         {
             let (_, document) = solana_confidential_compute_crypto::nitro::parse_nitro_attestation(
                 data.get(53..).ok_or("missing Nitro document")?,
@@ -607,10 +528,7 @@ fn screen_consumer_identity(
             return Err("Mode B verifier is not for the sidecar backend".into());
         };
         if key != workload.to_bytes() || measurement != registered.measurement {
-            return Err(
-                "Mode B workload key or measurement differs from the confirmed sidecar identity"
-                    .into(),
-            );
+            return Err("Mode B workload key or measurement differs from the confirmed sidecar identity".into());
         }
     }
     Ok(())
@@ -618,8 +536,7 @@ fn screen_consumer_identity(
 
 /// Read only nonce-protected Mode B layouts; registration is never action authorization.
 fn mode_b_action_hash(data: &[u8], consumer_program: &Pubkey) -> Result<[u8; 32], String> {
-    let malformed =
-        || "consumer requires a well-formed nonce-protected Mode B verifier".to_string();
+    let malformed = || "consumer requires a well-formed nonce-protected Mode B verifier".to_string();
     let disc = data.get(..8).ok_or_else(malformed)?;
     let hash = if disc == solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR {
         if data.len() != 80 + solana_confidential_compute_core::SNP_REPORT_SIZE
@@ -647,27 +564,21 @@ fn mode_b_action_hash(data: &[u8], consumer_program: &Pubkey) -> Result<[u8; 32]
     } else if disc == crate::onchain::VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR {
         // Fixed layout: mode @ 8, action hash @ 17..49, measurement @ 49..81.
         // There is no length prefix. Mode A is not action authorization.
-        if data.len() != crate::onchain::VERIFY_NVIDIA_IX_LEN
-            || data[8] != crate::onchain::VERIFY_NVIDIA_MODE_B
-        {
+        if data.len() != crate::onchain::VERIFY_NVIDIA_IX_LEN || data[8] != crate::onchain::VERIFY_NVIDIA_MODE_B {
             return Err(malformed());
         }
         data.get(17..49)
     } else {
         return Err(malformed());
     };
-    hash.and_then(|bytes| bytes.try_into().ok())
-        .ok_or_else(malformed)
+    hash.and_then(|bytes| bytes.try_into().ok()).ok_or_else(malformed)
 }
 
 // ---------------------------------------------------------------------------
 // POST /v1/renew
 // ---------------------------------------------------------------------------
 
-async fn renew_handler(
-    State(state): State<Arc<SidecarAppState>>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn renew_handler(State(state): State<Arc<SidecarAppState>>, headers: HeaderMap) -> impl IntoResponse {
     let _operation = match state.enrollment.begin_http(&headers) {
         Ok(operation) => operation,
         Err(error) => return error.into_response(),
@@ -684,11 +595,9 @@ async fn renew_handler(
             })),
         )
             .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))).into_response()
+        }
     }
 }
 
@@ -704,13 +613,8 @@ mod tests {
     use solana_system_interface::instruction as system_instruction;
 
     fn compiled(payer: &Pubkey, ixs: &[Instruction]) -> VersionedTransaction {
-        let message = VersionedMessage::V0(
-            Message::try_compile(payer, ixs, &[], Hash::default()).expect("compile"),
-        );
-        VersionedTransaction {
-            signatures: vec![Signature::default()],
-            message,
-        }
+        let message = VersionedMessage::V0(Message::try_compile(payer, ixs, &[], Hash::default()).expect("compile"));
+        VersionedTransaction { signatures: vec![Signature::default()], message }
     }
 
     fn canonical_action_hash(payer: &Pubkey, action: &Instruction) -> [u8; 32] {
@@ -736,16 +640,11 @@ mod tests {
         let payer = Pubkey::new_unique();
         let raw = compiled(
             &payer,
-            &[verifier_ix(
-                &payer,
-                solana_confidential_compute_cpi::VERIFY_ATOMIC_DISCRIMINATOR.to_vec(),
-            )],
+            &[verifier_ix(&payer, solana_confidential_compute_cpi::VERIFY_ATOMIC_DISCRIMINATOR.to_vec())],
         );
         assert!(screen_transaction(&raw, &solana_confidential_compute_cpi::ID, None).is_err());
-        let verifier = verifier_ix(
-            &payer,
-            solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec(),
-        );
+        let verifier =
+            verifier_ix(&payer, solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec());
         let cap = Budget::set_compute_unit_limit(1_400_000);
         assert!(screen_transaction(
             &compiled(&payer, &[cap.clone(), verifier.clone()]),
@@ -753,24 +652,12 @@ mod tests {
             None
         )
         .is_ok());
-        let deprecated = Instruction {
-            program_id: COMPUTE_BUDGET_PROGRAM_ID,
-            accounts: vec![],
-            data: vec![0; 9],
-        };
-        for budgets in [
-            vec![Budget::set_compute_unit_price(1)],
-            vec![deprecated],
-            vec![cap.clone(), cap],
-        ] {
+        let deprecated = Instruction { program_id: COMPUTE_BUDGET_PROGRAM_ID, accounts: vec![], data: vec![0; 9] };
+        for budgets in [vec![Budget::set_compute_unit_price(1)], vec![deprecated], vec![cap.clone(), cap]] {
             let mut instructions = budgets;
             instructions.push(verifier.clone());
-            assert!(screen_transaction(
-                &compiled(&payer, &instructions),
-                &solana_confidential_compute_cpi::ID,
-                None
-            )
-            .is_err());
+            assert!(screen_transaction(&compiled(&payer, &instructions), &solana_confidential_compute_cpi::ID, None)
+                .is_err());
         }
     }
 
@@ -786,11 +673,7 @@ mod tests {
             &payer,
             &[
                 budget,
-                verifier_ix(
-                    &payer,
-                    solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-                        .to_vec(),
-                ),
+                verifier_ix(&payer, solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec()),
             ],
         );
         assert!(screen_transaction(&tx, &solana_confidential_compute_cpi::ID, None).is_ok());
@@ -801,25 +684,15 @@ mod tests {
         let payer = Pubkey::new_unique();
         let recipient = Pubkey::new_unique();
         let transfer = system_instruction::transfer(&payer, &recipient, 5_000);
-        let verify = verifier_ix(
-            &payer,
-            solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec(),
-        );
+        let verify =
+            verifier_ix(&payer, solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec());
         let mixed = compiled(&payer, &[verify, transfer]);
-        let err =
-            screen_transaction(&mixed, &solana_confidential_compute_cpi::ID, None).unwrap_err();
+        let err = screen_transaction(&mixed, &solana_confidential_compute_cpi::ID, None).unwrap_err();
         assert!(err.contains("system transfer"), "{err}");
 
-        let governance = compiled(
-            &payer,
-            &[verifier_ix(&payer, vec![90, 53, 0, 89, 164, 70, 107, 186])],
-        );
-        let err = screen_transaction(&governance, &solana_confidential_compute_cpi::ID, None)
-            .unwrap_err();
-        assert!(
-            err.contains("verifier instruction is not allowlisted"),
-            "{err}"
-        );
+        let governance = compiled(&payer, &[verifier_ix(&payer, vec![90, 53, 0, 89, 164, 70, 107, 186])]);
+        let err = screen_transaction(&governance, &solana_confidential_compute_cpi::ID, None).unwrap_err();
+        assert!(err.contains("verifier instruction is not allowlisted"), "{err}");
 
         let only_budget = compiled(
             &payer,
@@ -829,8 +702,7 @@ mod tests {
                 data: vec![3, 0, 0, 0, 0, 0, 0, 0, 0],
             }],
         );
-        let err = screen_transaction(&only_budget, &solana_confidential_compute_cpi::ID, None)
-            .unwrap_err();
+        let err = screen_transaction(&only_budget, &solana_confidential_compute_cpi::ID, None).unwrap_err();
         assert!(err.contains("does not call the verifier program"), "{err}");
     }
 
@@ -840,8 +712,7 @@ mod tests {
         // It does not prove this document commits to our action or possession
         // of the archived workload's secret. No chain verification is modeled.
         let document = include_bytes!("../../../fixtures/nitro_hardware_document.cose");
-        let (_, parsed) =
-            solana_confidential_compute_crypto::nitro::parse_nitro_attestation(document).unwrap();
+        let (_, parsed) = solana_confidential_compute_crypto::nitro::parse_nitro_attestation(document).unwrap();
         let workload = Pubkey::new_from_array(parsed.user_data);
         let consumer = Pubkey::new_unique();
         let mut bytes = vec![0; solana_confidential_compute_cpi::ATTESTED_SIGNER_ACCOUNT_SIZE];
@@ -849,10 +720,8 @@ mod tests {
         bytes[8..40].copy_from_slice(workload.as_ref());
         bytes[40] = 2;
         bytes[41..89].copy_from_slice(&parsed.pcrs.pcr0);
-        let registered =
-            solana_confidential_compute_cpi::AttestedSignerAccount::try_from_slice(&bytes).unwrap();
-        let mut data =
-            solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR.to_vec();
+        let registered = solana_confidential_compute_cpi::AttestedSignerAccount::try_from_slice(&bytes).unwrap();
+        let mut data = solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR.to_vec();
         data.push(1);
         data.extend_from_slice(&95u64.to_le_bytes());
         data.extend_from_slice(&[0; 32]);
@@ -869,18 +738,9 @@ mod tests {
                 },
             ],
         );
-        let check =
-            |key: &Pubkey,
-             mode,
-             record: &solana_confidential_compute_cpi::AttestedSignerAccount| {
-                screen_consumer_identity(
-                    &tx,
-                    &solana_confidential_compute_cpi::ID,
-                    key,
-                    mode,
-                    record,
-                )
-            };
+        let check = |key: &Pubkey, mode, record: &solana_confidential_compute_cpi::AttestedSignerAccount| {
+            screen_consumer_identity(&tx, &solana_confidential_compute_cpi::ID, key, mode, record)
+        };
         assert!(check(&workload, EnclaveMode::AwsNitro, &registered).is_ok());
         assert!(check(&Pubkey::new_unique(), EnclaveMode::AwsNitro, &registered).is_err());
         assert!(check(&workload, EnclaveMode::AmdSevSnp, &registered).is_err());
@@ -904,16 +764,14 @@ mod tests {
                 data: vec![9; length],
             };
             let hash = solana_confidential_compute_core::action::hash_instruction(&action);
-            let mut data =
-                solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
+            let mut data = solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
             data.extend_from_slice(&95u64.to_le_bytes());
             data.extend_from_slice(&hash);
             data.extend_from_slice(consumer.as_ref());
             data.resize(80 + solana_confidential_compute_core::SNP_REPORT_SIZE, 0);
             let tx = compiled(&payer, &[verifier_ix(&payer, data), action]);
             assert!(
-                screen_transaction(&tx, &solana_confidential_compute_cpi::ID, Some(&consumer))
-                    .is_ok(),
+                screen_transaction(&tx, &solana_confidential_compute_cpi::ID, Some(&consumer)).is_ok(),
                 "canonical V3 full wire length {length} must pass without guessing a split"
             );
         }
@@ -923,11 +781,8 @@ mod tests {
     fn issue_300_screen_has_no_v1_or_v2_digest_fallback() {
         let payer = Pubkey::new_unique();
         let consumer = Pubkey::new_unique();
-        let action = Instruction {
-            program_id: consumer,
-            accounts: vec![AccountMeta::new(payer, true)],
-            data: vec![1, 9, 9],
-        };
+        let action =
+            Instruction { program_id: consumer, accounts: vec![AccountMeta::new(payer, true)], data: vec![1, 9, 9] };
         for v2 in [false, true] {
             // Historical encodings retained only as rejection controls.
             let mut hash = solana_sdk::hash::Hasher::default();
@@ -943,17 +798,13 @@ mod tests {
             }
             hash.hash(&2u32.to_le_bytes());
             hash.hash(&action.data[1..]);
-            let mut data =
-                solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
+            let mut data = solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
             data.extend_from_slice(&95u64.to_le_bytes());
             data.extend_from_slice(hash.result().as_ref());
             data.extend_from_slice(consumer.as_ref());
             data.resize(80 + solana_confidential_compute_core::SNP_REPORT_SIZE, 0);
             let tx = compiled(&payer, &[verifier_ix(&payer, data), action.clone()]);
-            assert!(
-                screen_transaction(&tx, &solana_confidential_compute_cpi::ID, Some(&consumer))
-                    .is_err()
-            );
+            assert!(screen_transaction(&tx, &solana_confidential_compute_cpi::ID, Some(&consumer)).is_err());
         }
     }
 
@@ -961,11 +812,8 @@ mod tests {
     fn consumers_require_adjacent_mode_b_and_matching_full_action() {
         let payer = Pubkey::new_unique();
         let consumer = Pubkey::new_unique();
-        let action = Instruction {
-            program_id: consumer,
-            accounts: vec![AccountMeta::new(payer, true)],
-            data: vec![1, 9, 9],
-        };
+        let action =
+            Instruction { program_id: consumer, accounts: vec![AccountMeta::new(payer, true)], data: vec![1, 9, 9] };
         let hash = canonical_action_hash(&payer, &action);
         let mut data = solana_confidential_compute_cpi::VERIFY_GOOGLE_JWT_DISCRIMINATOR.to_vec();
         data.push(1);
@@ -975,11 +823,7 @@ mod tests {
         data.push(b'x');
         let verify = verifier_ix(&payer, data);
         let check = |ixs: &[Instruction]| {
-            screen_transaction(
-                &compiled(&payer, ixs),
-                &solana_confidential_compute_cpi::ID,
-                Some(&consumer),
-            )
+            screen_transaction(&compiled(&payer, ixs), &solana_confidential_compute_cpi::ID, Some(&consumer))
         };
         assert!(check(&[verify.clone(), action.clone()]).is_ok());
         assert!(check(&[verify.clone(), action.clone(), action.clone()]).is_err());
@@ -988,9 +832,7 @@ mod tests {
         changed.data[2] ^= 1;
         assert!(check(&[verify.clone(), changed]).is_err());
         let mut changed = action.clone();
-        changed
-            .accounts
-            .push(AccountMeta::new_readonly(Pubkey::new_unique(), false));
+        changed.accounts.push(AccountMeta::new_readonly(Pubkey::new_unique(), false));
         assert!(check(&[verify.clone(), changed]).is_err());
         let mut mode_a = verify.clone();
         mode_a.data[8] = 0;
@@ -998,11 +840,7 @@ mod tests {
         let mut malformed = verify.clone();
         malformed.data.pop();
         assert!(check(&[malformed, action.clone()]).is_err());
-        let budget = Instruction {
-            program_id: COMPUTE_BUDGET_PROGRAM_ID,
-            accounts: vec![],
-            data: vec![2, 1, 0, 0, 0],
-        };
+        let budget = Instruction { program_id: COMPUTE_BUDGET_PROGRAM_ID, accounts: vec![], data: vec![2, 1, 0, 0, 0] };
         assert!(check(&[verify.clone(), budget, action.clone()]).is_err());
         let mut foreign = action.clone();
         foreign.program_id = Pubkey::new_unique();
@@ -1012,9 +850,7 @@ mod tests {
         anchor.data = vec![7; 12];
         let anchor_hash = canonical_action_hash(&payer, &anchor);
         let mut nitro = verify.clone();
-        nitro.data[..8].copy_from_slice(
-            &solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR,
-        );
+        nitro.data[..8].copy_from_slice(&solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR);
         nitro.data[17..49].copy_from_slice(&anchor_hash);
         assert!(check(&[nitro, anchor]).is_ok());
         let mut nvidia = vec![0u8; crate::onchain::VERIFY_NVIDIA_IX_LEN];
@@ -1027,51 +863,31 @@ mod tests {
         assert!(screen_transaction(
             &compiled(
                 &payer,
-                &[verifier_ix(
-                    &payer,
-                    crate::onchain::VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR.to_vec(),
-                )],
+                &[verifier_ix(&payer, crate::onchain::VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR.to_vec(),)],
             ),
             &solana_confidential_compute_cpi::ID,
             None,
         )
         .is_ok());
-        let nonce_free = verifier_ix(
-            &payer,
-            solana_confidential_compute_cpi::VERIFY_ATOMIC_DISCRIMINATOR.to_vec(),
-        );
+        let nonce_free = verifier_ix(&payer, solana_confidential_compute_cpi::VERIFY_ATOMIC_DISCRIMINATOR.to_vec());
         assert!(check(&[nonce_free, action.clone()]).is_err());
         let mut bad_index = compiled(&payer, &[verify.clone(), action.clone()]);
         if let VersionedMessage::V0(message) = &mut bad_index.message {
             message.instructions[1].accounts[0] = 255;
         }
-        assert!(screen_transaction(
-            &bad_index,
-            &solana_confidential_compute_cpi::ID,
-            Some(&consumer)
-        )
-        .is_err());
+        assert!(screen_transaction(&bad_index, &solana_confidential_compute_cpi::ID, Some(&consumer)).is_err());
         let mut with_lookup = compiled(&payer, &[verify.clone(), action.clone()]);
         if let VersionedMessage::V0(message) = &mut with_lookup.message {
-            message.address_table_lookups.push(
-                solana_sdk::message::v0::MessageAddressTableLookup {
-                    account_key: Pubkey::new_unique(),
-                    writable_indexes: vec![0],
-                    readonly_indexes: vec![],
-                },
-            );
+            message.address_table_lookups.push(solana_sdk::message::v0::MessageAddressTableLookup {
+                account_key: Pubkey::new_unique(),
+                writable_indexes: vec![0],
+                readonly_indexes: vec![],
+            });
         }
-        assert!(screen_transaction(
-            &with_lookup,
-            &solana_confidential_compute_cpi::ID,
-            Some(&consumer)
-        )
-        .is_err());
+        assert!(screen_transaction(&with_lookup, &solana_confidential_compute_cpi::ID, Some(&consumer)).is_err());
         let second_key = Pubkey::new_unique();
         let mut ordered = action.clone();
-        ordered
-            .accounts
-            .push(AccountMeta::new_readonly(second_key, false));
+        ordered.accounts.push(AccountMeta::new_readonly(second_key, false));
         let ordered_hash = canonical_action_hash(&payer, &ordered);
         let mut ordered_verify = verify.clone();
         ordered_verify.data[17..49].copy_from_slice(&ordered_hash);
@@ -1099,8 +915,7 @@ mod tests {
         data.push(b'x');
         let mut verifier = verifier_ix(&payer, data);
         let template = compiled(&payer, &[verifier.clone(), action.clone()]);
-        let original =
-            solana_confidential_compute_sdk::hash_compiled_action(&template.message, 1, 1).unwrap();
+        let original = solana_confidential_compute_sdk::hash_compiled_action(&template.message, 1, 1).unwrap();
         verifier.data[17..49].copy_from_slice(&original);
         assert!(screen_transaction(
             &compiled(&payer, &[verifier.clone(), action.clone()]),
@@ -1116,14 +931,8 @@ mod tests {
             }
             let payer = if new_payer { subject } else { payer };
             let stale = compiled(&payer, &[elevated.clone(), action.clone()]);
-            assert!(screen_transaction(
-                &stale,
-                &solana_confidential_compute_cpi::ID,
-                Some(&consumer)
-            )
-            .is_err());
-            let fresh = solana_confidential_compute_sdk::hash_compiled_action(&stale.message, 1, 1)
-                .unwrap();
+            assert!(screen_transaction(&stale, &solana_confidential_compute_cpi::ID, Some(&consumer)).is_err());
+            let fresh = solana_confidential_compute_sdk::hash_compiled_action(&stale.message, 1, 1).unwrap();
             assert_ne!(fresh, original);
             elevated.data[17..49].copy_from_slice(&fresh);
             assert!(screen_transaction(
@@ -1153,129 +962,74 @@ mod tests {
         let payer = Pubkey::new_unique();
         let tx = compiled(
             &payer,
-            &[verifier_ix(
-                &payer,
-                solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR.to_vec(),
-            )],
+            &[verifier_ix(&payer, solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR.to_vec())],
         );
         let bytes = bincode::serialize(&tx).expect("serialize");
         let decoded = deserialize_sign_transaction(&bytes).expect("decode");
-        screen_transaction(&decoded, &solana_confidential_compute_cpi::ID, None)
-            .expect("allowlist");
+        screen_transaction(&decoded, &solana_confidential_compute_cpi::ID, None).expect("allowlist");
     }
 
     #[test]
     fn allowlist_accepts_pinned_consumer_and_keeps_transfer_and_governance_closed() {
         let payer = Pubkey::new_unique();
         let consumer = Pubkey::new_unique();
-        let consumer_ix = Instruction {
-            program_id: consumer,
-            accounts: vec![AccountMeta::new(payer, true)],
-            data: vec![9, 9, 9],
-        };
+        let consumer_ix =
+            Instruction { program_id: consumer, accounts: vec![AccountMeta::new(payer, true)], data: vec![9, 9, 9] };
         let hash = canonical_action_hash(&payer, &consumer_ix);
-        let mut data =
-            solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
+        let mut data = solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
         data.extend_from_slice(&95u64.to_le_bytes());
         data.extend_from_slice(&hash);
         data.extend_from_slice(consumer.as_ref());
         data.resize(80 + solana_confidential_compute_core::SNP_REPORT_SIZE, 0);
         let verify = verifier_ix(&payer, data);
         let tx = compiled(&payer, &[verify, consumer_ix]);
-        assert!(
-            screen_transaction(&tx, &solana_confidential_compute_cpi::ID, Some(&consumer)).is_ok()
-        );
+        assert!(screen_transaction(&tx, &solana_confidential_compute_cpi::ID, Some(&consumer)).is_ok());
 
-        let missing =
-            screen_transaction(&tx, &solana_confidential_compute_cpi::ID, None).unwrap_err();
+        let missing = screen_transaction(&tx, &solana_confidential_compute_cpi::ID, None).unwrap_err();
         assert!(missing.contains("not allowlisted"), "{missing}");
 
         let other = Pubkey::new_unique();
-        let wrong = screen_transaction(&tx, &solana_confidential_compute_cpi::ID, Some(&other))
-            .unwrap_err();
+        let wrong = screen_transaction(&tx, &solana_confidential_compute_cpi::ID, Some(&other)).unwrap_err();
         assert!(wrong.contains(&consumer.to_string()), "{wrong}");
 
-        let only_consumer = compiled(
-            &payer,
-            &[Instruction {
-                program_id: consumer,
-                accounts: vec![],
-                data: vec![1],
-            }],
-        );
-        let err = screen_transaction(
-            &only_consumer,
-            &solana_confidential_compute_cpi::ID,
-            Some(&consumer),
-        )
-        .unwrap_err();
+        let only_consumer = compiled(&payer, &[Instruction { program_id: consumer, accounts: vec![], data: vec![1] }]);
+        let err =
+            screen_transaction(&only_consumer, &solana_confidential_compute_cpi::ID, Some(&consumer)).unwrap_err();
         assert!(err.contains("does not call the verifier program"), "{err}");
 
         let governance = compiled(
             &payer,
             &[
                 verifier_ix(&payer, vec![90, 53, 0, 89, 164, 70, 107, 186]),
-                Instruction {
-                    program_id: consumer,
-                    accounts: vec![],
-                    data: vec![1],
-                },
+                Instruction { program_id: consumer, accounts: vec![], data: vec![1] },
             ],
         );
-        let err = screen_transaction(
-            &governance,
-            &solana_confidential_compute_cpi::ID,
-            Some(&consumer),
-        )
-        .unwrap_err();
-        assert!(
-            err.contains("verifier instruction is not allowlisted"),
-            "{err}"
-        );
+        let err = screen_transaction(&governance, &solana_confidential_compute_cpi::ID, Some(&consumer)).unwrap_err();
+        assert!(err.contains("verifier instruction is not allowlisted"), "{err}");
 
         let recipient = Pubkey::new_unique();
         let transfer = system_instruction::transfer(&payer, &recipient, 5_000);
         let mixed = compiled(
             &payer,
             &[
-                verifier_ix(
-                    &payer,
-                    solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-                        .to_vec(),
-                ),
-                Instruction {
-                    program_id: consumer,
-                    accounts: vec![],
-                    data: vec![1],
-                },
+                verifier_ix(&payer, solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec()),
+                Instruction { program_id: consumer, accounts: vec![], data: vec![1] },
                 transfer,
             ],
         );
-        let err = screen_transaction(
-            &mixed,
-            &solana_confidential_compute_cpi::ID,
-            Some(&consumer),
-        )
-        .unwrap_err();
+        let err = screen_transaction(&mixed, &solana_confidential_compute_cpi::ID, Some(&consumer)).unwrap_err();
         assert!(err.contains("system transfer"), "{err}");
 
         let system_as_consumer = compiled(
             &payer,
             &[
-                verifier_ix(
-                    &payer,
-                    solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-                        .to_vec(),
-                ),
+                verifier_ix(&payer, solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec()),
                 system_instruction::transfer(&payer, &recipient, 1),
             ],
         );
-        let err = screen_transaction(
-            &system_as_consumer,
-            &solana_confidential_compute_cpi::ID,
-            Some(&SYSTEM_PROGRAM_ID),
-        )
-        .unwrap_err();
+        let err =
+            screen_transaction(&system_as_consumer, &solana_confidential_compute_cpi::ID, Some(&SYSTEM_PROGRAM_ID))
+                .unwrap_err();
         assert!(err.contains("system transfer"), "{err}");
     }
 }

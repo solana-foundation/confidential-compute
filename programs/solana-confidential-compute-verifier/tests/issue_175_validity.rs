@@ -19,9 +19,7 @@
 #![allow(deprecated)]
 use {
     borsh::{BorshDeserialize, BorshSerialize},
-    solana_confidential_compute_verifier::{
-        error::VerifierError, payload::*, processor::transport::*, state::*,
-    },
+    solana_confidential_compute_verifier::{error::VerifierError, payload::*, processor::transport::*, state::*},
     solana_program_test::ProgramTestContext,
     solana_sdk::{
         account::Account,
@@ -37,8 +35,7 @@ use {
 #[path = "common/sbf.rs"]
 mod sbf;
 
-const ASK: &[u8] =
-    include_bytes!("../../../crates/solana-confidential-compute-crypto/tests/data/milan_ask.der");
+const ASK: &[u8] = include_bytes!("../../../crates/solana-confidential-compute-crypto/tests/data/milan_ask.der");
 const LEAF: &[u8] = include_bytes!("../../../fixtures/vcek_milan.der");
 
 /// Subject public key as it sits in the leaf's `SubjectPublicKeyInfo`.
@@ -90,12 +87,7 @@ async fn boot(pid: Pubkey, now: i64) -> ProgramTestContext {
     };
     pt.add_account(
         registry,
-        Account {
-            lamports: 10_000_000,
-            data: borsh::to_vec(&policy).unwrap(),
-            owner: pid,
-            ..Account::default()
-        },
+        Account { lamports: 10_000_000, data: borsh::to_vec(&policy).unwrap(), owner: pid, ..Account::default() },
     );
     let ctx = pt.start_with_context().await;
     let mut clock: Clock = ctx.banks_client.get_sysvar().await.unwrap();
@@ -104,19 +96,10 @@ async fn boot(pid: Pubkey, now: i64) -> ProgramTestContext {
     ctx
 }
 
-fn transport_ix(
-    pid: Pubkey,
-    tag: [u8; 8],
-    rest: Vec<u8>,
-    accounts: Vec<AccountMeta>,
-) -> Instruction {
+fn transport_ix(pid: Pubkey, tag: [u8; 8], rest: Vec<u8>, accounts: Vec<AccountMeta>) -> Instruction {
     let mut data = tag.to_vec();
     data.extend(rest);
-    Instruction {
-        program_id: pid,
-        accounts,
-        data,
-    }
+    Instruction { program_id: pid, accounts, data }
 }
 
 /// Uploads and seals `payload`, returning the stage PDA. Sealing authenticates
@@ -124,25 +107,15 @@ fn transport_ix(
 async fn seal(ctx: &mut ProgramTestContext, pid: Pubkey, payload: &[u8]) -> Pubkey {
     let authority = ctx.payer.pubkey();
     let digest = hash(payload);
-    let stage = Pubkey::find_program_address(
-        &[b"attestation_stage", authority.as_ref(), digest.as_ref()],
-        &pid,
-    )
-    .0;
-    let pair = vec![
-        AccountMeta::new(authority, true),
-        AccountMeta::new(stage, false),
-    ];
+    let stage = Pubkey::find_program_address(&[b"attestation_stage", authority.as_ref(), digest.as_ref()], &pid).0;
+    let pair = vec![AccountMeta::new(authority, true), AccountMeta::new(stage, false)];
     let slot = ctx.banks_client.get_sysvar::<Clock>().await.unwrap().slot;
 
     let mut begin = digest.to_bytes().to_vec();
     begin.extend((payload.len() as u32).to_le_bytes());
     begin.extend((slot + MAX_LIFETIME_SLOTS).to_le_bytes());
     let mut begin_accounts = pair.clone();
-    begin_accounts.push(AccountMeta::new_readonly(
-        solana_sdk_ids::system_program::ID,
-        false,
-    ));
+    begin_accounts.push(AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false));
 
     let mut packets = vec![transport_ix(pid, BEGIN, begin, begin_accounts)];
     for (index, chunk) in payload.chunks(MAX_CHUNK).enumerate() {
@@ -153,19 +126,8 @@ async fn seal(ctx: &mut ProgramTestContext, pid: Pubkey, payload: &[u8]) -> Pubk
     packets.push(transport_ix(pid, SEAL, vec![], pair.clone()));
 
     for ix in packets {
-        let tx = Transaction::new_signed_with_payer(
-            &[ix],
-            Some(&authority),
-            &[&ctx.payer],
-            ctx.last_blockhash,
-        );
-        assert!(
-            solana_packet::Packet::from_data(None, &tx)
-                .unwrap()
-                .meta()
-                .size
-                <= 1232
-        );
+        let tx = Transaction::new_signed_with_payer(&[ix], Some(&authority), &[&ctx.payer], ctx.last_blockhash);
+        assert!(solana_packet::Packet::from_data(None, &tx).unwrap().meta().size <= 1232);
         ctx.banks_client.process_transaction(tx).await.unwrap();
     }
     stage
@@ -197,18 +159,10 @@ fn consume(
 /// ceiling is not enough. Consumes repeat verbatim across the denylist cases,
 /// so each gets a fresh blockhash -- an identical signature would be answered
 /// from the status cache instead of being executed.
-async fn send(
-    ctx: &mut ProgramTestContext,
-    ix: Instruction,
-) -> Result<(), solana_program_test::BanksClientError> {
+async fn send(ctx: &mut ProgramTestContext, ix: Instruction) -> Result<(), solana_program_test::BanksClientError> {
     let blockhash = ctx.get_new_latest_blockhash().await.unwrap();
     let tx = Transaction::new_signed_with_payer(
-        &[
-            solana_compute_budget_interface::ComputeBudgetInstruction::set_compute_unit_limit(
-                1_400_000,
-            ),
-            ix,
-        ],
+        &[solana_compute_budget_interface::ComputeBudgetInstruction::set_compute_unit_limit(1_400_000), ix],
         Some(&ctx.payer.pubkey()),
         &[&ctx.payer],
         blockhash,
@@ -223,27 +177,18 @@ async fn real_chain_registration_rejects_out_of_window_clock_without_writes() {
     let chip_id_hash = hashv(&[&identity.chip_id]).to_bytes();
     let payload = register_vcek_payload(xy);
 
-    for (now, accept) in [
-        (1_790_287_994, false),
-        (1_790_287_995, true),
-        (2_011_212_795, false),
-        (2_208_988_800, false),
-        (-1, false),
-    ] {
+    for (now, accept) in
+        [(1_790_287_994, false), (1_790_287_995, true), (2_011_212_795, false), (2_208_988_800, false), (-1, false)]
+    {
         let pid = Pubkey::new_unique();
         let mut ctx = boot(pid, now).await;
         let authority = ctx.payer.pubkey();
         let (registry, _) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
         let (vcek, _) = Pubkey::find_program_address(
-            &[
-                VcekAccount::SEED,
-                &chip_id_hash,
-                &identity.tcb_version.to_le_bytes(),
-            ],
+            &[VcekAccount::SEED, &chip_id_hash, &identity.tcb_version.to_le_bytes()],
             &pid,
         );
-        let (revocation, _) =
-            Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, &chip_id_hash], &pid);
+        let (revocation, _) = Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, &chip_id_hash], &pid);
         let stage = seal(&mut ctx, pid, &payload).await;
 
         if accept {
@@ -251,80 +196,35 @@ async fn real_chain_registration_rejects_out_of_window_clock_without_writes() {
             // denylist: any program-owned record fails closed.
             ctx.set_account(
                 &revocation,
-                &Account {
-                    lamports: 10_000_000,
-                    data: vec![0; 1],
-                    owner: pid,
-                    ..Account::default()
-                }
-                .into(),
+                &Account { lamports: 10_000_000, data: vec![0; 1], owner: pid, ..Account::default() }.into(),
             );
-            let err = send(
-                &mut ctx,
-                consume(pid, authority, stage, registry, vcek, Some(revocation)),
-            )
-            .await
-            .unwrap_err();
-            assert_eq!(
-                instruction_error(err),
-                InstructionError::Custom(VerifierError::UnauthorizedPolicy as u32)
-            );
+            let err =
+                send(&mut ctx, consume(pid, authority, stage, registry, vcek, Some(revocation))).await.unwrap_err();
+            assert_eq!(instruction_error(err), InstructionError::Custom(VerifierError::UnauthorizedPolicy as u32));
             assert!(ctx.banks_client.get_account(vcek).await.unwrap().is_none());
             ctx.set_account(
                 &revocation,
-                &Account {
-                    lamports: 1,
-                    owner: solana_sdk_ids::system_program::ID,
-                    ..Account::default()
-                }
-                .into(),
+                &Account { lamports: 1, owner: solana_sdk_ids::system_program::ID, ..Account::default() }.into(),
             );
 
             // Omitting the denylist account is not a way to skip the check.
-            let err = send(
-                &mut ctx,
-                consume(pid, authority, stage, registry, vcek, None),
-            )
-            .await
-            .unwrap_err();
-            assert_eq!(
-                instruction_error(err),
-                InstructionError::NotEnoughAccountKeys
-            );
+            let err = send(&mut ctx, consume(pid, authority, stage, registry, vcek, None)).await.unwrap_err();
+            assert_eq!(instruction_error(err), InstructionError::NotEnoughAccountKeys);
             assert!(ctx.banks_client.get_account(vcek).await.unwrap().is_none());
         }
 
-        let result = send(
-            &mut ctx,
-            consume(pid, authority, stage, registry, vcek, Some(revocation)),
-        )
-        .await;
+        let result = send(&mut ctx, consume(pid, authority, stage, registry, vcek, Some(revocation))).await;
 
         if accept {
             result.expect("in-window real chain");
-            let saved = VcekAccount::try_from_slice(
-                &ctx.banks_client
-                    .get_account(vcek)
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .data,
-            )
-            .unwrap();
+            let saved =
+                VcekAccount::try_from_slice(&ctx.banks_client.get_account(vcek).await.unwrap().unwrap().data).unwrap();
             assert_eq!(saved.public_key_xy, xy);
             assert_eq!(saved.valid_until_unix, 2_011_212_795);
             assert_eq!(saved.trust_profile, VcekAccount::MILAN_TRUST_PROFILE);
             assert!(!saved.is_revoked);
             // Only a successful handler marks the stage consumed.
-            assert_eq!(
-                ctx.banks_client
-                    .get_account(stage)
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .data[88],
-                2
-            );
+            assert_eq!(ctx.banks_client.get_account(stage).await.unwrap().unwrap().data[88], 2);
         } else {
             assert_eq!(
                 instruction_error(result.unwrap_err()),
@@ -338,15 +238,7 @@ async fn real_chain_registration_rejects_out_of_window_clock_without_writes() {
             );
             assert!(ctx.banks_client.get_account(vcek).await.unwrap().is_none());
             // A rejected consume leaves the stage sealed, never consumed.
-            assert_eq!(
-                ctx.banks_client
-                    .get_account(stage)
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .data[88],
-                1
-            );
+            assert_eq!(ctx.banks_client.get_account(stage).await.unwrap().unwrap().data[88], 1);
         }
     }
 }

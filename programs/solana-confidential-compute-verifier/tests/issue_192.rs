@@ -1,8 +1,6 @@
 //! Governance authorization errors must identify the failed condition.
 use borsh::BorshSerialize;
-use solana_confidential_compute_verifier::{
-    error::VerifierError, payload::*, processor::Processor, state::*,
-};
+use solana_confidential_compute_verifier::{error::VerifierError, payload::*, processor::Processor, state::*};
 use solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
 fn exercise(
@@ -14,11 +12,7 @@ fn exercise(
     let program = Pubkey::new_unique();
     let owner = Pubkey::new_unique();
     let authority = Pubkey::new_unique();
-    let actor = if correct {
-        authority
-    } else {
-        Pubkey::new_unique()
-    };
+    let actor = if correct { authority } else { Pubkey::new_unique() };
     let (registry_key, bump) = Pubkey::find_program_address(&[b"policy_registry"], &program);
     let registry = PolicyRegistry {
         discriminator: POLICY_REGISTRY_DISCRIMINATOR,
@@ -34,17 +28,9 @@ fn exercise(
     };
     let mut registry_data = borsh::to_vec(&registry).unwrap();
     let kid_hash = [7; 32];
-    let (jwks_key, jwks_bump) = Pubkey::find_program_address(
-        &[
-            solana_confidential_compute_crypto::jwt::JWKS_SEED,
-            &kid_hash,
-        ],
-        &program,
-    );
-    let mut jwks_data = borsh::to_vec(&JwksAccount::new(
-        kid_hash, [1; 256], 65537, 0, [0; 256], 0, jwks_bump,
-    ))
-    .unwrap();
+    let (jwks_key, jwks_bump) =
+        Pubkey::find_program_address(&[solana_confidential_compute_crypto::jwt::JWKS_SEED, &kid_hash], &program);
+    let mut jwks_data = borsh::to_vec(&JwksAccount::new(kid_hash, [1; 256], 65537, 0, [0; 256], 0, jwks_bump)).unwrap();
     let mut ix = discriminator.to_vec();
     if discriminator == UPDATE_POLICY_DISCRIMINATOR {
         UpdatePolicyArgs {
@@ -58,11 +44,7 @@ fn exercise(
         .serialize(&mut ix)
         .unwrap();
     } else if discriminator == ROTATE_ROOT_CERT_DISCRIMINATOR {
-        RotateRootCertArgs {
-            new_ark_pubkey_xy: [2; 96],
-        }
-        .serialize(&mut ix)
-        .unwrap();
+        RotateRootCertArgs { new_ark_pubkey_xy: [2; 96] }.serialize(&mut ix).unwrap();
     } else {
         RevokeJwksKeyArgs { kid_hash }.serialize(&mut ix).unwrap();
     }
@@ -72,15 +54,7 @@ fn exercise(
     let mut empty = [];
     let accounts = [
         AccountInfo::new(&actor, signed, false, &mut a, &mut empty, &owner, false),
-        AccountInfo::new(
-            &registry_key,
-            false,
-            true,
-            &mut r,
-            &mut registry_data,
-            &program,
-            false,
-        ),
+        AccountInfo::new(&registry_key, false, true, &mut r, &mut registry_data, &program, false),
         AccountInfo::new(
             &jwks_key,
             false,
@@ -102,25 +76,12 @@ fn exercise(
 
 #[test]
 fn issue_192_governance_errors_and_negative_controls() {
-    for ix in [
-        UPDATE_POLICY_DISCRIMINATOR,
-        ROTATE_ROOT_CERT_DISCRIMINATOR,
-        REVOKE_JWKS_KEY_DISCRIMINATOR,
-    ] {
-        assert_eq!(
-            exercise(ix, false, true, false).0,
-            Err(ProgramError::MissingRequiredSignature)
-        );
-        assert_eq!(
-            exercise(ix, true, false, false).0,
-            Err(VerifierError::InvalidAuthority.into())
-        );
+    for ix in [UPDATE_POLICY_DISCRIMINATOR, ROTATE_ROOT_CERT_DISCRIMINATOR, REVOKE_JWKS_KEY_DISCRIMINATOR] {
+        assert_eq!(exercise(ix, false, true, false).0, Err(ProgramError::MissingRequiredSignature));
+        assert_eq!(exercise(ix, true, false, false).0, Err(VerifierError::InvalidAuthority.into()));
         // Issue #172: authorized root rotation is refused (registry unchanged).
-        let expected = if ix == ROTATE_ROOT_CERT_DISCRIMINATOR {
-            Err(VerifierError::InvalidInstruction.into())
-        } else {
-            Ok(())
-        };
+        let expected =
+            if ix == ROTATE_ROOT_CERT_DISCRIMINATOR { Err(VerifierError::InvalidInstruction.into()) } else { Ok(()) };
         assert_eq!(exercise(ix, true, true, false).0, expected);
     }
     assert_eq!(

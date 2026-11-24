@@ -15,9 +15,7 @@ use solana_sdk::{
 #[path = "common/legacy_nonce.rs"]
 mod legacy_nonce_fixture;
 use legacy_nonce_fixture::TestProcessor as Processor;
-use solana_confidential_compute_verifier::state::{
-    LEGACY_USED_NONCE_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR,
-};
+use solana_confidential_compute_verifier::state::{LEGACY_USED_NONCE_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR};
 
 #[path = "common/sbf.rs"]
 mod sbf;
@@ -39,8 +37,7 @@ async fn stale_nonce_closes_only_after_replay_window_and_refunds_recorded_payer(
     let legacy = Pubkey::new_unique();
     let workload = Keypair::new();
     let workload_key = workload.pubkey();
-    let (record_key, bump) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", workload_key.as_ref()], &pid);
+    let (record_key, bump) = Pubkey::find_program_address(&[b"attested_signer_v2", workload_key.as_ref()], &pid);
     let mut pt = sbf::verifier_program_test(pid);
     for (key, slot) in [(fresh, 501), (stale, 500), (future, 652)] {
         pt.add_account(
@@ -57,16 +54,7 @@ async fn stale_nonce_closes_only_after_replay_window_and_refunds_recorded_payer(
     let mut old = LEGACY_USED_NONCE_DISCRIMINATOR.to_vec();
     old.extend_from_slice(&500u64.to_le_bytes());
     old.push(0);
-    pt.add_account(
-        legacy,
-        Account {
-            lamports: 2_000_000,
-            data: old,
-            owner: pid,
-            executable: false,
-            rent_epoch: 0,
-        },
-    );
+    pt.add_account(legacy, Account { lamports: 2_000_000, data: old, owner: pid, executable: false, rent_epoch: 0 });
     for key in [refund, wrong] {
         pt.add_account(
             key,
@@ -112,10 +100,7 @@ async fn stale_nonce_closes_only_after_replay_window_and_refunds_recorded_payer(
         },
     );
     let ctx = pt.start_with_context().await;
-    ctx.set_sysvar(&Clock {
-        slot: 651,
-        ..Clock::default()
-    });
+    ctx.set_sysvar(&Clock { slot: 651, ..Clock::default() });
     for (nonce, destination, success) in [
         (fresh, refund, false),
         (future, refund, false),
@@ -133,12 +118,8 @@ async fn stale_nonce_closes_only_after_replay_window_and_refunds_recorded_payer(
             ],
             data: CLOSE_STALE_NONCE_DISCRIMINATOR.to_vec(),
         };
-        let tx = Transaction::new_signed_with_payer(
-            &[ix],
-            Some(&ctx.payer.pubkey()),
-            &[&ctx.payer],
-            ctx.last_blockhash,
-        );
+        let tx =
+            Transaction::new_signed_with_payer(&[ix], Some(&ctx.payer.pubkey()), &[&ctx.payer], ctx.last_blockhash);
         let result = ctx.banks_client.process_transaction(tx).await;
         assert_eq!(result.is_ok(), success, "{nonce}: {result:?}");
         let remaining = ctx.banks_client.get_account(nonce).await.unwrap();
@@ -170,25 +151,10 @@ async fn stale_nonce_closes_only_after_replay_window_and_refunds_recorded_payer(
                 ctx.last_blockhash,
             )
         } else {
-            Transaction::new_signed_with_payer(
-                &[ix],
-                Some(&ctx.payer.pubkey()),
-                &[&ctx.payer],
-                ctx.last_blockhash,
-            )
+            Transaction::new_signed_with_payer(&[ix], Some(&ctx.payer.pubkey()), &[&ctx.payer], ctx.last_blockhash)
         };
-        assert_eq!(
-            ctx.banks_client.process_transaction(tx).await.is_ok(),
-            signed
-        );
-        assert_eq!(
-            ctx.banks_client
-                .get_account(record_key)
-                .await
-                .unwrap()
-                .is_none(),
-            signed
-        );
+        assert_eq!(ctx.banks_client.process_transaction(tx).await.is_ok(), signed);
+        assert_eq!(ctx.banks_client.get_account(record_key).await.unwrap().is_none(), signed);
         assert_eq!(
             ctx.banks_client.get_balance(workload_key).await.unwrap(),
             before + if signed { 2_000_000 } else { 0 }
@@ -201,15 +167,8 @@ async fn stale_nonce_closes_only_after_replay_window_and_refunds_recorded_payer(
     let mut bytes = 1u64.to_le_bytes().to_vec();
     bytes.extend_from_slice(&500u64.to_le_bytes());
     bytes.extend_from_slice(&[8; 32]);
-    let acc = solana_program::account_info::AccountInfo::new(
-        &sh,
-        false,
-        false,
-        &mut lamports,
-        &mut bytes,
-        &owner,
-        false,
-    );
+    let acc =
+        solana_program::account_info::AccountInfo::new(&sh, false, false, &mut lamports, &mut bytes, &owner, false);
     assert!(Processor::verify_recent_slot_hash(&acc, 651, 500, &[8; 32]).is_err());
     assert!(Processor::verify_recent_slot_hash(&acc, 650, 500, &[8; 32]).is_ok());
 }

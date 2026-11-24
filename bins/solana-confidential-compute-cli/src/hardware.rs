@@ -97,10 +97,7 @@ pub fn fetch_snp_report(
 }
 
 #[cfg(target_os = "linux")]
-fn fetch_hardware_report(
-    user_data: &[u8; 64],
-    device: &str,
-) -> Result<[u8; SNP_REPORT_SIZE], CliError> {
+fn fetch_hardware_report(user_data: &[u8; 64], device: &str) -> Result<[u8; SNP_REPORT_SIZE], CliError> {
     use std::fs::OpenOptions;
     use std::io;
     use std::os::unix::io::AsRawFd;
@@ -115,12 +112,7 @@ fn fetch_hardware_report(
         .open(device)
         .map_err(|err| CliError::HardwareUnavailable(format!("failed to open {device}: {err}")))?;
 
-    let mut req = SnpReportReq {
-        user_data: *user_data,
-        vmpl: 0,
-        key_sel: 0,
-        reserved: [0; 27],
-    };
+    let mut req = SnpReportReq { user_data: *user_data, vmpl: 0, key_sel: 0, reserved: [0; 27] };
     let mut resp = SnpReportResp {
         data: [0u8; solana_confidential_compute_cli::SNP_GUEST_RESP_DATA_LEN],
         reserved: [0u8; solana_confidential_compute_cli::SNP_GUEST_RESP_TAIL_LEN],
@@ -149,10 +141,7 @@ fn fetch_hardware_report(
 }
 
 #[cfg(not(target_os = "linux"))]
-fn fetch_hardware_report(
-    _user_data: &[u8; 64],
-    device: &str,
-) -> Result<[u8; SNP_REPORT_SIZE], CliError> {
+fn fetch_hardware_report(_user_data: &[u8; 64], device: &str) -> Result<[u8; SNP_REPORT_SIZE], CliError> {
     Err(CliError::HardwareUnavailable(format!(
         "SEV-SNP device {device} is not available on this platform; pass --mock"
     )))
@@ -180,10 +169,7 @@ mod tests {
         };
         let base = std::ptr::from_ref(&resp) as usize;
         let data = resp.data.as_ptr() as usize;
-        assert_eq!(
-            data, base,
-            "snp_report_resp.data must start at byte 0; a PSP prefix sits inside that buffer"
-        );
+        assert_eq!(data, base, "snp_report_resp.data must start at byte 0; a PSP prefix sits inside that buffer");
     }
 
     #[test]
@@ -197,15 +183,13 @@ mod tests {
         resp.data[SNP_REPORT_SIZE] = 0xFF;
         resp.data[solana_confidential_compute_cli::SNP_GUEST_RESP_DATA_LEN - 1] = 0xFF;
 
-        let report =
-            report_from_guest_response(&resp, &user_data, "/dev/sev-guest").expect("prefix echo");
+        let report = report_from_guest_response(&resp, &user_data, "/dev/sev-guest").expect("prefix echo");
         assert_eq!(report.len(), SNP_REPORT_SIZE);
         assert_eq!(&report[0x50..0x90], &user_data);
         assert_eq!(report[SNP_REPORT_SIZE - 1], 0);
 
         resp.data[0x70] ^= 0xFF;
-        let echo = report_from_guest_response(&resp, &user_data, "/dev/sev-guest")
-            .expect_err("REPORT_DATA mismatch");
+        let echo = report_from_guest_response(&resp, &user_data, "/dev/sev-guest").expect_err("REPORT_DATA mismatch");
         match echo {
             CliError::HardwareUnavailable(msg) => assert!(msg.contains("REPORT_DATA"), "{msg}"),
             other => panic!("expected HardwareUnavailable, got {other:?}"),
@@ -214,8 +198,7 @@ mod tests {
 
     #[test]
     fn test_milan_fixture_psp_prefix_round_trip() {
-        let raw: [u8; SNP_REPORT_SIZE] =
-            *include_bytes!("../../../fixtures/snp_hardware_report_milan.bin");
+        let raw: [u8; SNP_REPORT_SIZE] = *include_bytes!("../../../fixtures/snp_hardware_report_milan.bin");
         let mut user_data = [0u8; 64];
         user_data.copy_from_slice(&raw[0x50..0x90]);
 
@@ -228,8 +211,8 @@ mod tests {
         let start = solana_confidential_compute_cli::SNP_PSP_REPORT_PREFIX_LEN;
         resp.data[start..start + SNP_REPORT_SIZE].copy_from_slice(&raw);
 
-        let report = report_from_guest_response(&resp, &user_data, "/dev/sev-guest")
-            .expect("psp-prefixed Milan report");
+        let report =
+            report_from_guest_response(&resp, &user_data, "/dev/sev-guest").expect("psp-prefixed Milan report");
         assert_eq!(report, raw);
         assert_ne!(report[0], 0, "version byte must survive the prefix skip");
     }
@@ -248,8 +231,7 @@ mod tests {
         let mut data = [0u8; SNP_REPORT_SIZE];
         data[0x50..0x90].copy_from_slice(&user_data);
 
-        let zero = accept_hardware_report(0, &data, &user_data, "/dev/sev-guest")
-            .expect_err("zero report_size");
+        let zero = accept_hardware_report(0, &data, &user_data, "/dev/sev-guest").expect_err("zero report_size");
         match zero {
             CliError::HardwareUnavailable(msg) => {
                 assert!(msg.contains("size 0"), "{msg}");
@@ -259,9 +241,8 @@ mod tests {
         }
 
         data[0x70] ^= 0xFF;
-        let echo =
-            accept_hardware_report(SNP_REPORT_SIZE as u32, &data, &user_data, "/dev/sev-guest")
-                .expect_err("REPORT_DATA mismatch");
+        let echo = accept_hardware_report(SNP_REPORT_SIZE as u32, &data, &user_data, "/dev/sev-guest")
+            .expect_err("REPORT_DATA mismatch");
         match echo {
             CliError::HardwareUnavailable(msg) => assert!(msg.contains("REPORT_DATA"), "{msg}"),
             other => panic!("expected HardwareUnavailable, got {other:?}"),

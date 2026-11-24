@@ -12,14 +12,10 @@ use solana_system_interface::instruction as system_instruction;
 fn rejects_system_transfers_before_signing_in_both_entrypoints() {
     let signer = Keypair::new();
     let ix = system_instruction::transfer(&signer.pubkey(), &Pubkey::new_unique(), 1_000_000_000);
-    assert!(
-        build_session_action_tx(&signer.pubkey(), &signer, ix.clone(), Hash::new_unique()).is_err()
-    );
-    assert!(
-        ConfidentialComputeClient::new(solana_confidential_compute_sdk::ID)
-            .build_session_action_tx(&signer.pubkey(), &signer, ix, Hash::new_unique())
-            .is_err()
-    );
+    assert!(build_session_action_tx(&signer.pubkey(), &signer, ix.clone(), Hash::new_unique()).is_err());
+    assert!(ConfidentialComputeClient::new(solana_confidential_compute_sdk::ID)
+        .build_session_action_tx(&signer.pubkey(), &signer, ix, Hash::new_unique())
+        .is_err());
 }
 
 #[test]
@@ -33,8 +29,5 @@ fn signs_custom_consumer_and_verifies_workload_signature() {
     };
     let tx = build_session_action_tx(&signer.pubkey(), &signer, ix, Hash::new_unique()).unwrap();
     assert!(tx.signatures[0].verify(signer.pubkey().as_ref(), &tx.message_data()));
-    assert_eq!(
-        tx.message.account_keys[tx.message.instructions[0].program_id_index as usize],
-        consumer
-    );
+    assert_eq!(tx.message.account_keys[tx.message.instructions[0].program_id_index as usize], consumer);
 }

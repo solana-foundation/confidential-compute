@@ -39,9 +39,8 @@ pub const QE_REPORT_LEN: usize = 384;
 pub const BODY_REPORT_DATA: usize = 520;
 
 /// Intel's QE vendor id. Any other value is not an Intel quote.
-const INTEL_QE_VENDOR_ID: [u8; 16] = [
-    0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0x0a, 0x0d, 0xb3, 0x95, 0x7f, 0x06, 0x07,
-];
+const INTEL_QE_VENDOR_ID: [u8; 16] =
+    [0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0x0a, 0x0d, 0xb3, 0x95, 0x7f, 0x06, 0x07];
 /// `ECDSA-256-with-P-256`.
 const ATTESTATION_KEY_TYPE_ECDSA_P256: u16 = 2;
 /// TEE type discriminator for TDX.
@@ -73,8 +72,8 @@ const CERT_DATA_TYPE_PCK_CHAIN: u16 = 5;
 /// this byte sequence -- the signature `AlgorithmIdentifier` uses
 /// `ecdsa-with-SHA256`, a different OID.
 const P256_SPKI_PREFIX: [u8; 27] = [
-    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x08, 0x2A,
-    0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04,
+    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE,
+    0x3D, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04,
 ];
 
 const PEM_BEGIN: &str = "-----BEGIN CERTIFICATE-----";
@@ -104,14 +103,11 @@ fn bad(reason: &str) -> SidecarError {
 }
 
 fn take(raw: &[u8], offset: usize, len: usize) -> Result<&[u8], SidecarError> {
-    raw.get(offset..offset.saturating_add(len))
-        .ok_or_else(|| bad("truncated before a required field"))
+    raw.get(offset..offset.saturating_add(len)).ok_or_else(|| bad("truncated before a required field"))
 }
 
 fn take64(raw: &[u8], offset: usize) -> Result<[u8; 64], SidecarError> {
-    take(raw, offset, 64)?
-        .try_into()
-        .map_err(|_| bad("a 64-byte field was short"))
+    take(raw, offset, 64)?.try_into().map_err(|_| bad("a 64-byte field was short"))
 }
 
 fn u16_at(raw: &[u8], offset: usize) -> Result<u16, SidecarError> {
@@ -166,9 +162,8 @@ pub fn split_tdx_quote(raw: &[u8]) -> Result<TdxQuoteParts, SidecarError> {
     }
 
     let qe_auth_data_len = u16_at(raw, OFF_QE_AUTH_DATA_LEN)? as usize;
-    let qe_auth_end = OFF_QE_AUTH_DATA
-        .checked_add(qe_auth_data_len)
-        .ok_or_else(|| bad("QE auth data length overflows"))?;
+    let qe_auth_end =
+        OFF_QE_AUTH_DATA.checked_add(qe_auth_data_len).ok_or_else(|| bad("QE auth data length overflows"))?;
     if qe_auth_end > sig_data_end {
         return Err(bad("QE auth data runs past the signature data"));
     }
@@ -193,11 +188,7 @@ pub fn split_tdx_quote(raw: &[u8]) -> Result<TdxQuoteParts, SidecarError> {
 /// with, and then against the source-5 allowlist. The client therefore has to
 /// name the same key the Quoting Enclave's platform used, and the only place
 /// it appears is the leaf certificate in the chain appended to the quote.
-fn extract_pck_pubkey(
-    raw: &[u8],
-    cert_data_start: usize,
-    sig_data_end: usize,
-) -> Result<[u8; 33], SidecarError> {
+fn extract_pck_pubkey(raw: &[u8], cert_data_start: usize, sig_data_end: usize) -> Result<[u8; 33], SidecarError> {
     let cert_type = u16_at(raw, cert_data_start)?;
     if cert_type != CERT_DATA_TYPE_PCK_CHAIN {
         return Err(bad(&format!(
@@ -207,15 +198,12 @@ fn extract_pck_pubkey(
     }
     let cert_len = u32_at(raw, cert_data_start + 2)? as usize;
     let body_start = cert_data_start + 6;
-    let body_end = body_start
-        .checked_add(cert_len)
-        .ok_or_else(|| bad("certification data length overflows"))?;
+    let body_end = body_start.checked_add(cert_len).ok_or_else(|| bad("certification data length overflows"))?;
     if body_end > sig_data_end || body_end > raw.len() {
         return Err(bad("certification data runs past the end of the quote"));
     }
 
-    let pem = std::str::from_utf8(&raw[body_start..body_end])
-        .map_err(|_| bad("certificate chain is not UTF-8 PEM"))?;
+    let pem = std::str::from_utf8(&raw[body_start..body_end]).map_err(|_| bad("certificate chain is not UTF-8 PEM"))?;
     let leaf_der = first_pem_certificate(pem)?;
 
     let offset = leaf_der
@@ -233,18 +221,9 @@ fn extract_pck_pubkey(
 
 /// DER bytes of the first certificate in a PEM chain. That is the leaf.
 fn first_pem_certificate(pem: &str) -> Result<Vec<u8>, SidecarError> {
-    let begin = pem
-        .find(PEM_BEGIN)
-        .ok_or_else(|| bad("certificate chain has no PEM header"))?
-        + PEM_BEGIN.len();
-    let end = pem[begin..]
-        .find(PEM_END)
-        .ok_or_else(|| bad("certificate chain has no PEM footer"))?
-        + begin;
-    let body: String = pem[begin..end]
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
+    let begin = pem.find(PEM_BEGIN).ok_or_else(|| bad("certificate chain has no PEM header"))? + PEM_BEGIN.len();
+    let end = pem[begin..].find(PEM_END).ok_or_else(|| bad("certificate chain has no PEM footer"))? + begin;
+    let body: String = pem[begin..end].chars().filter(|c| !c.is_whitespace()).collect();
     base64::engine::general_purpose::STANDARD
         .decode(body.as_bytes())
         .map_err(|_| bad("leaf certificate is not valid base64"))
@@ -357,10 +336,7 @@ pub fn validate_challenge_readback(
 ) -> Result<(), SidecarError> {
     let refuse = |reason: String| Err(SidecarError::OnchainError(reason));
     if record.source != expected_source {
-        return refuse(format!(
-            "challenge read back with source {} rather than {expected_source}",
-            record.source
-        ));
+        return refuse(format!("challenge read back with source {} rather than {expected_source}", record.source));
     }
     if &record.nonce != expected_nonce {
         return refuse("challenge read back with a nonce this process did not issue".to_string());
@@ -372,9 +348,7 @@ pub fn validate_challenge_readback(
         ));
     }
     if &record.slot_hash != expected_slot_hash {
-        return refuse(
-            "challenge read back with a slot hash the SlotHashes sysvar did not report".to_string(),
-        );
+        return refuse("challenge read back with a slot hash the SlotHashes sysvar did not report".to_string());
     }
     if record.is_consumed() {
         return refuse("challenge read back already consumed".to_string());

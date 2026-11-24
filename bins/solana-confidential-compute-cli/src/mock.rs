@@ -73,9 +73,7 @@ pub fn sign_report_body(report: &mut [u8; SNP_REPORT_SIZE], signing_key: &Signin
     let mut hasher = Sha384::new();
     hasher.update(&report[..SNP_SIGNED_BODY_SIZE]);
     let digest: [u8; 48] = hasher.finalize().into();
-    let (signature, _) = signing_key
-        .sign_prehash(&digest)
-        .expect("mock P-384 prehash sign succeeds");
+    let (signature, _) = signing_key.sign_prehash(&digest).expect("mock P-384 prehash sign succeeds");
     let sig_bytes = signature.to_bytes();
     write_le_scalar(&mut report[0x2A0..0x2E8], &sig_bytes[..48]);
     write_le_scalar(&mut report[0x2E8..0x330], &sig_bytes[48..96]);

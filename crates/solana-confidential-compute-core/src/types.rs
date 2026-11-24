@@ -4,9 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 /// Supported hardware enclave environments.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[borsh(use_discriminant = true)]
 #[repr(u8)]
 pub enum EnclaveType {
@@ -28,9 +26,7 @@ pub enum EnclaveType {
 }
 
 /// 48-byte SHA-384 binary measurement digest (MRENCLAVE / PCR).
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct MeasurementDigest(#[serde(with = "serde_bytes")] pub [u8; 48]);
 
 impl MeasurementDigest {
@@ -47,9 +43,7 @@ impl MeasurementDigest {
 ///
 /// `rtmrs_hash` is the 32-byte RTMR digest, or a 32-byte journal digest.
 /// @spec SCC-TDX-002
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct JournalV3 {
     #[serde(with = "serde_bytes")]
     pub mr_td: [u8; 48],
@@ -118,12 +112,8 @@ pub fn compute_action_commitment(
     action_hash: &[u8; 32],
     consumer_program_id: &[u8; 32],
 ) -> [u8; 32] {
-    solana_program::hash::hashv(&[
-        slot_hash.as_slice(),
-        action_hash.as_slice(),
-        consumer_program_id.as_slice(),
-    ])
-    .to_bytes()
+    solana_program::hash::hashv(&[slot_hash.as_slice(), action_hash.as_slice(), consumer_program_id.as_slice()])
+        .to_bytes()
 }
 
 #[cfg(test)]
@@ -138,10 +128,7 @@ mod tests {
         let first = compute_action_commitment(&slot_hash, &action_hash, &consumer);
         let second = compute_action_commitment(&slot_hash, &action_hash, &consumer);
         assert_eq!(first, second);
-        assert_ne!(
-            first,
-            compute_action_commitment(&slot_hash, &[0x44u8; 32], &consumer)
-        );
+        assert_ne!(first, compute_action_commitment(&slot_hash, &[0x44u8; 32], &consumer));
     }
 
     #[test]
@@ -153,18 +140,13 @@ mod tests {
 
     #[test]
     fn journal_v3_hash_binds_each_measurement() {
-        let journal = JournalV3 {
-            mr_td: [0x11; 48],
-            mr_config_id: [0x22; 48],
-            rtmrs_hash: [0x33; 32],
-        };
+        let journal = JournalV3 { mr_td: [0x11; 48], mr_config_id: [0x22; 48], rtmrs_hash: [0x33; 32] };
         let digest = compute_journal_hash(&journal);
         assert_eq!(
             digest,
             [
-                0x37, 0x3e, 0x30, 0x83, 0x48, 0xc3, 0xe5, 0x23, 0x8f, 0xc0, 0x36, 0x0b, 0xf4, 0x6d,
-                0xe6, 0x0c, 0xd3, 0x37, 0x75, 0xee, 0xbd, 0xbf, 0x6f, 0xf0, 0x43, 0x79, 0xb7, 0xd0,
-                0x70, 0x83, 0xe0, 0xb9,
+                0x37, 0x3e, 0x30, 0x83, 0x48, 0xc3, 0xe5, 0x23, 0x8f, 0xc0, 0x36, 0x0b, 0xf4, 0x6d, 0xe6, 0x0c, 0xd3,
+                0x37, 0x75, 0xee, 0xbd, 0xbf, 0x6f, 0xf0, 0x43, 0x79, 0xb7, 0xd0, 0x70, 0x83, 0xe0, 0xb9,
             ]
         );
         assert_eq!(digest, compute_journal_hash(&journal));

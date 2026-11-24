@@ -25,15 +25,9 @@ mod sbf;
 
 fn malformed_register_vcek_data() -> Vec<u8> {
     let mut instruction = REGISTER_VCEK_DISCRIMINATOR.to_vec();
-    RegisterVcekArgs {
-        chip_id: [0; 64],
-        tcb_version: 0,
-        public_key_xy: [0; 96],
-        ask_cert_len: 1,
-        vcek_cert_len: 1,
-    }
-    .serialize(&mut instruction)
-    .unwrap();
+    RegisterVcekArgs { chip_id: [0; 64], tcb_version: 0, public_key_xy: [0; 96], ask_cert_len: 1, vcek_cert_len: 1 }
+        .serialize(&mut instruction)
+        .unwrap();
     instruction.extend_from_slice(&[0xff, 0xff]); // deliberately malformed DER
     instruction
 }
@@ -81,23 +75,13 @@ async fn unsigned_vcek_registration_stops_before_der_parsing() {
         let pid = Pubkey::new_unique();
         let authority = Keypair::new();
         let (ctx, registry) = boot(pid, &authority.pubkey()).await;
-        let before = ctx
-            .banks_client
-            .get_account(registry)
-            .await
-            .unwrap()
-            .unwrap()
-            .data;
+        let before = ctx.banks_client.get_account(registry).await.unwrap().unwrap().data;
         let vcek = Pubkey::new_unique();
 
         let ix = Instruction {
             program_id: pid,
             accounts: vec![
-                AccountMeta {
-                    pubkey: authority.pubkey(),
-                    is_signer: signed,
-                    is_writable: true,
-                },
+                AccountMeta { pubkey: authority.pubkey(), is_signer: signed, is_writable: true },
                 AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(vcek, false),
                 AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
@@ -109,12 +93,7 @@ async fn unsigned_vcek_registration_stops_before_der_parsing() {
         if signed {
             signers.push(&authority);
         }
-        let tx = Transaction::new_signed_with_payer(
-            &[ix],
-            Some(&ctx.payer.pubkey()),
-            &signers,
-            ctx.last_blockhash,
-        );
+        let tx = Transaction::new_signed_with_payer(&[ix], Some(&ctx.payer.pubkey()), &signers, ctx.last_blockhash);
         let err = instruction_error(ctx.banks_client.process_transaction(tx).await.unwrap_err());
         assert_eq!(
             err,
@@ -127,13 +106,7 @@ async fn unsigned_vcek_registration_stops_before_der_parsing() {
         );
 
         // No partial writes on either path.
-        let after = ctx
-            .banks_client
-            .get_account(registry)
-            .await
-            .unwrap()
-            .unwrap()
-            .data;
+        let after = ctx.banks_client.get_account(registry).await.unwrap().unwrap().data;
         assert_eq!(after, before, "registry was mutated (signed={signed})");
         assert!(
             ctx.banks_client.get_account(vcek).await.unwrap().is_none(),

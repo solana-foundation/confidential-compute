@@ -36,11 +36,7 @@ fn base64(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
     for chunk in bytes.chunks(3) {
-        let b = [
-            chunk[0],
-            *chunk.get(1).unwrap_or(&0),
-            *chunk.get(2).unwrap_or(&0),
-        ];
+        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
         let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
         for i in 0..4 {
             if i <= chunk.len() {
@@ -55,27 +51,15 @@ fn base64(bytes: &[u8]) -> String {
 
 /// `sol_log_data` renders as `Program data: <b64 field> <b64 field> ...`.
 fn assert_event(logs: &[String], fields: &[&[u8]]) {
-    let expected = format!(
-        "Program data: {}",
-        fields
-            .iter()
-            .map(|f| base64(f))
-            .collect::<Vec<_>>()
-            .join(" ")
-    );
-    let observed: Vec<_> = logs
-        .iter()
-        .filter(|l| l.starts_with("Program data: "))
-        .collect();
+    let expected = format!("Program data: {}", fields.iter().map(|f| base64(f)).collect::<Vec<_>>().join(" "));
+    let observed: Vec<_> = logs.iter().filter(|l| l.starts_with("Program data: ")).collect();
     assert_eq!(observed.len(), 1, "one success event per registration");
     assert_eq!(*observed[0], expected);
 }
 
 #[tokio::test]
 async fn authentic_milan_registration_preserves_supported_vendor_profile() {
-    let ask = include_bytes!(
-        "../../../crates/solana-confidential-compute-crypto/tests/data/milan_ask.der"
-    );
+    let ask = include_bytes!("../../../crates/solana-confidential-compute-crypto/tests/data/milan_ask.der");
     let leaf = include_bytes!("../../../fixtures/vcek_milan.der");
     let offset = leaf.windows(4).position(|w| w == [3, 0x62, 0, 4]).unwrap() + 4;
     let xy: [u8; 96] = leaf[offset..offset + 96].try_into().unwrap();
@@ -114,11 +98,7 @@ async fn authentic_milan_registration_preserves_supported_vendor_profile() {
         }
         .into(),
     );
-    ctx.set_sysvar(&Clock {
-        slot: 500,
-        unix_timestamp: NOW_UNIX,
-        ..Clock::default()
-    });
+    ctx.set_sysvar(&Clock { slot: 500, unix_timestamp: NOW_UNIX, ..Clock::default() });
 
     let mut data = REGISTER_VCEK_DISCRIMINATOR.to_vec();
     RegisterVcekArgs {
@@ -146,28 +126,16 @@ async fn authentic_milan_registration_preserves_supported_vendor_profile() {
     };
     let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
     let tx = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(CU_LIMIT),
-            register,
-        ],
+        &[ComputeBudgetInstruction::set_compute_unit_limit(CU_LIMIT), register],
         Some(&ctx.payer.pubkey()),
         &[&ctx.payer],
         blockhash,
     );
-    let outcome = ctx
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .unwrap();
+    let outcome = ctx.banks_client.process_transaction_with_metadata(tx).await.unwrap();
     let metadata = outcome.metadata.expect("execution metadata required");
     assert_eq!(outcome.result, Ok(()));
 
-    let account = ctx
-        .banks_client
-        .get_account(vcek)
-        .await
-        .unwrap()
-        .expect("vcek cache");
+    let account = ctx.banks_client.get_account(vcek).await.unwrap().expect("vcek cache");
     assert_eq!(account.owner, pid);
     assert_event(
         &metadata.log_messages,

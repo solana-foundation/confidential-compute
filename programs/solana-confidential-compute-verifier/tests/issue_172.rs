@@ -1,7 +1,5 @@
 use borsh::BorshSerialize;
-use solana_confidential_compute_verifier::{
-    error::VerifierError, payload::*, processor::Processor, state::*,
-};
+use solana_confidential_compute_verifier::{error::VerifierError, payload::*, processor::Processor, state::*};
 use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 #[test]
 fn mutable_p384_root_rotation_is_unsupported_and_preserves_policy() {
@@ -31,15 +29,8 @@ fn mutable_p384_root_rotation_is_unsupported_and_preserves_policy() {
             AccountInfo::new(&registry, false, true, &mut b, &mut bytes, &pid, false),
         ];
         let mut ix = ROTATE_ROOT_CERT_DISCRIMINATOR.to_vec();
-        RotateRootCertArgs {
-            new_ark_pubkey_xy: proposed,
-        }
-        .serialize(&mut ix)
-        .unwrap();
-        assert_eq!(
-            Processor::process(&pid, &accounts, &ix),
-            Err(VerifierError::InvalidInstruction.into())
-        );
+        RotateRootCertArgs { new_ark_pubkey_xy: proposed }.serialize(&mut ix).unwrap();
+        assert_eq!(Processor::process(&pid, &accounts, &ix), Err(VerifierError::InvalidInstruction.into()));
         assert_eq!(&**accounts[1].try_borrow_data().unwrap(), before.as_slice());
     }
 }

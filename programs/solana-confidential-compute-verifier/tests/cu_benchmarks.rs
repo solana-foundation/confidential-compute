@@ -11,12 +11,9 @@ use solana_confidential_compute_core::types::{compute_action_commitment, VerifyA
 use solana_confidential_compute_core::SNP_REPORT_SIZE;
 use solana_confidential_compute_verifier::payload::{
     InitPolicyRegistryArgs, VerifyAndRegisterArgs, INIT_POLICY_REGISTRY_DISCRIMINATOR,
-    VERIFY_AND_REGISTER_DISCRIMINATOR, VERIFY_ATOMIC_DISCRIMINATOR,
-    VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
+    VERIFY_AND_REGISTER_DISCRIMINATOR, VERIFY_ATOMIC_DISCRIMINATOR, VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
 };
-use solana_confidential_compute_verifier::state::{
-    BackendPolicy, VcekAccount, VCEK_ACCOUNT_DISCRIMINATOR,
-};
+use solana_confidential_compute_verifier::state::{BackendPolicy, VcekAccount, VCEK_ACCOUNT_DISCRIMINATOR};
 use solana_program_test::*;
 use solana_sdk::{
     account::Account,
@@ -51,11 +48,7 @@ fn sign_snp_report(report: &mut [u8; SNP_REPORT_SIZE], signing_key: &SigningKey)
     }
 }
 
-fn create_mock_report(
-    user_data: &[u8; 64],
-    measurement: &[u8; 48],
-    signing_key: &SigningKey,
-) -> [u8; SNP_REPORT_SIZE] {
+fn create_mock_report(user_data: &[u8; 64], measurement: &[u8; 48], signing_key: &SigningKey) -> [u8; SNP_REPORT_SIZE] {
     let mut report = [0u8; SNP_REPORT_SIZE];
     report[0..4].copy_from_slice(&2u32.to_le_bytes());
     report[8..16].copy_from_slice(&(1u64 << 17).to_le_bytes()); // SMT enabled
@@ -102,10 +95,8 @@ async fn test_cu_benchmarks_live_sbf() {
     let consumer_program = Pubkey::new_unique();
 
     let (registry_pda, _) = Pubkey::find_program_address(&[b"policy_registry"], &program_id);
-    let (vcek_pda, vcek_bump) = Pubkey::find_program_address(
-        &[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()],
-        &program_id,
-    );
+    let (vcek_pda, vcek_bump) =
+        Pubkey::find_program_address(&[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()], &program_id);
 
     let mut program_test = ProgramTest::default();
     program_test.prefer_bpf(true);
@@ -130,13 +121,7 @@ async fn test_cu_benchmarks_live_sbf() {
     .unwrap();
     program_test.add_account(
         vcek_pda,
-        Account {
-            lamports: 10_000_000,
-            data: vcek_data,
-            owner: program_id,
-            executable: false,
-            rent_epoch: 0,
-        },
+        Account { lamports: 10_000_000, data: vcek_data, owner: program_id, executable: false, rent_epoch: 0 },
     );
 
     // #183: AMD (source 1) measurements are checked against the readonly backend policy.
@@ -171,19 +156,11 @@ async fn test_cu_benchmarks_live_sbf() {
     program_data[13..45].copy_from_slice(ctx.payer.pubkey().as_ref());
     ctx.set_account(
         &program_data_pda,
-        &Account {
-            lamports: 1_000_000,
-            data: program_data,
-            owner: loader,
-            executable: false,
-            rent_epoch: 0,
-        }
-        .into(),
+        &Account { lamports: 1_000_000, data: program_data, owner: loader, executable: false, rent_epoch: 0 }.into(),
     );
     let (banks_client, payer, recent_blockhash) = (ctx.banks_client, ctx.payer, ctx.last_blockhash);
 
-    let slot_hashes_sysvar: solana_sdk::slot_hashes::SlotHashes =
-        banks_client.get_sysvar().await.unwrap();
+    let slot_hashes_sysvar: solana_sdk::slot_hashes::SlotHashes = banks_client.get_sysvar().await.unwrap();
     let nonce_slot = 0u64;
     let slot_hash = slot_hashes_sysvar
         .iter()
@@ -223,25 +200,15 @@ async fn test_cu_benchmarks_live_sbf() {
     };
 
     let tx = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(100_000),
-            init_ix,
-        ],
+        &[ComputeBudgetInstruction::set_compute_unit_limit(100_000), init_ix],
         Some(&payer.pubkey()),
         &[&payer],
         recent_blockhash,
     );
-    let res = banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .unwrap();
+    let res = banks_client.process_transaction_with_metadata(tx).await.unwrap();
     assert!(res.result.is_ok(), "init_policy_registry failed");
     let init_cus = res.metadata.unwrap().compute_units_consumed;
-    assert!(
-        init_cus <= 15_000,
-        "init_policy_registry exceeded 15,000 CUs: {}",
-        init_cus
-    );
+    assert!(init_cus <= 15_000, "init_policy_registry exceeded 15,000 CUs: {}", init_cus);
 
     // ------------------------------------------------------------------------
     // Benchmark 2: Mode A (verify_and_register)
@@ -252,28 +219,14 @@ async fn test_cu_benchmarks_live_sbf() {
     mode_a_user_data[32..64].copy_from_slice(&slot_hash);
     let mode_a_report = create_mock_report(&mode_a_user_data, &measurement, &signing_key);
 
-    let (signer_pda, signer_bump) = Pubkey::find_program_address(
-        &[b"attested_signer_v2", &workload_keypair.pubkey().to_bytes()],
-        &program_id,
-    );
-    let (used_nonce_pda_a, nonce_bump) = Pubkey::find_program_address(
-        &[
-            b"nonce",
-            &[1],
-            &workload_keypair.pubkey().to_bytes(),
-            &slot_hash,
-        ],
-        &program_id,
-    );
+    let (signer_pda, signer_bump) =
+        Pubkey::find_program_address(&[b"attested_signer_v2", &workload_keypair.pubkey().to_bytes()], &program_id);
+    let (used_nonce_pda_a, nonce_bump) =
+        Pubkey::find_program_address(&[b"nonce", &[1], &workload_keypair.pubkey().to_bytes(), &slot_hash], &program_id);
 
     let mut mode_a_ix_data = Vec::new();
     mode_a_ix_data.extend_from_slice(&VERIFY_AND_REGISTER_DISCRIMINATOR);
-    VerifyAndRegisterArgs {
-        nonce_slot,
-        report: mode_a_report,
-    }
-    .serialize(&mut mode_a_ix_data)
-    .unwrap();
+    VerifyAndRegisterArgs { nonce_slot, report: mode_a_report }.serialize(&mut mode_a_ix_data).unwrap();
     mode_a_ix_data.push(nonce_bump);
     mode_a_ix_data.push(signer_bump);
 
@@ -294,23 +247,13 @@ async fn test_cu_benchmarks_live_sbf() {
     };
 
     let tx_a = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(550_000),
-            mode_a_ix,
-        ],
+        &[ComputeBudgetInstruction::set_compute_unit_limit(550_000), mode_a_ix],
         Some(&payer.pubkey()),
         &[&payer],
         recent_blockhash,
     );
-    let res_a = banks_client
-        .process_transaction_with_metadata(tx_a)
-        .await
-        .unwrap();
-    assert!(
-        res_a.result.is_ok(),
-        "verify_and_register failed: {:?}",
-        res_a.result
-    );
+    let res_a = banks_client.process_transaction_with_metadata(tx_a).await.unwrap();
+    assert!(res_a.result.is_ok(), "verify_and_register failed: {:?}", res_a.result);
     let mode_a_cus = res_a.metadata.unwrap().compute_units_consumed;
     assert!(
         mode_a_cus <= 550_000,
@@ -321,19 +264,14 @@ async fn test_cu_benchmarks_live_sbf() {
     // ------------------------------------------------------------------------
     // Benchmark 3: Mode B Stateless (verify_atomic)
     // ------------------------------------------------------------------------
-    let commitment =
-        compute_action_commitment(&slot_hash, &action_hash, &consumer_program.to_bytes());
+    let commitment = compute_action_commitment(&slot_hash, &action_hash, &consumer_program.to_bytes());
     let workload_signer = [0x88u8; 32];
     let mut mode_b_user_data = [0u8; 64];
     mode_b_user_data[0..32].copy_from_slice(&workload_signer);
     mode_b_user_data[32..64].copy_from_slice(&commitment);
     let mode_b_report = create_mock_report(&mode_b_user_data, &measurement, &signing_key);
 
-    let header = VerifyAtomicHeader {
-        nonce_slot,
-        action_hash,
-        consumer_program_id: consumer_program.to_bytes(),
-    };
+    let header = VerifyAtomicHeader { nonce_slot, action_hash, consumer_program_id: consumer_program.to_bytes() };
     let mut mode_b_ix_data = Vec::new();
     mode_b_ix_data.extend_from_slice(&VERIFY_ATOMIC_DISCRIMINATOR);
     header.serialize(&mut mode_b_ix_data).unwrap();
@@ -352,42 +290,23 @@ async fn test_cu_benchmarks_live_sbf() {
     };
 
     let tx_b = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(550_000),
-            mode_b_ix,
-        ],
+        &[ComputeBudgetInstruction::set_compute_unit_limit(550_000), mode_b_ix],
         Some(&payer.pubkey()),
         &[&payer],
         recent_blockhash,
     );
-    let res_b = banks_client
-        .process_transaction_with_metadata(tx_b)
-        .await
-        .expect("verify_atomic transaction processed");
-    assert!(
-        res_b.result.is_err(),
-        "verify_atomic must fail-closed without nonce: {:?}",
-        res_b.result
-    );
-    let mode_b_cus = res_b
-        .metadata
-        .as_ref()
-        .map(|m| m.compute_units_consumed)
-        .unwrap_or(0);
-    assert!(
-        mode_b_cus <= 550_000,
-        "@spec SCC-PERF-002 violated: verify_atomic consumed {} CUs > 550,000",
-        mode_b_cus
-    );
+    let res_b =
+        banks_client.process_transaction_with_metadata(tx_b).await.expect("verify_atomic transaction processed");
+    assert!(res_b.result.is_err(), "verify_atomic must fail-closed without nonce: {:?}", res_b.result);
+    let mode_b_cus = res_b.metadata.as_ref().map(|m| m.compute_units_consumed).unwrap_or(0);
+    assert!(mode_b_cus <= 550_000, "@spec SCC-PERF-002 violated: verify_atomic consumed {} CUs > 550,000", mode_b_cus);
 
     // ------------------------------------------------------------------------
     // Benchmark 4: Mode B with Nonce (verify_atomic_with_nonce)
     // ------------------------------------------------------------------------
     let workload_signer = [0x88u8; 32];
-    let (used_nonce_pda_b, nonce_bump_b) = Pubkey::find_program_address(
-        &[b"nonce", &[1], &workload_signer, &commitment],
-        &program_id,
-    );
+    let (used_nonce_pda_b, nonce_bump_b) =
+        Pubkey::find_program_address(&[b"nonce", &[1], &workload_signer, &commitment], &program_id);
 
     let mut mode_b_nonce_ix_data = Vec::new();
     mode_b_nonce_ix_data.extend_from_slice(&VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
@@ -411,29 +330,15 @@ async fn test_cu_benchmarks_live_sbf() {
     };
 
     let tx_b_nonce = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(550_000),
-            mode_b_nonce_ix,
-        ],
+        &[ComputeBudgetInstruction::set_compute_unit_limit(550_000), mode_b_nonce_ix],
         Some(&payer.pubkey()),
         &[&payer],
         recent_blockhash,
     );
-    let res_b_nonce = banks_client
-        .process_transaction_with_metadata(tx_b_nonce)
-        .await
-        .unwrap();
-    assert!(
-        res_b_nonce.result.is_ok(),
-        "verify_atomic_with_nonce failed: {:?}",
-        res_b_nonce.result
-    );
+    let res_b_nonce = banks_client.process_transaction_with_metadata(tx_b_nonce).await.unwrap();
+    assert!(res_b_nonce.result.is_ok(), "verify_atomic_with_nonce failed: {:?}", res_b_nonce.result);
     let mode_b_nonce_cus = res_b_nonce.metadata.unwrap().compute_units_consumed;
-    assert!(
-        mode_b_nonce_cus <= 550_000,
-        "verify_atomic_with_nonce consumed {} CUs > 550,000",
-        mode_b_nonce_cus
-    );
+    assert!(mode_b_nonce_cus <= 550_000, "verify_atomic_with_nonce consumed {} CUs > 550,000", mode_b_nonce_cus);
 
     // ------------------------------------------------------------------------
     // Benchmark Summary Reporting (@spec SCC-PERF-003)
@@ -454,18 +359,9 @@ async fn test_cu_benchmarks_live_sbf() {
     println!("\n================================================================================");
     println!("SOLANA CONFIDENTIAL COMPUTE VERIFIER SBF COMPUTE UNIT BENCHMARK REPORT");
     println!("================================================================================");
-    println!(
-        "{:<35} {:<15} {:<15} {:<15}",
-        "Instruction", "Measured CUs", "Ceiling CUs", "Headroom"
-    );
+    println!("{:<35} {:<15} {:<15} {:<15}", "Instruction", "Measured CUs", "Ceiling CUs", "Headroom");
     println!("--------------------------------------------------------------------------------");
-    println!(
-        "{:<35} {:<15} {:<15} {:<15}",
-        "init_policy_registry",
-        init_cus,
-        15_000,
-        15_000i64 - init_cus as i64
-    );
+    println!("{:<35} {:<15} {:<15} {:<15}", "init_policy_registry", init_cus, 15_000, 15_000i64 - init_cus as i64);
     println!(
         "{:<35} {:<15} {:<15} {:<15}",
         "verify_and_register (Mode A)",
@@ -488,8 +384,6 @@ async fn test_cu_benchmarks_live_sbf() {
         550_000i64 - mode_b_nonce_cus as i64
     );
     println!("--------------------------------------------------------------------------------");
-    println!(
-        "Mode A and Mode B (with nonce) are both under the 550,000 CU ceiling (SCC-PERF-002)."
-    );
+    println!("Mode A and Mode B (with nonce) are both under the 550,000 CU ceiling (SCC-PERF-002).");
     println!("================================================================================\n");
 }

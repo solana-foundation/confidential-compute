@@ -3,15 +3,14 @@
 //! @spec SCC-SDK-001 SCC-SEC-005
 
 use solana_confidential_compute_sdk::internal::{
-    build_atomic_attestation_tx_for_program_oversized,
-    build_register_signer_ix_for_program_oversized, build_register_signer_ix_oversized,
+    build_atomic_attestation_tx_for_program_oversized, build_register_signer_ix_for_program_oversized,
+    build_register_signer_ix_oversized,
 };
 use solana_confidential_compute_sdk::{
-    build_atomic_attestation_tx, build_register_signer_ix, build_session_action_tx,
-    compute_commitment, hash_action, ConfidentialComputeClient, SdkError, ATTESTATION_TTL_SLOTS,
-    ID as SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, MODE_B_REQUIRE_NONCE_DEFAULT, PACKET_DATA_SIZE,
-    SNP_REPORT_SIZE, VERIFY_AND_REGISTER_DISCRIMINATOR, VERIFY_AND_REGISTER_IX_LEN,
-    VERIFY_ATOMIC_DISCRIMINATOR, VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
+    build_atomic_attestation_tx, build_register_signer_ix, build_session_action_tx, compute_commitment, hash_action,
+    ConfidentialComputeClient, SdkError, ATTESTATION_TTL_SLOTS, ID as SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
+    MODE_B_REQUIRE_NONCE_DEFAULT, PACKET_DATA_SIZE, SNP_REPORT_SIZE, VERIFY_AND_REGISTER_DISCRIMINATOR,
+    VERIFY_AND_REGISTER_IX_LEN, VERIFY_ATOMIC_DISCRIMINATOR, VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
     VERIFY_ATOMIC_WITH_NONCE_IX_LEN,
 };
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
@@ -39,11 +38,7 @@ fn sample_report(signer: [u8; 32], measurement: [u8; 48]) -> [u8; SNP_REPORT_SIZ
 }
 
 fn dummy_consumer_ix(program_id: Pubkey, payer: Pubkey) -> Instruction {
-    Instruction {
-        program_id,
-        accounts: vec![AccountMeta::new(payer, true)],
-        data: vec![0xAB, 0xCD],
-    }
+    Instruction { program_id, accounts: vec![AccountMeta::new(payer, true)], data: vec![0xAB, 0xCD] }
 }
 
 fn compiled_program_id(tx: &Transaction, ix_index: usize) -> Pubkey {
@@ -58,8 +53,7 @@ fn register_signer_ix_packs_verify_and_register() {
     let report = sample_report(signer.to_bytes(), MEASUREMENT);
     let expires = 500 + ATTESTATION_TTL_SLOTS;
 
-    let ix =
-        build_register_signer_ix_oversized(&payer, &signer, &report, expires).expect("register ix");
+    let ix = build_register_signer_ix_oversized(&payer, &signer, &report, expires).expect("register ix");
     assert!(matches!(
         build_register_signer_ix(&payer, &signer, &report, expires),
         Err(SdkError::PacketTooLarge { len }) if len > PACKET_DATA_SIZE
@@ -75,12 +69,9 @@ fn register_signer_ix_packs_verify_and_register() {
     assert_eq!(
         ix.accounts[9],
         AccountMeta::new_readonly(
-            solana_confidential_compute_sdk::derive_backend_policy_pda(
-                &SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-                1
-            )
-            .unwrap()
-            .0,
+            solana_confidential_compute_sdk::derive_backend_policy_pda(&SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, 1)
+                .unwrap()
+                .0,
             false
         )
     );
@@ -123,15 +114,9 @@ fn register_signer_ix_at_slot_packs_nonce_slot() {
 fn register_signer_ix_rejects_short_report_and_signer_mismatch() {
     let payer = Pubkey::new_unique();
     let signer = Pubkey::new_unique();
-    assert_eq!(
-        build_register_signer_ix(&payer, &signer, &[0u8; 16], 1).unwrap_err(),
-        SdkError::InvalidReportSize
-    );
+    assert_eq!(build_register_signer_ix(&payer, &signer, &[0u8; 16], 1).unwrap_err(), SdkError::InvalidReportSize);
     let report = sample_report(Pubkey::new_unique().to_bytes(), MEASUREMENT);
-    assert_eq!(
-        build_register_signer_ix(&payer, &signer, &report, 1).unwrap_err(),
-        SdkError::SignerMismatch
-    );
+    assert_eq!(build_register_signer_ix(&payer, &signer, &report, 1).unwrap_err(), SdkError::SignerMismatch);
 }
 
 #[test]
@@ -140,17 +125,13 @@ fn session_action_tx_contains_consumer_ix_and_workload_signature() {
     let consumer = Pubkey::new_unique();
     let blockhash = Hash::new_unique();
     let consumer_ix = dummy_consumer_ix(consumer, signer.pubkey());
-    let tx = build_session_action_tx(&signer.pubkey(), &signer, consumer_ix.clone(), blockhash)
-        .expect("session tx");
+    let tx = build_session_action_tx(&signer.pubkey(), &signer, consumer_ix.clone(), blockhash).expect("session tx");
     assert_eq!(tx.message.instructions.len(), 1);
     assert_eq!(compiled_program_id(&tx, 0), consumer);
     assert_eq!(tx.message.instructions[0].data, consumer_ix.data);
     assert_eq!(tx.message.recent_blockhash, blockhash);
     assert_eq!(tx.signatures.len(), 1);
-    assert_ne!(
-        tx.signatures[0],
-        solana_sdk::signature::Signature::default()
-    );
+    assert_ne!(tx.signatures[0], solana_sdk::signature::Signature::default());
 }
 
 #[test]
@@ -164,19 +145,12 @@ fn session_action_tx_promotes_existing_workload_account_to_signer() {
         accounts: vec![AccountMeta::new(signer.pubkey(), false)],
         data: vec![0x11],
     };
-    let tx = build_session_action_tx(&payer, &signer, consumer_ix, blockhash)
-        .expect("existing account becomes a signer");
-    let signer_index = tx
-        .message
-        .account_keys
-        .iter()
-        .position(|key| key == &signer.pubkey())
-        .expect("workload key is on the message");
+    let tx =
+        build_session_action_tx(&payer, &signer, consumer_ix, blockhash).expect("existing account becomes a signer");
+    let signer_index =
+        tx.message.account_keys.iter().position(|key| key == &signer.pubkey()).expect("workload key is on the message");
     assert!(signer_index < usize::from(tx.message.header.num_required_signatures));
-    assert_ne!(
-        tx.signatures[signer_index],
-        solana_sdk::signature::Signature::default()
-    );
+    assert_ne!(tx.signatures[signer_index], solana_sdk::signature::Signature::default());
 }
 
 #[test]
@@ -214,32 +188,17 @@ fn atomic_attestation_tx_packs_nonce_bound_confidential_compute_then_consumer() 
     ));
 
     assert_eq!(tx.message.instructions.len(), 2);
-    assert_eq!(
-        compiled_program_id(&tx, 0),
-        SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID
-    );
+    assert_eq!(compiled_program_id(&tx, 0), SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID);
     assert_eq!(compiled_program_id(&tx, 1), consumer);
 
     let confidential_compute_data = &tx.message.instructions[0].data;
-    assert_eq!(
-        &confidential_compute_data[..8],
-        &VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-    );
-    assert_ne!(
-        &confidential_compute_data[..8],
-        &VERIFY_ATOMIC_DISCRIMINATOR
-    );
+    assert_eq!(&confidential_compute_data[..8], &VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
+    assert_ne!(&confidential_compute_data[..8], &VERIFY_ATOMIC_DISCRIMINATOR);
     assert_eq!(&confidential_compute_data[8..16], &0u64.to_le_bytes());
     assert_eq!(&confidential_compute_data[0x10..0x30], &ACTION_HASH);
     assert_eq!(&confidential_compute_data[0x30..0x50], consumer.as_ref());
-    assert_eq!(
-        &confidential_compute_data[80..80 + SNP_REPORT_SIZE],
-        report.as_slice()
-    );
-    assert_eq!(
-        confidential_compute_data.len(),
-        VERIFY_ATOMIC_WITH_NONCE_IX_LEN
-    );
+    assert_eq!(&confidential_compute_data[80..80 + SNP_REPORT_SIZE], report.as_slice());
+    assert_eq!(confidential_compute_data.len(), VERIFY_ATOMIC_WITH_NONCE_IX_LEN);
     assert_eq!(VERIFY_ATOMIC_WITH_NONCE_IX_LEN, 1265);
     let (_, nonce_bump) = Pubkey::find_program_address(
         &[b"nonce", &[1], signer.as_ref(), &*NONCE],
@@ -275,16 +234,8 @@ fn atomic_attestation_tx_rejects_invalid_report_and_measurement() {
 
     let report = sample_report(signer.to_bytes(), MEASUREMENT);
     assert_eq!(
-        build_atomic_attestation_tx(
-            &payer,
-            &consumer,
-            ACTION_HASH,
-            [0x99; 48],
-            &report,
-            consumer_ix,
-            blockhash,
-        )
-        .unwrap_err(),
+        build_atomic_attestation_tx(&payer, &consumer, ACTION_HASH, [0x99; 48], &report, consumer_ix, blockhash,)
+            .unwrap_err(),
         SdkError::MeasurementMismatch
     );
 }
@@ -300,9 +251,8 @@ fn client_builders_target_custom_program_id() {
         client.build_register_signer_ix(&payer, &signer, &report, 1),
         Err(SdkError::PacketTooLarge { len }) if len > PACKET_DATA_SIZE
     ));
-    let ix =
-        build_register_signer_ix_for_program_oversized(&program_id, &payer, &signer, &report, 1, 0)
-            .expect("oversized register");
+    let ix = build_register_signer_ix_for_program_oversized(&program_id, &payer, &signer, &report, 1, 0)
+        .expect("oversized register");
     assert_eq!(ix.program_id, program_id);
 
     let consumer = Pubkey::new_unique();
@@ -342,19 +292,10 @@ fn compute_commitment_matches_core_and_hash_action_is_exported() {
     let commitment = compute_commitment(&slot_hash, &ACTION_HASH, &consumer);
     assert_eq!(
         commitment,
-        solana_confidential_compute_core::compute_action_commitment(
-            &slot_hash,
-            &ACTION_HASH,
-            &consumer.to_bytes()
-        )
+        solana_confidential_compute_core::compute_action_commitment(&slot_hash, &ACTION_HASH, &consumer.to_bytes())
     );
-    let hashed = hash_action(
-        &[7u8; 8],
-        &[solana_sdk::instruction::AccountMeta::new_readonly(
-            consumer, false,
-        )],
-        &[1, 2, 3],
-    );
+    let hashed =
+        hash_action(&[7u8; 8], &[solana_sdk::instruction::AccountMeta::new_readonly(consumer, false)], &[1, 2, 3]);
     assert_eq!(hashed.len(), 32);
 }
 
@@ -378,8 +319,8 @@ fn shared_wire_test_vector_action_hash_and_commitment() {
     );
 
     let expected_action_hash: [u8; 32] = [
-        235, 83, 105, 10, 187, 214, 226, 188, 61, 43, 63, 19, 184, 121, 255, 58, 52, 126, 160, 114,
-        12, 209, 122, 216, 71, 203, 76, 236, 70, 186, 77, 72,
+        235, 83, 105, 10, 187, 214, 226, 188, 61, 43, 63, 19, 184, 121, 255, 58, 52, 126, 160, 114, 12, 209, 122, 216,
+        71, 203, 76, 236, 70, 186, 77, 72,
     ];
     assert_eq!(action_hash, expected_action_hash);
 
@@ -388,25 +329,17 @@ fn shared_wire_test_vector_action_hash_and_commitment() {
     let commitment = compute_commitment(&slot_hash, &action_hash, &consumer);
 
     let expected_commitment: [u8; 32] = [
-        14, 199, 119, 170, 190, 142, 1, 96, 135, 78, 206, 131, 174, 75, 39, 221, 193, 93, 1, 176,
-        24, 11, 0, 50, 19, 98, 109, 138, 103, 222, 225, 29,
+        14, 199, 119, 170, 190, 142, 1, 96, 135, 78, 206, 131, 174, 75, 39, 221, 193, 93, 1, 176, 24, 11, 0, 50, 19,
+        98, 109, 138, 103, 222, 225, 29,
     ];
     assert_eq!(commitment, expected_commitment);
     assert_eq!(
         commitment,
-        solana_confidential_compute_core::compute_action_commitment(
-            &slot_hash,
-            &action_hash,
-            &consumer.to_bytes()
-        )
+        solana_confidential_compute_core::compute_action_commitment(&slot_hash, &action_hash, &consumer.to_bytes())
     );
 }
 
-fn noop(
-    _program_id: &Pubkey,
-    _accounts: &[AccountInfo],
-    _instruction_data: &[u8],
-) -> ProgramResult {
+fn noop(_program_id: &Pubkey, _accounts: &[AccountInfo], _instruction_data: &[u8]) -> ProgramResult {
     Ok(())
 }
 
@@ -418,11 +351,7 @@ async fn atomic_attestation_tx_executes_packed_indices_against_noop_programs() {
         SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
         processor!(noop),
     );
-    pt.add_program(
-        "confidential_compute_consumer",
-        consumer_id,
-        processor!(noop),
-    );
+    pt.add_program("confidential_compute_consumer", consumer_id, processor!(noop));
     let context = pt.start_with_context().await;
 
     let signer = Pubkey::new_unique();
@@ -440,35 +369,19 @@ async fn atomic_attestation_tx_executes_packed_indices_against_noop_programs() {
         500,
     )
     .expect("pack atomic");
-    assert_eq!(
-        compiled_program_id(&tx, 0),
-        SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID
-    );
+    assert_eq!(compiled_program_id(&tx, 0), SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID);
     assert_eq!(compiled_program_id(&tx, 1), consumer_id);
-    assert_eq!(
-        &tx.message.instructions[0].data[..8],
-        &VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-    );
+    assert_eq!(&tx.message.instructions[0].data[..8], &VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
 
     tx.sign(&[&context.payer], context.last_blockhash);
-    context
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .expect("packed Mode B transaction processes");
+    context.banks_client.process_transaction(tx).await.expect("packed Mode B transaction processes");
 }
 
 fn invoke_builder_ix(ix: &Instruction) -> solana_program::program_error::ProgramError {
     let keys: Vec<_> = ix.accounts.iter().map(|m| m.pubkey).collect();
     let owners: Vec<_> = keys
         .iter()
-        .map(|k| {
-            if *k == solana_program::sysvar::clock::ID {
-                solana_program::sysvar::ID
-            } else {
-                Pubkey::default()
-            }
-        })
+        .map(|k| if *k == solana_program::sysvar::clock::ID { solana_program::sysvar::ID } else { Pubkey::default() })
         .collect();
     let mut lamports = vec![1_000_000u64; keys.len()];
     let mut data: Vec<Vec<u8>> = keys
@@ -493,15 +406,7 @@ fn invoke_builder_ix(ix: &Instruction) -> solana_program::program_error::Program
         .zip(lamports.iter_mut())
         .zip(data.iter_mut())
         .map(|((((m, key), owner), balance), bytes)| {
-            AccountInfo::new(
-                key,
-                m.is_signer,
-                m.is_writable,
-                balance,
-                bytes,
-                owner,
-                false,
-            )
+            AccountInfo::new(key, m.is_signer, m.is_writable, balance, bytes, owner, false)
         })
         .collect();
     solana_confidential_compute_verifier::process_instruction(&ix.program_id, &accounts, &ix.data)
@@ -554,38 +459,32 @@ fn mode_a_enrollment_requires_and_can_collect_workload_consent() {
     let payer = Keypair::new();
     let workload = Keypair::new();
     let report = sample_report(workload.pubkey().to_bytes(), MEASUREMENT);
-    let snp = build_register_signer_ix_oversized(&payer.pubkey(), &workload.pubkey(), &report, 1)
-        .unwrap();
+    let snp = build_register_signer_ix_oversized(&payer.pubkey(), &workload.pubkey(), &report, 1).unwrap();
     let nonce = Hash::new_unique().to_bytes();
-    let nitro =
-        solana_confidential_compute_sdk::nitro::build_verify_nitro_attestation_ix_oversized(
-            &payer.pubkey(),
-            &workload.pubkey(),
-            0,
-            1,
-            [0; 32],
-            &[1],
-            &nonce,
-        )
-        .unwrap();
+    let nitro = solana_confidential_compute_sdk::nitro::build_verify_nitro_attestation_ix_oversized(
+        &payer.pubkey(),
+        &workload.pubkey(),
+        0,
+        1,
+        [0; 32],
+        &[1],
+        &nonce,
+    )
+    .unwrap();
     for (ix, source, legacy_nonce) in [(snp, 1, *NONCE), (nitro, 2, nonce)] {
         assert_eq!(
             ix.accounts[ix.accounts.len() - if source == 1 { 4 } else { 3 }],
             AccountMeta::new_readonly(workload.pubkey(), true)
         );
         assert_eq!(
-            ix.accounts
-                .get(ix.accounts.len() - if source == 1 { 3 } else { 2 }),
+            ix.accounts.get(ix.accounts.len() - if source == 1 { 3 } else { 2 }),
             Some(&AccountMeta::new_readonly(
-                solana_confidential_compute_sdk::derive_backend_policy_pda(&ix.program_id, source)
-                    .unwrap()
-                    .0,
+                solana_confidential_compute_sdk::derive_backend_policy_pda(&ix.program_id, source).unwrap().0,
                 false
             ))
         );
         assert_eq!(
-            ix.accounts
-                .get(ix.accounts.len() - if source == 1 { 2 } else { 1 }),
+            ix.accounts.get(ix.accounts.len() - if source == 1 { 2 } else { 1 }),
             Some(&AccountMeta::new_readonly(
                 solana_confidential_compute_sdk::derive_legacy_used_nonce_pda(
                     &ix.program_id,

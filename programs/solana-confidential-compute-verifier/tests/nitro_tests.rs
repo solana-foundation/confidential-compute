@@ -16,8 +16,7 @@ use solana_confidential_compute_core::types::{compute_action_commitment, Enclave
 use solana_confidential_compute_core::SignatureVerifier;
 use solana_confidential_compute_verifier::error::VerifierError;
 use solana_confidential_compute_verifier::payload::{
-    VerifyNitroAttestationArgs, VERIFY_NITRO_ATTESTATION_DISCRIMINATOR, VERIFY_NITRO_MODE_A,
-    VERIFY_NITRO_MODE_B,
+    VerifyNitroAttestationArgs, VERIFY_NITRO_ATTESTATION_DISCRIMINATOR, VERIFY_NITRO_MODE_A, VERIFY_NITRO_MODE_B,
 };
 use solana_program::entrypoint::ProgramResult;
 use solana_program::{
@@ -152,14 +151,7 @@ fn synthetic_nitro_keys() -> NitroKeys {
         leaf_sk,
         root_cert: standard_cert(&root_xy, &root_sk, b"root", b"root", true),
         inter_cert: standard_cert(&inter_xy, &root_sk, b"root", b"inter", true),
-        leaf_cert: standard_cert_until(
-            &leaf_xy,
-            &inter_sk,
-            b"inter",
-            b"leaf",
-            false,
-            b"270115080001Z",
-        ),
+        leaf_cert: standard_cert_until(&leaf_xy, &inter_sk, b"inter", b"leaf", false, b"270115080001Z"),
     }
 }
 
@@ -176,14 +168,7 @@ fn nitro_keys() -> NitroKeys {
         // accept that one link through `AwsRootTestVerifier`. Production
         // `DirectCryptoVerifier` still requires a real AWS signature.
         inter_cert: standard_cert(&inter_xy, &root_sk, b"root", b"inter", true),
-        leaf_cert: standard_cert_until(
-            &leaf_xy,
-            &inter_sk,
-            b"inter",
-            b"leaf",
-            false,
-            b"270115080001Z",
-        ),
+        leaf_cert: standard_cert_until(&leaf_xy, &inter_sk, b"inter", b"leaf", false, b"270115080001Z"),
     }
 }
 
@@ -221,20 +206,10 @@ fn process_nitro(
 }
 
 fn encode_sig_structure(protected: &[u8], payload: &[u8]) -> Vec<u8> {
-    cbor_array(&[
-        cbor_tstr("Signature1"),
-        cbor_bstr(protected),
-        cbor_bstr(b""),
-        cbor_bstr(payload),
-    ])
+    cbor_array(&[cbor_tstr("Signature1"), cbor_bstr(protected), cbor_bstr(b""), cbor_bstr(payload)])
 }
 
-fn nitro_document(
-    keys: &NitroKeys,
-    pcr0: [u8; 48],
-    user_data: [u8; 32],
-    nonce: [u8; 32],
-) -> Vec<u8> {
+fn nitro_document(keys: &NitroKeys, pcr0: [u8; 48], user_data: [u8; 32], nonce: [u8; 32]) -> Vec<u8> {
     let pcrs = cbor_map_int(&[
         (0, cbor_bstr(&pcr0)),
         (1, cbor_bstr(&[1u8; 48])),
@@ -261,26 +236,16 @@ fn nitro_document(
     let mut sig = [0u8; 96];
     sig.copy_from_slice(signature.to_bytes().as_slice());
     let mut doc = vec![0xd2];
-    doc.extend_from_slice(&cbor_array(&[
-        cbor_bstr(&protected),
-        vec![0xa0],
-        cbor_bstr(&payload),
-        cbor_bstr(&sig),
-    ]));
+    doc.extend_from_slice(&cbor_array(&[cbor_bstr(&protected), vec![0xa0], cbor_bstr(&payload), cbor_bstr(&sig)]));
     doc
 }
 
 fn verify_ix(mode: u8, nonce_slot: u64, action_hash: [u8; 32], document: &[u8]) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&VERIFY_NITRO_ATTESTATION_DISCRIMINATOR);
-    VerifyNitroAttestationArgs {
-        mode,
-        nonce_slot,
-        expected_action_hash: action_hash,
-        document: document.to_vec(),
-    }
-    .serialize(&mut data)
-    .unwrap();
+    VerifyNitroAttestationArgs { mode, nonce_slot, expected_action_hash: action_hash, document: document.to_vec() }
+        .serialize(&mut data)
+        .unwrap();
     data
 }
 
@@ -376,14 +341,8 @@ impl SyscallGuard {
     fn install(slot: u64, unix_timestamp: i64) -> Self {
         let lock = TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         registration_events::clear();
-        let prev = set_syscall_stubs(Box::new(ClockSyscallStub {
-            slot,
-            unix_timestamp,
-        }));
-        Self {
-            _lock: lock,
-            prev: Some(prev),
-        }
+        let prev = set_syscall_stubs(Box::new(ClockSyscallStub { slot, unix_timestamp }));
+        Self { _lock: lock, prev: Some(prev) }
     }
 }
 
@@ -395,11 +354,7 @@ impl Drop for SyscallGuard {
     }
 }
 
-fn system_program_account<'a>(
-    key: &'a Pubkey,
-    lamports: &'a mut u64,
-    data: &'a mut [u8],
-) -> AccountInfo<'a> {
+fn system_program_account<'a>(key: &'a Pubkey, lamports: &'a mut u64, data: &'a mut [u8]) -> AccountInfo<'a> {
     AccountInfo::new(key, false, false, lamports, data, key, false)
 }
 
@@ -418,15 +373,9 @@ fn nitro_registration_case(renewal: bool) {
     let authority_key = Pubkey::new_unique();
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid);
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
 
-    let mut registry_data = registry_bytes(
-        authority_key.to_bytes(),
-        UNRELATED_AMD_ARK,
-        registry_bump,
-        PCR0,
-    );
+    let mut registry_data = registry_bytes(authority_key.to_bytes(), UNRELATED_AMD_ARK, registry_bump, PCR0);
     let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
     let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
     let mut clock_data = clock_bytes(CURRENT_SLOT, UNIX_NOW);
@@ -444,51 +393,13 @@ fn nitro_registration_case(renewal: bool) {
     let clock_key = clock::ID;
     let sh_key = slot_hashes::ID;
 
-    let payer_acc = AccountInfo::new(
-        &payer_key,
-        true,
-        true,
-        &mut payer_lamports,
-        &mut payer_data,
-        &pid,
-        false,
-    );
-    let registry_acc = AccountInfo::new(
-        &registry_pda,
-        false,
-        false,
-        &mut reg_lamports,
-        &mut registry_data,
-        &pid,
-        false,
-    );
-    let signer_acc = AccountInfo::new(
-        &signer_pda,
-        false,
-        true,
-        &mut signer_lamports,
-        &mut signer_data,
-        &pid,
-        false,
-    );
-    let nonce_acc = AccountInfo::new(
-        &nonce_pda,
-        false,
-        true,
-        &mut nonce_lamports,
-        &mut nonce_data,
-        &pid,
-        false,
-    );
-    let sh_acc = AccountInfo::new(
-        &sh_key,
-        false,
-        false,
-        &mut sh_lamports,
-        &mut sh_data,
-        &solana_program::sysvar::ID,
-        false,
-    );
+    let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
+    let registry_acc =
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false);
+    let signer_acc = AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false);
+    let nonce_acc = AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false);
+    let sh_acc =
+        AccountInfo::new(&sh_key, false, false, &mut sh_lamports, &mut sh_data, &solana_program::sysvar::ID, false);
     let clock_acc = AccountInfo::new(
         &clock_key,
         false,
@@ -504,25 +415,9 @@ fn nitro_registration_case(renewal: bool) {
     let workload_key = Pubkey::new_from_array(USER_DATA);
     let mut workload_lamports = 1;
     let mut workload_data = [];
-    let workload_acc = AccountInfo::new(
-        &workload_key,
-        true,
-        false,
-        &mut workload_lamports,
-        &mut workload_data,
-        &pid,
-        false,
-    );
-    let mut accounts = vec![
-        payer_acc,
-        registry_acc,
-        signer_acc,
-        nonce_acc,
-        sh_acc,
-        clock_acc,
-        sys_acc,
-        workload_acc,
-    ];
+    let workload_acc =
+        AccountInfo::new(&workload_key, true, false, &mut workload_lamports, &mut workload_data, &pid, false);
+    let mut accounts = vec![payer_acc, registry_acc, signer_acc, nonce_acc, sh_acc, clock_acc, sys_acc, workload_acc];
     if renewal {
         let existing = AttestedSignerAccount::new(
             solana_confidential_compute_core::types::AttestedSigner {
@@ -536,9 +431,7 @@ fn nitro_registration_case(renewal: bool) {
             },
             Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid).1,
         );
-        existing
-            .serialize(&mut &mut accounts[2].try_borrow_mut_data().unwrap()[..])
-            .unwrap();
+        existing.serialize(&mut &mut accounts[2].try_borrow_mut_data().unwrap()[..]).unwrap();
     }
     let signer_before = accounts[2].try_borrow_data().unwrap().to_vec();
     let nonce_before = accounts[3].try_borrow_data().unwrap().to_vec();
@@ -548,10 +441,7 @@ fn nitro_registration_case(renewal: bool) {
         Err(solana_program::program_error::ProgramError::MissingRequiredSignature)
     );
     let workload = accounts.pop().unwrap();
-    assert_eq!(
-        process_nitro(&pid, &accounts, &ix),
-        Err(VerifierError::SignerMismatch.into())
-    );
+    assert_eq!(process_nitro(&pid, &accounts, &ix), Err(VerifierError::SignerMismatch.into()));
     assert_eq!(*accounts[2].try_borrow_data().unwrap(), signer_before);
     assert_eq!(*accounts[3].try_borrow_data().unwrap(), nonce_before);
     accounts.push(workload);
@@ -562,43 +452,18 @@ fn nitro_registration_case(renewal: bool) {
     let (_, inter_xy) = keypair(0x32);
     for (label, extensions, issuer_name) in [
         ("extensionless", vec![], cert_fixture::name(b"root")),
-        (
-            "non-CA",
-            cert_fixture::constraints(false, None, 128),
-            cert_fixture::name(b"root"),
-        ),
-        (
-            "no keyCertSign",
-            cert_fixture::constraints(true, None, 128),
-            cert_fixture::name(b"root"),
-        ),
-        (
-            "issuer mismatch",
-            cert_fixture::constraints(true, None, 4),
-            cert_fixture::name(b"wrong"),
-        ),
+        ("non-CA", cert_fixture::constraints(false, None, 128), cert_fixture::name(b"root")),
+        ("no keyCertSign", cert_fixture::constraints(true, None, 128), cert_fixture::name(b"root")),
+        ("issuer mismatch", cert_fixture::constraints(true, None, 4), cert_fixture::name(b"wrong")),
     ] {
         let mut malformed = nitro_keys();
-        malformed.inter_cert = cert_fixture::encode_cert(
-            &inter_xy,
-            &root_sk,
-            &issuer_name,
-            &cert_fixture::name(b"inter"),
-            &extensions,
-        );
+        malformed.inter_cert =
+            cert_fixture::encode_cert(&inter_xy, &root_sk, &issuer_name, &cert_fixture::name(b"inter"), &extensions);
         let bad_doc = nitro_document(&malformed, PCR0, USER_DATA, *SLOT_HASH);
         let bad_ix = verify_ix(VERIFY_NITRO_MODE_A, NONCE_SLOT, [0; 32], &bad_doc);
         assert!(process_nitro(&pid, &accounts, &bad_ix).is_err(), "{label}");
-        assert_eq!(
-            *accounts[2].try_borrow_data().unwrap(),
-            signer_before,
-            "{label}"
-        );
-        assert_eq!(
-            *accounts[3].try_borrow_data().unwrap(),
-            nonce_before,
-            "{label}"
-        );
+        assert_eq!(*accounts[2].try_borrow_data().unwrap(), signer_before, "{label}");
+        assert_eq!(*accounts[3].try_borrow_data().unwrap(), nonce_before, "{label}");
         registration_events::assert_empty();
     }
     let mut revoked = AttestedSignerAccount::new(
@@ -614,45 +479,26 @@ fn nitro_registration_case(renewal: bool) {
         Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid).1,
     );
     revoked.expires_unix_timestamp = 86_400;
-    revoked
-        .serialize(&mut &mut accounts[2].try_borrow_mut_data().unwrap()[..])
-        .unwrap();
-    assert_eq!(
-        process_nitro(&pid, &accounts, &ix),
-        Err(VerifierError::UnauthorizedPolicy.into())
-    );
-    assert_eq!(
-        AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap(),
-        revoked
-    );
+    revoked.serialize(&mut &mut accounts[2].try_borrow_mut_data().unwrap()[..]).unwrap();
+    assert_eq!(process_nitro(&pid, &accounts, &ix), Err(VerifierError::UnauthorizedPolicy.into()));
+    assert_eq!(AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap(), revoked);
     // Native harness does not provide transaction rollback of nonce writes.
-    accounts[3]
-        .try_borrow_mut_data()
-        .unwrap()
-        .copy_from_slice(&nonce_before);
-    accounts[2]
-        .try_borrow_mut_data()
-        .unwrap()
-        .copy_from_slice(&signer_before);
+    accounts[3].try_borrow_mut_data().unwrap().copy_from_slice(&nonce_before);
+    accounts[2].try_borrow_mut_data().unwrap().copy_from_slice(&signer_before);
     let res = process_nitro(&pid, &accounts, &ix);
     assert_eq!(res, Ok(()));
     registration_events::assert_event(b"register_signer", b"aws_nitro", &USER_DATA, &accounts[2]);
 
-    let saved =
-        AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap();
+    let saved = AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap();
     assert_eq!(saved.discriminator, ATTESTED_SIGNER_DISCRIMINATOR);
     assert_eq!(saved.record.signer_pubkey, USER_DATA);
     assert_eq!(saved.record.enclave_type, EnclaveType::AwsNitro);
     assert_eq!(saved.record.measurement.0, PCR0);
     assert_eq!(saved.record.registered_slot, CURRENT_SLOT);
     assert_eq!(saved.expires_unix_timestamp, UNIX_NOW + 1);
-    assert_eq!(
-        saved.record.expires_slot,
-        CURRENT_SLOT + ATTESTATION_TTL_SLOTS
-    );
+    assert_eq!(saved.record.expires_slot, CURRENT_SLOT + ATTESTATION_TTL_SLOTS);
 
-    let saved_nonce =
-        UsedNonceAccount::try_from_slice(&accounts[3].try_borrow_data().unwrap()).unwrap();
+    let saved_nonce = UsedNonceAccount::try_from_slice(&accounts[3].try_borrow_data().unwrap()).unwrap();
     assert_eq!(saved_nonce.discriminator, USED_NONCE_DISCRIMINATOR);
     assert_eq!(saved_nonce.slot, CURRENT_SLOT);
 
@@ -670,15 +516,9 @@ fn test_verify_nitro_rejects_unknown_pcr0() {
     let authority_key = Pubkey::new_unique();
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid);
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
 
-    let mut registry_data = registry_bytes(
-        authority_key.to_bytes(),
-        UNRELATED_AMD_ARK,
-        registry_bump,
-        PCR0,
-    );
+    let mut registry_data = registry_bytes(authority_key.to_bytes(), UNRELATED_AMD_ARK, registry_bump, PCR0);
     let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
     let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
     let mut clock_data = clock_bytes(CURRENT_SLOT, UNIX_NOW);
@@ -698,51 +538,13 @@ fn test_verify_nitro_rejects_unknown_pcr0() {
 
     // Unknown PCR0 (non-zero but not allowlisted).
     let unknown = nitro_document(&keys, [0x77u8; 48], USER_DATA, *SLOT_HASH);
-    let payer_acc = AccountInfo::new(
-        &payer_key,
-        true,
-        true,
-        &mut payer_lamports,
-        &mut payer_data,
-        &pid,
-        false,
-    );
-    let registry_acc = AccountInfo::new(
-        &registry_pda,
-        false,
-        false,
-        &mut reg_lamports,
-        &mut registry_data,
-        &pid,
-        false,
-    );
-    let signer_acc = AccountInfo::new(
-        &signer_pda,
-        false,
-        true,
-        &mut signer_lamports,
-        &mut signer_data,
-        &pid,
-        false,
-    );
-    let nonce_acc = AccountInfo::new(
-        &nonce_pda,
-        false,
-        true,
-        &mut nonce_lamports,
-        &mut nonce_data,
-        &pid,
-        false,
-    );
-    let sh_acc = AccountInfo::new(
-        &sh_key,
-        false,
-        false,
-        &mut sh_lamports,
-        &mut sh_data,
-        &solana_program::sysvar::ID,
-        false,
-    );
+    let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
+    let registry_acc =
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false);
+    let signer_acc = AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false);
+    let nonce_acc = AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false);
+    let sh_acc =
+        AccountInfo::new(&sh_key, false, false, &mut sh_lamports, &mut sh_data, &solana_program::sysvar::ID, false);
     let clock_acc = AccountInfo::new(
         &clock_key,
         false,
@@ -754,19 +556,7 @@ fn test_verify_nitro_rejects_unknown_pcr0() {
     );
     let sys_acc = system_program_account(&sys_key, &mut sys_lamports, &mut sys_data);
     let ix = verify_ix(VERIFY_NITRO_MODE_A, NONCE_SLOT, [0u8; 32], &unknown);
-    let res = process_nitro(
-        &pid,
-        &[
-            payer_acc,
-            registry_acc,
-            signer_acc,
-            nonce_acc,
-            sh_acc,
-            clock_acc,
-            sys_acc,
-        ],
-        &ix,
-    );
+    let res = process_nitro(&pid, &[payer_acc, registry_acc, signer_acc, nonce_acc, sh_acc, clock_acc, sys_acc], &ix);
     assert_eq!(res, Err(VerifierError::DisallowedMeasurement.into()));
     registration_events::assert_empty();
 }
@@ -781,15 +571,9 @@ fn test_verify_nitro_rejects_stale_nonce() {
     let authority_key = Pubkey::new_unique();
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid);
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
 
-    let mut registry_data = registry_bytes(
-        authority_key.to_bytes(),
-        UNRELATED_AMD_ARK,
-        registry_bump,
-        PCR0,
-    );
+    let mut registry_data = registry_bytes(authority_key.to_bytes(), UNRELATED_AMD_ARK, registry_bump, PCR0);
     let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
     let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
     let mut clock_data = clock_bytes(CURRENT_SLOT, UNIX_NOW);
@@ -807,51 +591,13 @@ fn test_verify_nitro_rejects_stale_nonce() {
     let clock_key = clock::ID;
     let sh_key = slot_hashes::ID;
 
-    let payer_acc = AccountInfo::new(
-        &payer_key,
-        true,
-        true,
-        &mut payer_lamports,
-        &mut payer_data,
-        &pid,
-        false,
-    );
-    let registry_acc = AccountInfo::new(
-        &registry_pda,
-        false,
-        false,
-        &mut reg_lamports,
-        &mut registry_data,
-        &pid,
-        false,
-    );
-    let signer_acc = AccountInfo::new(
-        &signer_pda,
-        false,
-        true,
-        &mut signer_lamports,
-        &mut signer_data,
-        &pid,
-        false,
-    );
-    let nonce_acc = AccountInfo::new(
-        &nonce_pda,
-        false,
-        true,
-        &mut nonce_lamports,
-        &mut nonce_data,
-        &pid,
-        false,
-    );
-    let sh_acc = AccountInfo::new(
-        &sh_key,
-        false,
-        false,
-        &mut sh_lamports,
-        &mut sh_data,
-        &solana_program::sysvar::ID,
-        false,
-    );
+    let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
+    let registry_acc =
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false);
+    let signer_acc = AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false);
+    let nonce_acc = AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false);
+    let sh_acc =
+        AccountInfo::new(&sh_key, false, false, &mut sh_lamports, &mut sh_data, &solana_program::sysvar::ID, false);
     let clock_acc = AccountInfo::new(
         &clock_key,
         false,
@@ -865,19 +611,7 @@ fn test_verify_nitro_rejects_stale_nonce() {
 
     let stale_slot = CURRENT_SLOT - 151;
     let ix = verify_ix(VERIFY_NITRO_MODE_A, stale_slot, [0u8; 32], &doc);
-    let res = process_nitro(
-        &pid,
-        &[
-            payer_acc,
-            registry_acc,
-            signer_acc,
-            nonce_acc,
-            sh_acc,
-            clock_acc,
-            sys_acc,
-        ],
-        &ix,
-    );
+    let res = process_nitro(&pid, &[payer_acc, registry_acc, signer_acc, nonce_acc, sh_acc, clock_acc, sys_acc], &ix);
     assert_eq!(res, Err(VerifierError::StaleNonce.into()));
     registration_events::assert_empty();
 }
@@ -890,26 +624,16 @@ fn test_verify_nitro_mode_b_commitment_and_replay() {
     let payer_key = Pubkey::new_unique();
     let authority_key = Pubkey::new_unique();
     let consumer = Pubkey::new_unique();
-    let action_hash = solana_confidential_compute_core::action::hash_action_parts(
-        &[],
-        0,
-        core::iter::empty(),
-        &[0u8; 8],
-    );
+    let action_hash =
+        solana_confidential_compute_core::action::hash_action_parts(&[], 0, core::iter::empty(), &[0u8; 8]);
     let commitment = compute_action_commitment(&SLOT_HASH, &action_hash, &consumer.to_bytes());
     let doc = nitro_document(&keys, PCR0, USER_DATA, commitment);
 
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid);
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &commitment], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &commitment], &pid);
 
-    let mut registry_data = registry_bytes(
-        authority_key.to_bytes(),
-        UNRELATED_AMD_ARK,
-        registry_bump,
-        PCR0,
-    );
+    let mut registry_data = registry_bytes(authority_key.to_bytes(), UNRELATED_AMD_ARK, registry_bump, PCR0);
     let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
     let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
     let mut clock_data = clock_bytes(CURRENT_SLOT, UNIX_NOW);
@@ -931,51 +655,13 @@ fn test_verify_nitro_mode_b_commitment_and_replay() {
     let sh_key = slot_hashes::ID;
     let ix_key = instructions::ID;
 
-    let payer_acc = AccountInfo::new(
-        &payer_key,
-        true,
-        true,
-        &mut payer_lamports,
-        &mut payer_data,
-        &pid,
-        false,
-    );
-    let registry_acc = AccountInfo::new(
-        &registry_pda,
-        false,
-        false,
-        &mut reg_lamports,
-        &mut registry_data,
-        &pid,
-        false,
-    );
-    let signer_acc = AccountInfo::new(
-        &signer_pda,
-        false,
-        true,
-        &mut signer_lamports,
-        &mut signer_data,
-        &pid,
-        false,
-    );
-    let nonce_acc = AccountInfo::new(
-        &nonce_pda,
-        false,
-        true,
-        &mut nonce_lamports,
-        &mut nonce_data,
-        &pid,
-        false,
-    );
-    let sh_acc = AccountInfo::new(
-        &sh_key,
-        false,
-        false,
-        &mut sh_lamports,
-        &mut sh_data,
-        &solana_program::sysvar::ID,
-        false,
-    );
+    let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
+    let registry_acc =
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false);
+    let signer_acc = AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false);
+    let nonce_acc = AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false);
+    let sh_acc =
+        AccountInfo::new(&sh_key, false, false, &mut sh_lamports, &mut sh_data, &solana_program::sysvar::ID, false);
     let clock_acc = AccountInfo::new(
         &clock_key,
         false,
@@ -986,58 +672,24 @@ fn test_verify_nitro_mode_b_commitment_and_replay() {
         false,
     );
     let sys_acc = system_program_account(&sys_key, &mut sys_lamports, &mut sys_data);
-    let ix_acc = AccountInfo::new(
-        &ix_key,
-        false,
-        false,
-        &mut ix_lamports,
-        &mut ixs_data,
-        &ix_key,
-        false,
-    );
+    let ix_acc = AccountInfo::new(&ix_key, false, false, &mut ix_lamports, &mut ixs_data, &ix_key, false);
 
-    let accounts = vec![
-        payer_acc,
-        registry_acc,
-        signer_acc,
-        nonce_acc,
-        sh_acc,
-        clock_acc,
-        sys_acc,
-        ix_acc,
-    ];
+    let accounts = vec![payer_acc, registry_acc, signer_acc, nonce_acc, sh_acc, clock_acc, sys_acc, ix_acc];
     // Same-program instruction substitution must fail before nonce writes.
-    let sysvar = accounts
-        .iter()
-        .find(|a| a.key == &instructions::ID)
-        .unwrap();
+    let sysvar = accounts.iter().find(|a| a.key == &instructions::ID).unwrap();
     let original_sysvar = sysvar.try_borrow_data().unwrap().to_vec();
     let mut substituted = [0u8; 8];
     substituted[0] ^= 1;
     let changed = serialize_instructions(&[(pid, &ix), (consumer, &substituted)], 0);
-    sysvar
-        .try_borrow_mut_data()
-        .unwrap()
-        .copy_from_slice(&changed);
-    assert_eq!(
-        process_nitro(&pid, &accounts, &ix),
-        Err(VerifierError::ActionHashMismatch.into())
-    );
-    assert!(accounts[3]
-        .try_borrow_data()
-        .unwrap()
-        .iter()
-        .all(|b| *b == 0));
-    sysvar
-        .try_borrow_mut_data()
-        .unwrap()
-        .copy_from_slice(&original_sysvar);
+    sysvar.try_borrow_mut_data().unwrap().copy_from_slice(&changed);
+    assert_eq!(process_nitro(&pid, &accounts, &ix), Err(VerifierError::ActionHashMismatch.into()));
+    assert!(accounts[3].try_borrow_data().unwrap().iter().all(|b| *b == 0));
+    sysvar.try_borrow_mut_data().unwrap().copy_from_slice(&original_sysvar);
 
     let res = process_nitro(&pid, &accounts, &ix);
     assert_eq!(res, Ok(()));
 
-    let saved_nonce =
-        UsedNonceAccount::try_from_slice(&accounts[3].try_borrow_data().unwrap()).unwrap();
+    let saved_nonce = UsedNonceAccount::try_from_slice(&accounts[3].try_borrow_data().unwrap()).unwrap();
     assert_eq!(saved_nonce.discriminator, USED_NONCE_DISCRIMINATOR);
 
     let replay = process_nitro(&pid, &accounts, &ix);
@@ -1052,26 +704,16 @@ fn test_verify_nitro_mode_b_rejects_action_hash_mismatch() {
     let payer_key = Pubkey::new_unique();
     let authority_key = Pubkey::new_unique();
     let consumer = Pubkey::new_unique();
-    let action_hash = solana_confidential_compute_core::action::hash_action_parts(
-        &[],
-        0,
-        core::iter::empty(),
-        &[0u8; 8],
-    );
+    let action_hash =
+        solana_confidential_compute_core::action::hash_action_parts(&[], 0, core::iter::empty(), &[0u8; 8]);
     let commitment = compute_action_commitment(&SLOT_HASH, &action_hash, &consumer.to_bytes());
     let doc = nitro_document(&keys, PCR0, USER_DATA, commitment);
 
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid);
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &commitment], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &commitment], &pid);
 
-    let mut registry_data = registry_bytes(
-        authority_key.to_bytes(),
-        UNRELATED_AMD_ARK,
-        registry_bump,
-        PCR0,
-    );
+    let mut registry_data = registry_bytes(authority_key.to_bytes(), UNRELATED_AMD_ARK, registry_bump, PCR0);
     let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
     let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
     let mut clock_data = clock_bytes(CURRENT_SLOT, UNIX_NOW);
@@ -1095,51 +737,11 @@ fn test_verify_nitro_mode_b_rejects_action_hash_mismatch() {
     let ix_key = instructions::ID;
 
     let accounts = vec![
-        AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut payer_lamports,
-            &mut payer_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &registry_pda,
-            false,
-            false,
-            &mut reg_lamports,
-            &mut registry_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &signer_pda,
-            false,
-            true,
-            &mut signer_lamports,
-            &mut signer_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &nonce_pda,
-            false,
-            true,
-            &mut nonce_lamports,
-            &mut nonce_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &sh_key,
-            false,
-            false,
-            &mut sh_lamports,
-            &mut sh_data,
-            &solana_program::sysvar::ID,
-            false,
-        ),
+        AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false),
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false),
+        AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false),
+        AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false),
+        AccountInfo::new(&sh_key, false, false, &mut sh_lamports, &mut sh_data, &solana_program::sysvar::ID, false),
         AccountInfo::new(
             &clock_key,
             false,
@@ -1150,15 +752,7 @@ fn test_verify_nitro_mode_b_rejects_action_hash_mismatch() {
             false,
         ),
         system_program_account(&sys_key, &mut sys_lamports, &mut sys_data),
-        AccountInfo::new(
-            &ix_key,
-            false,
-            false,
-            &mut ix_lamports,
-            &mut ixs_data,
-            &ix_key,
-            false,
-        ),
+        AccountInfo::new(&ix_key, false, false, &mut ix_lamports, &mut ixs_data, &ix_key, false),
     ];
     let res = process_nitro(&pid, &accounts, &ix);
     assert_eq!(res, Err(VerifierError::ActionHashMismatch.into()));
@@ -1174,15 +768,9 @@ fn test_verify_nitro_rejects_trailing_wire_bytes() {
     let authority_key = Pubkey::new_unique();
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid);
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
 
-    let mut registry_data = registry_bytes(
-        authority_key.to_bytes(),
-        UNRELATED_AMD_ARK,
-        registry_bump,
-        PCR0,
-    );
+    let mut registry_data = registry_bytes(authority_key.to_bytes(), UNRELATED_AMD_ARK, registry_bump, PCR0);
     let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
     let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
     let mut clock_data = clock_bytes(CURRENT_SLOT, UNIX_NOW);
@@ -1201,51 +789,11 @@ fn test_verify_nitro_rejects_trailing_wire_bytes() {
     let sh_key = slot_hashes::ID;
 
     let accounts = vec![
-        AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut payer_lamports,
-            &mut payer_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &registry_pda,
-            false,
-            false,
-            &mut reg_lamports,
-            &mut registry_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &signer_pda,
-            false,
-            true,
-            &mut signer_lamports,
-            &mut signer_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &nonce_pda,
-            false,
-            true,
-            &mut nonce_lamports,
-            &mut nonce_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &sh_key,
-            false,
-            false,
-            &mut sh_lamports,
-            &mut sh_data,
-            &solana_program::sysvar::ID,
-            false,
-        ),
+        AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false),
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false),
+        AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false),
+        AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false),
+        AccountInfo::new(&sh_key, false, false, &mut sh_lamports, &mut sh_data, &solana_program::sysvar::ID, false),
         AccountInfo::new(
             &clock_key,
             false,
@@ -1276,11 +824,9 @@ fn test_verify_nitro_rejects_untrusted_root_ca() {
     let authority_key = Pubkey::new_unique();
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let (signer_pda, _) = Pubkey::find_program_address(&[b"attested_signer_v2", &USER_DATA], &pid);
-    let (nonce_pda, _) =
-        Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
+    let (nonce_pda, _) = Pubkey::find_program_address(&[b"nonce", &[2], &USER_DATA, &*SLOT_HASH], &pid);
 
-    let mut registry_data =
-        registry_bytes(authority_key.to_bytes(), keys.root_xy, registry_bump, PCR0);
+    let mut registry_data = registry_bytes(authority_key.to_bytes(), keys.root_xy, registry_bump, PCR0);
     let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
     let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
     let mut clock_data = clock_bytes(CURRENT_SLOT, UNIX_NOW);
@@ -1299,51 +845,11 @@ fn test_verify_nitro_rejects_untrusted_root_ca() {
     let sh_key = slot_hashes::ID;
 
     let accounts = vec![
-        AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut payer_lamports,
-            &mut payer_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &registry_pda,
-            false,
-            false,
-            &mut reg_lamports,
-            &mut registry_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &signer_pda,
-            false,
-            true,
-            &mut signer_lamports,
-            &mut signer_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &nonce_pda,
-            false,
-            true,
-            &mut nonce_lamports,
-            &mut nonce_data,
-            &pid,
-            false,
-        ),
-        AccountInfo::new(
-            &sh_key,
-            false,
-            false,
-            &mut sh_lamports,
-            &mut sh_data,
-            &solana_program::sysvar::ID,
-            false,
-        ),
+        AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false),
+        AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false),
+        AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false),
+        AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false),
+        AccountInfo::new(&sh_key, false, false, &mut sh_lamports, &mut sh_data, &solana_program::sysvar::ID, false),
         AccountInfo::new(
             &clock_key,
             false,

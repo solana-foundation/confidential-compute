@@ -19,8 +19,7 @@ async fn identity_revoke_is_proactive_rent_funded_and_validates_all_metas() {
     let identity = [9; 32];
     let tcb = 7u64;
     let (registry, bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
-    let (cache, _) =
-        Pubkey::find_program_address(&[VcekAccount::SEED, &identity, &tcb.to_le_bytes()], &pid);
+    let (cache, _) = Pubkey::find_program_address(&[VcekAccount::SEED, &identity, &tcb.to_le_bytes()], &pid);
     let (deny, db) = Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, &identity], &pid);
     let mut test = sbf::verifier_program_test(pid);
     let reg = PolicyRegistry {
@@ -37,28 +36,11 @@ async fn identity_revoke_is_proactive_rent_funded_and_validates_all_metas() {
     };
     test.add_account(
         registry,
-        Account {
-            lamports: 10_000_000,
-            data: borsh::to_vec(&reg).unwrap(),
-            owner: pid,
-            ..Account::default()
-        },
+        Account { lamports: 10_000_000, data: borsh::to_vec(&reg).unwrap(), owner: pid, ..Account::default() },
     );
-    test.add_account(
-        authority.pubkey(),
-        Account {
-            lamports: 10_000_000,
-            ..Account::default()
-        },
-    );
+    test.add_account(authority.pubkey(), Account { lamports: 10_000_000, ..Account::default() });
     // A prefunded system-owned PDA must still be allocated, assigned and topped up.
-    test.add_account(
-        deny,
-        Account {
-            lamports: 1,
-            ..Account::default()
-        },
-    );
+    test.add_account(deny, Account { lamports: 1, ..Account::default() });
     let ctx = test.start_with_context().await;
     let mut data = REVOKE_VCEK_DISCRIMINATOR.to_vec();
     data.extend(identity);
@@ -94,21 +76,9 @@ async fn identity_revoke_is_proactive_rent_funded_and_validates_all_metas() {
                 bad.accounts.truncate(3);
             }
         }
-        let signers: Vec<&dyn Signer> = if case == 0 {
-            vec![&ctx.payer]
-        } else {
-            vec![&ctx.payer, &authority]
-        };
-        let tx = Transaction::new_signed_with_payer(
-            &[bad],
-            Some(&ctx.payer.pubkey()),
-            &signers,
-            ctx.last_blockhash,
-        );
-        assert!(
-            ctx.banks_client.process_transaction(tx).await.is_err(),
-            "case {case}"
-        );
+        let signers: Vec<&dyn Signer> = if case == 0 { vec![&ctx.payer] } else { vec![&ctx.payer, &authority] };
+        let tx = Transaction::new_signed_with_payer(&[bad], Some(&ctx.payer.pubkey()), &signers, ctx.last_blockhash);
+        assert!(ctx.banks_client.process_transaction(tx).await.is_err(), "case {case}");
         let state = ctx.banks_client.get_account(deny).await.unwrap().unwrap();
         assert_eq!(state.owner, solana_sdk_ids::system_program::ID);
         assert!(state.data.is_empty());
@@ -124,22 +94,10 @@ async fn identity_revoke_is_proactive_rent_funded_and_validates_all_metas() {
     let state = ctx.banks_client.get_account(deny).await.unwrap().unwrap();
     assert_eq!(state.owner, pid);
     assert_eq!(state.data.len(), AmdIdentityRevocation::SIZE);
-    assert!(
-        state.lamports
-            >= ctx
-                .banks_client
-                .get_rent()
-                .await
-                .unwrap()
-                .minimum_balance(state.data.len())
-    );
+    assert!(state.lamports >= ctx.banks_client.get_rent().await.unwrap().minimum_balance(state.data.len()));
     assert_eq!(
         AmdIdentityRevocation::try_from_slice(&state.data).unwrap(),
-        AmdIdentityRevocation {
-            discriminator: AmdIdentityRevocation::DISCRIMINATOR,
-            identity,
-            bump: db
-        }
+        AmdIdentityRevocation { discriminator: AmdIdentityRevocation::DISCRIMINATOR, identity, bump: db }
     );
     assert!(ctx.banks_client.get_account(cache).await.unwrap().is_none());
     // Idempotent repeat targets a different, never registered TCB with the same identity.
@@ -154,15 +112,7 @@ async fn identity_revoke_is_proactive_rent_funded_and_validates_all_metas() {
         ctx.last_blockhash,
     );
     ctx.banks_client.process_transaction(tx).await.unwrap();
-    assert_eq!(
-        ctx.banks_client
-            .get_account(deny)
-            .await
-            .unwrap()
-            .unwrap()
-            .data,
-        state.data
-    );
+    assert_eq!(ctx.banks_client.get_account(deny).await.unwrap().unwrap().data, state.data);
 }
 
 #[test]
@@ -176,8 +126,7 @@ fn existing_cache_revoke_checks_identity_owner_payer_signature_and_writability()
     let identity = [8; 32];
     let tcb = 7u64;
     let (rk, rb) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
-    let (ck, cb) =
-        Pubkey::find_program_address(&[VcekAccount::SEED, &identity, &tcb.to_le_bytes()], &pid);
+    let (ck, cb) = Pubkey::find_program_address(&[VcekAccount::SEED, &identity, &tcb.to_le_bytes()], &pid);
     let (dk, db) = Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, &identity], &pid);
     let mut ix = REVOKE_VCEK_DISCRIMINATOR.to_vec();
     ix.extend(identity);
@@ -199,9 +148,7 @@ fn existing_cache_revoke_checks_identity_owner_payer_signature_and_writability()
             bump: rb,
         })
         .unwrap();
-        let mut cd =
-            borsh::to_vec(&VcekAccount::new(identity, tcb, [2; 96], 0, cb).with_validity(100))
-                .unwrap();
+        let mut cd = borsh::to_vec(&VcekAccount::new(identity, tcb, [2; 96], 0, cb).with_validity(100)).unwrap();
         let mut dd = borsh::to_vec(&AmdIdentityRevocation {
             discriminator: AmdIdentityRevocation::DISCRIMINATOR,
             identity,
@@ -235,11 +182,7 @@ fn existing_cache_revoke_checks_identity_owner_payer_signature_and_writability()
         let result = Processor::process(&pid, &accounts, &ix);
         if case == 8 {
             assert_eq!(result, Ok(()));
-            assert!(
-                VcekAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap())
-                    .unwrap()
-                    .is_revoked
-            );
+            assert!(VcekAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap().is_revoked);
         } else {
             assert!(result.is_err(), "case {case}");
             if case == 0 {

@@ -57,17 +57,11 @@ mod feature_security_tests {
         let key = [0; 96];
         let digest = [0; 48];
         let signature = [0; 96];
-        assert!(MockVerifier::succeeding()
-            .verify_p384(&key, &digest, &signature, None)
-            .is_ok());
-        assert!(DirectCryptoVerifier
-            .verify_p384(&key, &digest, &signature, None)
-            .is_err());
+        assert!(MockVerifier::succeeding().verify_p384(&key, &digest, &signature, None).is_ok());
+        assert!(DirectCryptoVerifier.verify_p384(&key, &digest, &signature, None).is_err());
         // Only an explicit mock-crypto feature may select the native test double.
         assert_eq!(
-            DefaultVerifier::default()
-                .verify_p384(&key, &digest, &signature, None)
-                .is_ok(),
+            DefaultVerifier::default().verify_p384(&key, &digest, &signature, None).is_ok(),
             cfg!(feature = "mock-crypto")
         );
     }

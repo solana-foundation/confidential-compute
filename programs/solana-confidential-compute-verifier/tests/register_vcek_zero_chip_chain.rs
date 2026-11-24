@@ -66,10 +66,8 @@ async fn register_vcek_rejects_synthetic_zero_chip_chain() {
     let vcek_cert = encode_vcek_with_identity(&vcek_xy, &ask_sk, &zero_chip_id, tcb_version);
 
     let chip_id_hash = hashv(&[&vcek_xy]).to_bytes();
-    let (vcek_pda, _bump) = Pubkey::find_program_address(
-        &[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()],
-        &pid,
-    );
+    let (vcek_pda, _bump) =
+        Pubkey::find_program_address(&[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()], &pid);
     let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
 
     let registry = PolicyRegistry {
@@ -87,21 +85,12 @@ async fn register_vcek_rejects_synthetic_zero_chip_chain() {
     let mut registry_data = vec![0u8; PolicyRegistry::SIZE];
     registry.serialize(&mut &mut registry_data[..]).unwrap();
 
-    let funded = |owner: Pubkey, data: Vec<u8>| Account {
-        lamports: 100_000_000,
-        owner,
-        data,
-        ..Account::default()
-    };
+    let funded = |owner: Pubkey, data: Vec<u8>| Account { lamports: 100_000_000, owner, data, ..Account::default() };
     let mut pt = sbf::verifier_program_test(pid);
     pt.add_account(registry_pda, funded(pid, registry_data));
     pt.add_account(vcek_pda, funded(pid, vec![0u8; VcekAccount::SIZE]));
     let mut ctx = pt.start_with_context().await;
-    ctx.set_sysvar(&Clock {
-        slot: SLOT,
-        unix_timestamp: UNIX,
-        ..Clock::default()
-    });
+    ctx.set_sysvar(&Clock { slot: SLOT, unix_timestamp: UNIX, ..Clock::default() });
 
     let pack = |chip_id: [u8; 64], tcb: u64, vcek: &[u8]| -> Vec<u8> {
         let mut ix_data = Vec::new();
@@ -129,36 +118,18 @@ async fn register_vcek_rejects_synthetic_zero_chip_chain() {
 
     for (label, data) in [
         // Leaf without the AMD identity extensions.
-        (
-            "missing identity",
-            pack(zero_chip_id, tcb_version, &vcek_cert_bare),
-        ),
+        ("missing identity", pack(zero_chip_id, tcb_version, &vcek_cert_bare)),
         ("tcb mismatch", pack(zero_chip_id, 99, &vcek_cert)),
         ("chip mismatch", pack([0xABu8; 64], tcb_version, &vcek_cert)),
         // The namesake: identity extensions and PDA seed both agree.
-        (
-            "synthetic zero-chip chain",
-            pack(zero_chip_id, tcb_version, &vcek_cert),
-        ),
+        ("synthetic zero-chip chain", pack(zero_chip_id, tcb_version, &vcek_cert)),
     ] {
         let err = send(&mut ctx, pid, accounts.clone(), data).await;
-        assert_eq!(
-            err,
-            InstructionError::Custom(VerifierError::VerificationFailed as u32),
-            "{label}"
-        );
+        assert_eq!(err, InstructionError::Custom(VerifierError::VerificationFailed as u32), "{label}");
     }
 
     // No partial write to the preallocated cache.
-    assert!(ctx
-        .banks_client
-        .get_account(vcek_pda)
-        .await
-        .unwrap()
-        .unwrap()
-        .data
-        .iter()
-        .all(|b| *b == 0));
+    assert!(ctx.banks_client.get_account(vcek_pda).await.unwrap().unwrap().data.iter().all(|b| *b == 0));
 }
 
 /// Sends one registration and returns its `InstructionError`, asserting the
@@ -171,14 +142,7 @@ async fn send(
 ) -> InstructionError {
     ctx.last_blockhash = ctx.get_new_latest_blockhash().await.unwrap();
     let tx = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(BUDGET),
-            Instruction {
-                program_id: pid,
-                accounts,
-                data,
-            },
-        ],
+        &[ComputeBudgetInstruction::set_compute_unit_limit(BUDGET), Instruction { program_id: pid, accounts, data }],
         Some(&ctx.payer.pubkey()),
         &[&ctx.payer],
         ctx.last_blockhash,
@@ -188,16 +152,9 @@ async fn send(
         .meta()
         .size;
     assert!(size <= 1232, "transaction is {size} bytes");
-    let result = ctx
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .unwrap();
+    let result = ctx.banks_client.process_transaction_with_metadata(tx).await.unwrap();
     let logs = result.metadata.map(|m| m.log_messages).unwrap_or_default();
-    assert!(
-        !logs.iter().any(|l| l.starts_with("Program data:")),
-        "failed call emitted a registration event: {logs:?}"
-    );
+    assert!(!logs.iter().any(|l| l.starts_with("Program data:")), "failed call emitted a registration event: {logs:?}");
     match result.result.unwrap_err() {
         TransactionError::InstructionError(_, e) => e,
         other => panic!("unexpected transaction error: {other:?}"),

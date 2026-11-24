@@ -19,9 +19,7 @@ pub async fn request_for_submission(
     slot_hash: &[u8; 32],
 ) -> Result<AttestationReport, SidecarError> {
     if dry_run && provider.enclave_type() == EnclaveType::GcpConfidentialSpace {
-        return MockAttestationProvider::new_gcp(None)
-            .request_attestation(workload, slot_hash)
-            .await;
+        return MockAttestationProvider::new_gcp(None).request_attestation(workload, slot_hash).await;
     }
     provider.request_attestation(workload, slot_hash).await
 }

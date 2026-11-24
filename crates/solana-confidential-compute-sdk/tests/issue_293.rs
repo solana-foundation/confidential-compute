@@ -31,9 +31,7 @@
 #![cfg(feature = "test-utils")]
 use p384::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey};
 use sha2::{Digest, Sha384};
-use solana_confidential_compute_sdk::{
-    internal::build_verify_atomic_with_nonce_ix_oversized, SNP_REPORT_SIZE,
-};
+use solana_confidential_compute_sdk::{internal::build_verify_atomic_with_nonce_ix_oversized, SNP_REPORT_SIZE};
 use solana_confidential_compute_verifier::state::{
     BackendPolicy, PolicyRegistry, UsedNonceAccount, VcekAccount, POLICY_REGISTRY_DISCRIMINATOR,
     VCEK_ACCOUNT_DISCRIMINATOR,
@@ -41,8 +39,8 @@ use solana_confidential_compute_verifier::state::{
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult};
 use solana_program_test::processor;
 use solana_sdk::{
-    account::Account, clock::Clock, hash::hash, instruction::Instruction, pubkey::Pubkey,
-    signature::Signer, slot_hashes::SlotHashes, transaction::Transaction,
+    account::Account, clock::Clock, hash::hash, instruction::Instruction, pubkey::Pubkey, signature::Signer,
+    slot_hashes::SlotHashes, transaction::Transaction,
 };
 
 #[path = "support/sbf.rs"]
@@ -61,15 +59,11 @@ fn sigverify(_: &Pubkey, _: &[AccountInfo], _: &[u8]) -> ProgramResult {
 /// `target_os = "solana"`, so the host build re-states the literal: ASCII
 /// "SECP384R1SIGVERIFY", zero padded.
 const SIGVERIFY_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
-    0x53, 0x45, 0x43, 0x50, 0x33, 0x38, 0x34, 0x52, 0x31, 0x53, 0x49, 0x47, 0x56, 0x45, 0x52, 0x49,
-    0x46, 0x59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0x53, 0x45, 0x43, 0x50, 0x33, 0x38, 0x34, 0x52, 0x31, 0x53, 0x49, 0x47, 0x56, 0x45, 0x52, 0x49, 0x46, 0x59, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ]);
 /// `pubkey (96) || digest (48) || signature (96)`.
-fn sigverify_ix(
-    public_key_xy: &[u8; 96],
-    digest: &[u8; 48],
-    signature_rs: &[u8; 96],
-) -> Instruction {
+fn sigverify_ix(public_key_xy: &[u8; 96], digest: &[u8; 48], signature_rs: &[u8; 96]) -> Instruction {
     let mut data = Vec::with_capacity(240);
     data.extend_from_slice(public_key_xy);
     data.extend_from_slice(digest);
@@ -77,13 +71,7 @@ fn sigverify_ix(
     Instruction::new_with_bytes(SIGVERIFY_PROGRAM_ID, &data, vec![])
 }
 fn account(data: Vec<u8>, owner: Pubkey) -> Account {
-    Account {
-        lamports: 100_000_000,
-        data,
-        owner,
-        executable: false,
-        rent_epoch: 0,
-    }
+    Account { lamports: 100_000_000, data, owner, executable: false, rent_epoch: 0 }
 }
 #[tokio::test]
 async fn sdk_amd_mode_b_supplies_instructions_sysvar_and_consumes_nonce() {
@@ -99,8 +87,7 @@ async fn sdk_amd_mode_b_supplies_instructions_sysvar_and_consumes_nonce() {
     let consumer_ix = Instruction::new_with_bytes(consumer_id, &[], vec![]);
     let action_hash = solana_confidential_compute_core::action::hash_instruction(&consumer_ix);
     let identity = hash(&[9; 64]).to_bytes();
-    let (vcek, vb) =
-        Pubkey::find_program_address(&[b"vcek_v2", &identity, &0u64.to_le_bytes()], &pid);
+    let (vcek, vb) = Pubkey::find_program_address(&[b"vcek_v2", &identity, &0u64.to_le_bytes()], &pid);
     let mut cache = vec![0; VcekAccount::SIZE];
     cache[..8].copy_from_slice(&VCEK_ACCOUNT_DISCRIMINATOR);
     cache[8..40].copy_from_slice(&identity);
@@ -108,14 +95,12 @@ async fn sdk_amd_mode_b_supplies_instructions_sysvar_and_consumes_nonce() {
     cache[VcekAccount::BUMP_OFFSET] = vb;
     cache[VcekAccount::TRUST_PROFILE_OFFSET..VcekAccount::VALID_UNTIL_OFFSET]
         .copy_from_slice(&VcekAccount::MILAN_TRUST_PROFILE);
-    cache[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::REVOKED_OFFSET]
-        .copy_from_slice(&u64::MAX.to_le_bytes());
+    cache[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::REVOKED_OFFSET].copy_from_slice(&u64::MAX.to_le_bytes());
     let (registry, rb) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let mut policy = vec![0; PolicyRegistry::SIZE];
     policy[..8].copy_from_slice(&POLICY_REGISTRY_DISCRIMINATOR);
     policy[PolicyRegistry::BUMP_OFFSET] = rb;
-    let (backend, bb) =
-        solana_confidential_compute_sdk::derive_backend_policy_pda(&pid, 1).unwrap();
+    let (backend, bb) = solana_confidential_compute_sdk::derive_backend_policy_pda(&pid, 1).unwrap();
     let mut backend_data = vec![0; BackendPolicy::SIZE];
     backend_data[..8].copy_from_slice(&BackendPolicy::DISCRIMINATOR);
     backend_data[8] = 1;
@@ -134,11 +119,8 @@ async fn sdk_amd_mode_b_supplies_instructions_sysvar_and_consumes_nonce() {
     let clock: Clock = ctx.banks_client.get_sysvar().await.unwrap();
     let slots: SlotHashes = ctx.banks_client.get_sysvar().await.unwrap();
     let (nonce_slot, nonce_hash) = slots.first().unwrap();
-    let commitment = solana_confidential_compute_sdk::compute_commitment(
-        &nonce_hash.to_bytes(),
-        &action_hash,
-        &consumer_id,
-    );
+    let commitment =
+        solana_confidential_compute_sdk::compute_commitment(&nonce_hash.to_bytes(), &action_hash, &consumer_id);
     let mut report = [0; SNP_REPORT_SIZE];
     report[..4].copy_from_slice(&1u32.to_le_bytes());
     report[8..16].copy_from_slice(&(1u64 << 17).to_le_bytes());
@@ -147,8 +129,7 @@ async fn sdk_amd_mode_b_supplies_instructions_sysvar_and_consumes_nonce() {
     report[0x70..0x90].copy_from_slice(&commitment);
     report[0x90..0xc0].copy_from_slice(&measurement);
     report[0x1a0..0x1e0].fill(9);
-    let digest: [u8; 48] =
-        Sha384::digest(&report[..solana_confidential_compute_core::SNP_SIGNED_BODY_SIZE]).into();
+    let digest: [u8; 48] = Sha384::digest(&report[..solana_confidential_compute_core::SNP_SIGNED_BODY_SIZE]).into();
     let signature: Signature = signing.sign_prehash(&digest).unwrap();
     let bytes = signature.to_bytes();
     // The report stores r and s little-endian; `signature_r_be`/`_s_be` undo it.
@@ -179,8 +160,5 @@ async fn sdk_amd_mode_b_supplies_instructions_sysvar_and_consumes_nonce() {
     let used = ctx.banks_client.get_account(nonce).await.unwrap().unwrap();
     assert_eq!(used.owner, pid);
     assert_eq!(used.data.len(), UsedNonceAccount::SIZE);
-    assert_eq!(
-        u64::from_le_bytes(used.data[8..16].try_into().unwrap()),
-        clock.slot
-    );
+    assert_eq!(u64::from_le_bytes(used.data[8..16].try_into().unwrap()), clock.slot);
 }

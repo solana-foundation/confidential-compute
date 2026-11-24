@@ -54,8 +54,7 @@ fn governance_can_expire_a_live_signer_and_unauthorized_calls_preserve_it() {
         } else {
             assert_eq!(result, Err(ProgramError::MissingRequiredSignature));
         }
-        let saved =
-            AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap();
+        let saved = AttestedSignerAccount::try_from_slice(&accounts[2].try_borrow_data().unwrap()).unwrap();
         assert_eq!(saved.record.is_expired(21), authorized);
         if !authorized {
             assert_eq!(saved, original);

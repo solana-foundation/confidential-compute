@@ -47,13 +47,10 @@ pub enum HardwareReportError {
 impl fmt::Display for HardwareReportError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RejectedSize { report_size } => write!(
-                f,
-                "SNP_GET_REPORT size {report_size}, expected {SNP_REPORT_SIZE}"
-            ),
-            Self::ReportDataMismatch => {
-                f.write_str("SNP_GET_REPORT REPORT_DATA does not echo the requested user_data")
+            Self::RejectedSize { report_size } => {
+                write!(f, "SNP_GET_REPORT size {report_size}, expected {SNP_REPORT_SIZE}")
             }
+            Self::ReportDataMismatch => f.write_str("SNP_GET_REPORT REPORT_DATA does not echo the requested user_data"),
         }
     }
 }
@@ -115,11 +112,7 @@ pub fn validate_hardware_report(
 /// @spec SCC-CLI-001
 pub fn copy_guest_report_prefix(data: &[u8; SNP_GUEST_RESP_DATA_LEN]) -> [u8; SNP_REPORT_SIZE] {
     let mut report = [0u8; SNP_REPORT_SIZE];
-    let offset = if has_psp_report_prefix(data) {
-        SNP_PSP_REPORT_PREFIX_LEN
-    } else {
-        0
-    };
+    let offset = if has_psp_report_prefix(data) { SNP_PSP_REPORT_PREFIX_LEN } else { 0 };
     let Some(end) = offset.checked_add(SNP_REPORT_SIZE) else {
         return report;
     };
@@ -210,8 +203,7 @@ mod tests {
         let user_data = [0x22u8; 64];
         let data = report_with_user_data(&user_data);
         for size in [1u32, 1183, 1185, u32::MAX] {
-            let err =
-                validate_hardware_report(size, &data, &user_data).expect_err("non-canonical size");
+            let err = validate_hardware_report(size, &data, &user_data).expect_err("non-canonical size");
             assert_eq!(err, HardwareReportError::RejectedSize { report_size: size });
         }
     }
@@ -220,8 +212,8 @@ mod tests {
     fn test_report_size_accepts_exact_when_report_data_echoes() {
         let user_data = [0x33u8; 64];
         let data = report_with_user_data(&user_data);
-        let accepted = validate_hardware_report(SNP_REPORT_SIZE as u32, &data, &user_data)
-            .expect("exact size and echo");
+        let accepted =
+            validate_hardware_report(SNP_REPORT_SIZE as u32, &data, &user_data).expect("exact size and echo");
         assert_eq!(accepted, data);
         assert_eq!(&accepted[REPORT_DATA_OFFSET..REPORT_DATA_END], &user_data);
     }
@@ -231,8 +223,7 @@ mod tests {
         let user_data = [0x44u8; 64];
         let mut data = report_with_user_data(&user_data);
         data[0x50] ^= 0x01;
-        let err = validate_hardware_report(SNP_REPORT_SIZE as u32, &data, &user_data)
-            .expect_err("echo mismatch");
+        let err = validate_hardware_report(SNP_REPORT_SIZE as u32, &data, &user_data).expect_err("echo mismatch");
         assert_eq!(err, HardwareReportError::ReportDataMismatch);
         assert!(err.to_string().contains("REPORT_DATA"));
     }
@@ -342,9 +333,7 @@ mod tests {
 
         let selected = resolve_vcek_public_key(true, None, || xy).expect("selected mock key");
         assert_eq!(
-            solana_confidential_compute_crypto::verify_snp_report_signature(
-                &selected, &body, &sig_rs
-            ),
+            solana_confidential_compute_crypto::verify_snp_report_signature(&selected, &body, &sig_rs),
             Ok(true)
         );
 
@@ -354,10 +343,7 @@ mod tests {
         })
         .expect("explicit other key");
         assert_ne!(other, xy);
-        assert_ne!(
-            solana_confidential_compute_crypto::verify_snp_report_signature(&other, &body, &sig_rs),
-            Ok(true)
-        );
+        assert_ne!(solana_confidential_compute_crypto::verify_snp_report_signature(&other, &body, &sig_rs), Ok(true));
     }
 
     fn milan_report() -> &'static [u8; SNP_REPORT_SIZE] {
@@ -371,26 +357,16 @@ mod tests {
     /// Uncompressed P-384 point from the VCEK `SubjectPublicKeyInfo`.
     fn p384_xy_from_vcek_der(der: &[u8]) -> [u8; 96] {
         const OID: &[u8] = &[0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22];
-        let pos = der
-            .windows(OID.len())
-            .position(|window| window == OID)
-            .expect("secp384r1 oid");
+        let pos = der.windows(OID.len()).position(|window| window == OID).expect("secp384r1 oid");
         let rest = &der[pos + OID.len()..];
         assert!(rest.len() >= 4 + 96, "VCEK SPKI truncated after secp384r1");
-        assert_eq!(
-            &rest[..4],
-            &[0x03, 0x62, 0x00, 0x04],
-            "expected uncompressed P-384 BIT STRING"
-        );
+        assert_eq!(&rest[..4], &[0x03, 0x62, 0x00, 0x04], "expected uncompressed P-384 BIT STRING");
         let mut xy = [0u8; 96];
         xy.copy_from_slice(&rest[4..4 + 96]);
         xy
     }
 
-    fn response_containing(
-        report: &[u8; SNP_REPORT_SIZE],
-        psp_prefix: bool,
-    ) -> [u8; SNP_GUEST_RESP_DATA_LEN] {
+    fn response_containing(report: &[u8; SNP_REPORT_SIZE], psp_prefix: bool) -> [u8; SNP_GUEST_RESP_DATA_LEN] {
         let mut data = [0u8; SNP_GUEST_RESP_DATA_LEN];
         if psp_prefix {
             data[4..8].copy_from_slice(&(SNP_REPORT_SIZE as u32).to_le_bytes());
@@ -412,10 +388,7 @@ mod tests {
         let data = response_containing(&report, true);
         assert_eq!(&data[..4], &[0, 0, 0, 0]);
         assert_eq!(u32_le_at(&data, 4), Some(SNP_REPORT_SIZE as u32));
-        assert_eq!(
-            data[20], 0xA5,
-            "reserved prefix byte must not be required zero"
-        );
+        assert_eq!(data[20], 0xA5, "reserved prefix byte must not be required zero");
 
         let copied = copy_guest_report_prefix(&data);
         assert_eq!(copied, report);
@@ -468,8 +441,7 @@ mod tests {
 
         let vcek = milan_vcek_der();
         assert!(
-            vcek.windows(64)
-                .any(|window| window == &report[0x1A0..0x1E0]),
+            vcek.windows(64).any(|window| window == &report[0x1A0..0x1E0]),
             "VCEK hwID must carry the report chip id"
         );
         let xy = p384_xy_from_vcek_der(vcek);
@@ -478,11 +450,7 @@ mod tests {
         sig[..48].copy_from_slice(&view.signature_r_be().expect("r padding"));
         sig[48..].copy_from_slice(&view.signature_s_be().expect("s padding"));
         assert_eq!(
-            solana_confidential_compute_crypto::verify_snp_report_signature(
-                &xy,
-                view.signed_body(),
-                &sig
-            ),
+            solana_confidential_compute_crypto::verify_snp_report_signature(&xy, view.signed_body(), &sig),
             Ok(true)
         );
 

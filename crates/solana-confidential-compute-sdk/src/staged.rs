@@ -78,26 +78,13 @@ impl StagePlan {
         if units == 0 || units > 1_400_000 {
             return Err(StageError::InvalidComputeBudget);
         }
-        let payer = self
-            .consume
-            .accounts
-            .first()
-            .ok_or(StageError::InvalidAuthority)?
-            .pubkey;
+        let payer = self.consume.accounts.first().ok_or(StageError::InvalidAuthority)?.pubkey;
         let instructions = [
-            solana_compute_budget_interface::ComputeBudgetInstruction::set_compute_unit_limit(
-                units,
-            ),
+            solana_compute_budget_interface::ComputeBudgetInstruction::set_compute_unit_limit(units),
             self.consume.clone(),
         ];
-        let tx = Transaction::new_unsigned(Message::new_with_blockhash(
-            &instructions,
-            Some(&payer),
-            &blockhash,
-        ));
-        if bincode::serialized_size(&tx).map_err(|_| StageError::PacketTooLarge)?
-            > crate::PACKET_DATA_SIZE as u64
-        {
+        let tx = Transaction::new_unsigned(Message::new_with_blockhash(&instructions, Some(&payer), &blockhash));
+        if bincode::serialized_size(&tx).map_err(|_| StageError::PacketTooLarge)? > crate::PACKET_DATA_SIZE as u64 {
             return Err(StageError::PacketTooLarge);
         }
         Ok(tx)
@@ -121,26 +108,18 @@ pub fn stage_vcek_registration(
         return Err(StageError::InvalidSize);
     }
     let tcb = u64::from_le_bytes(source.data[72..80].try_into().unwrap());
-    let candidates = [
-        hash(&source.data[8..72]).to_bytes(),
-        hash(&source.data[80..176]).to_bytes(),
-    ];
+    let candidates = [hash(&source.data[8..72]).to_bytes(), hash(&source.data[80..176]).to_bytes()];
     let identity = candidates
         .iter()
         .find(|identity| {
-            crate::builder::derive_vcek_pda(&source.program_id, identity, tcb)
-                == source.accounts[2].pubkey
+            crate::builder::derive_vcek_pda(&source.program_id, identity, tcb) == source.accounts[2].pubkey
         })
         .ok_or(StageError::InvalidAuthority)?;
     let canonical = crate::derive_amd_revocation_pda(&source.program_id, identity).0;
     match source.accounts.iter().find(|meta| meta.pubkey == canonical) {
-        Some(meta) if meta.is_writable || meta.is_signer => {
-            return Err(StageError::InvalidAuthority)
-        }
+        Some(meta) if meta.is_writable || meta.is_signer => return Err(StageError::InvalidAuthority),
         Some(_) => {}
-        None => source
-            .accounts
-            .push(AccountMeta::new_readonly(canonical, false)),
+        None => source.accounts.push(AccountMeta::new_readonly(canonical, false)),
     }
     build_plan(source, authority, current_slot, expiry_slot)
 }
@@ -153,9 +132,7 @@ pub fn stage_nitro_registration(
     current_slot: u64,
     expiry_slot: u64,
 ) -> Result<StagePlan, StageError> {
-    if !source
-        .data
-        .starts_with(&crate::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR)
+    if !source.data.starts_with(&crate::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR)
         || source.data.get(8) != Some(&crate::VERIFY_NITRO_MODE_A)
     {
         return Err(StageError::UnsupportedInstruction);
@@ -187,16 +164,13 @@ pub fn build_staged_nitro_registration(
     current_slot: u64,
     expiry_slot: u64,
 ) -> Result<StagePlan, StageError> {
-    if document.is_empty()
-        || document.len() > solana_confidential_compute_core::MAX_NITRO_DOCUMENT_LEN
-    {
+    if document.is_empty() || document.len() > solana_confidential_compute_core::MAX_NITRO_DOCUMENT_LEN {
         return Err(StageError::InvalidSize);
     }
     let registry = crate::builder::derive_policy_registry_pda(&program_id);
     let (signer, _) = crate::builder::derive_signer_pda(&program_id, &workload.to_bytes());
-    let (used_nonce, _) =
-        crate::derive_used_nonce_pda_for_source(&program_id, 2, &workload.to_bytes(), &nonce)
-            .expect("fixed Nitro source");
+    let (used_nonce, _) = crate::derive_used_nonce_pda_for_source(&program_id, 2, &workload.to_bytes(), &nonce)
+        .expect("fixed Nitro source");
     let accounts = vec![
         AccountMeta::new(authority, true),
         AccountMeta::new_readonly(registry, false),
@@ -206,10 +180,7 @@ pub fn build_staged_nitro_registration(
         AccountMeta::new_readonly(solana_sdk::sysvar::clock::ID, false),
         AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
         AccountMeta::new_readonly(workload, true),
-        AccountMeta::new_readonly(
-            Pubkey::find_program_address(&[b"backend_policy", &[2]], &program_id).0,
-            false,
-        ),
+        AccountMeta::new_readonly(Pubkey::find_program_address(&[b"backend_policy", &[2]], &program_id).0, false),
         AccountMeta::new_readonly(
             crate::derive_legacy_used_nonce_pda(&program_id, &workload.to_bytes(), &nonce).0,
             false,
@@ -221,16 +192,7 @@ pub fn build_staged_nitro_registration(
     data.extend([0; 32]);
     data.extend((document.len() as u32).to_le_bytes());
     data.extend(document);
-    stage_nitro_registration(
-        Instruction {
-            program_id,
-            accounts,
-            data,
-        },
-        authority,
-        current_slot,
-        expiry_slot,
-    )
+    stage_nitro_registration(Instruction { program_id, accounts, data }, authority, current_slot, expiry_slot)
 }
 
 /// Build bounded AMD SNP Mode A transport. Only the staged packets are sendable;
@@ -271,40 +233,23 @@ fn build_plan(
     if expiry_slot <= current_slot || expiry_slot - current_slot > MAX_LIFETIME_SLOTS {
         return Err(StageError::InvalidDeadline);
     }
-    if source
-        .accounts
-        .first()
-        .map(|a| (a.pubkey, a.is_signer, a.is_writable))
-        != Some((authority, true, true))
-    {
+    if source.accounts.first().map(|a| (a.pubkey, a.is_signer, a.is_writable)) != Some((authority, true, true)) {
         return Err(StageError::InvalidAuthority);
     }
     let digest = hash(&source.data);
-    let (address, _) = Pubkey::find_program_address(
-        &[b"attestation_stage", authority.as_ref(), digest.as_ref()],
-        &source.program_id,
-    );
-    let base = vec![
-        AccountMeta::new(authority, true),
-        AccountMeta::new(address, false),
-    ];
+    let (address, _) =
+        Pubkey::find_program_address(&[b"attestation_stage", authority.as_ref(), digest.as_ref()], &source.program_id);
+    let base = vec![AccountMeta::new(authority, true), AccountMeta::new(address, false)];
     let make = |tag: [u8; 8], rest: &[u8], accounts: Vec<AccountMeta>| {
         let mut data = tag.to_vec();
         data.extend_from_slice(rest);
-        Instruction {
-            program_id: source.program_id,
-            accounts,
-            data,
-        }
+        Instruction { program_id: source.program_id, accounts, data }
     };
     let mut args = digest.to_bytes().to_vec();
     args.extend_from_slice(&(source.data.len() as u32).to_le_bytes());
     args.extend_from_slice(&expiry_slot.to_le_bytes());
     let mut begin_accounts = base.clone();
-    begin_accounts.push(AccountMeta::new_readonly(
-        solana_sdk_ids::system_program::ID,
-        false,
-    ));
+    begin_accounts.push(AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false));
     let begin = make(BEGIN, &args, begin_accounts);
     let uploads = source
         .data
@@ -321,24 +266,11 @@ fn build_plan(
     let mut consume_accounts = base;
     consume_accounts.extend_from_slice(&source.accounts);
     let consume = make(CONSUME, &[], consume_accounts);
-    for ix in std::iter::once(&begin)
-        .chain(uploads.iter())
-        .chain([&seal, &consume, &close])
-    {
-        let tx =
-            Transaction::new_unsigned(Message::new(std::slice::from_ref(ix), Some(&authority)));
-        if bincode::serialized_size(&tx).map_err(|_| StageError::PacketTooLarge)?
-            > crate::PACKET_DATA_SIZE as u64
-        {
+    for ix in std::iter::once(&begin).chain(uploads.iter()).chain([&seal, &consume, &close]) {
+        let tx = Transaction::new_unsigned(Message::new(std::slice::from_ref(ix), Some(&authority)));
+        if bincode::serialized_size(&tx).map_err(|_| StageError::PacketTooLarge)? > crate::PACKET_DATA_SIZE as u64 {
             return Err(StageError::PacketTooLarge);
         }
     }
-    Ok(StagePlan {
-        address,
-        begin,
-        uploads,
-        seal,
-        consume,
-        close,
-    })
+    Ok(StagePlan { address, begin, uploads, seal, consume, close })
 }

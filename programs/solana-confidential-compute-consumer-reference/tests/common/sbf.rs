@@ -26,9 +26,7 @@ use {
 fn so_path(program_name: &str) -> std::path::PathBuf {
     let dir = std::env::var("SBF_OUT_DIR")
         .or_else(|_| std::env::var("BPF_OUT_DIR"))
-        .unwrap_or_else(|_| {
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy").to_string()
-        });
+        .unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy").to_string());
     std::path::Path::new(&dir).join(format!("{program_name}.so"))
 }
 
@@ -57,10 +55,6 @@ pub fn add_sbf_program(pt: &mut ProgramTest, program_name: &str, program_id: Pub
 /// `ProgramTest` with the real consumer bytecode loaded at `program_id`.
 pub fn consumer_program_test(program_id: Pubkey) -> ProgramTest {
     let mut pt = ProgramTest::default();
-    add_sbf_program(
-        &mut pt,
-        "solana_confidential_compute_consumer_reference",
-        program_id,
-    );
+    add_sbf_program(&mut pt, "solana_confidential_compute_consumer_reference", program_id);
     pt
 }

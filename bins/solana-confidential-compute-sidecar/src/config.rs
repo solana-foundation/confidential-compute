@@ -35,11 +35,7 @@ pub enum EnclaveMode {
 }
 
 #[derive(Parser, Debug, Clone)]
-#[command(
-    author,
-    version,
-    about = "Solana Confidential Compute Enclave Sidecar Daemon"
-)]
+#[command(author, version, about = "Solana Confidential Compute Enclave Sidecar Daemon")]
 pub struct SidecarConfig {
     /// Loopback bind address for local RPC API.
     #[arg(long, env = "SOLANA_CC_BIND_ADDR", default_value = "127.0.0.1:8080")]
@@ -55,20 +51,11 @@ pub struct SidecarConfig {
     pub enrollment_min_interval_secs: u64,
 
     /// Solana RPC endpoint URL.
-    #[arg(
-        long,
-        env = "SOLANA_CC_SOLANA_RPC_URL",
-        default_value = "https://api.devnet.solana.com"
-    )]
+    #[arg(long, env = "SOLANA_CC_SOLANA_RPC_URL", default_value = "https://api.devnet.solana.com")]
     pub solana_rpc_url: String,
 
     /// Enclave execution environment.
-    #[arg(
-        long,
-        env = "SOLANA_CC_ENCLAVE_MODE",
-        value_enum,
-        default_value = "mock"
-    )]
+    #[arg(long, env = "SOLANA_CC_ENCLAVE_MODE", value_enum, default_value = "mock")]
     pub enclave_mode: EnclaveMode,
 
     /// Proactive attestation renewal buffer in slots.
@@ -161,64 +148,37 @@ mod tests {
 
     #[test]
     fn live_mock_mode_fails_closed() {
-        let live_mock = SidecarConfig {
-            dry_run: false,
-            enclave_mode: EnclaveMode::Mock,
-            ..SidecarConfig::default()
-        };
+        let live_mock = SidecarConfig { dry_run: false, enclave_mode: EnclaveMode::Mock, ..SidecarConfig::default() };
         assert!(live_mock.fail_closed_live_mock().is_err());
 
-        let dry_mock = SidecarConfig {
-            dry_run: true,
-            enclave_mode: EnclaveMode::Mock,
-            ..SidecarConfig::default()
-        };
+        let dry_mock = SidecarConfig { dry_run: true, enclave_mode: EnclaveMode::Mock, ..SidecarConfig::default() };
         assert!(dry_mock.fail_closed_live_mock().is_ok());
 
-        let live_sev = SidecarConfig {
-            dry_run: false,
-            enclave_mode: EnclaveMode::AmdSevSnp,
-            ..SidecarConfig::default()
-        };
+        let live_sev =
+            SidecarConfig { dry_run: false, enclave_mode: EnclaveMode::AmdSevSnp, ..SidecarConfig::default() };
         assert!(live_sev.fail_closed_live_mock().is_ok());
 
-        let live_nvidia = SidecarConfig {
-            dry_run: false,
-            enclave_mode: EnclaveMode::NvidiaGpu,
-            ..SidecarConfig::default()
-        };
+        let live_nvidia =
+            SidecarConfig { dry_run: false, enclave_mode: EnclaveMode::NvidiaGpu, ..SidecarConfig::default() };
         assert!(live_nvidia.fail_closed_live_mock().is_ok());
 
-        let dry_nvidia = SidecarConfig {
-            dry_run: true,
-            enclave_mode: EnclaveMode::NvidiaGpu,
-            ..SidecarConfig::default()
-        };
+        let dry_nvidia =
+            SidecarConfig { dry_run: true, enclave_mode: EnclaveMode::NvidiaGpu, ..SidecarConfig::default() };
         assert!(dry_nvidia.fail_closed_live_mock().is_ok());
 
-        let live_tdx = SidecarConfig {
-            dry_run: false,
-            enclave_mode: EnclaveMode::IntelTdx,
-            ..SidecarConfig::default()
-        };
+        let live_tdx =
+            SidecarConfig { dry_run: false, enclave_mode: EnclaveMode::IntelTdx, ..SidecarConfig::default() };
         assert!(live_tdx.fail_closed_live_mock().is_ok());
 
-        let dry_tdx = SidecarConfig {
-            dry_run: true,
-            enclave_mode: EnclaveMode::IntelTdx,
-            ..SidecarConfig::default()
-        };
+        let dry_tdx = SidecarConfig { dry_run: true, enclave_mode: EnclaveMode::IntelTdx, ..SidecarConfig::default() };
         assert!(dry_tdx.fail_closed_live_mock().is_ok());
     }
 
     #[test]
     fn intel_tdx_mode_accepts_name_and_alias() {
-        let by_name = SidecarConfig::try_parse_from([
-            "solana-confidential-compute-sidecar",
-            "--enclave-mode",
-            "intel-tdx",
-        ])
-        .expect("intel-tdx");
+        let by_name =
+            SidecarConfig::try_parse_from(["solana-confidential-compute-sidecar", "--enclave-mode", "intel-tdx"])
+                .expect("intel-tdx");
         assert_eq!(by_name.enclave_mode, EnclaveMode::IntelTdx);
         assert!(by_name.dry_run);
 
@@ -237,8 +197,7 @@ mod tests {
 
     #[test]
     fn enrollment_flags_default_closed_and_enforce_interval_floor() {
-        let parsed =
-            SidecarConfig::try_parse_from(["solana-confidential-compute-sidecar"]).unwrap();
+        let parsed = SidecarConfig::try_parse_from(["solana-confidential-compute-sidecar"]).unwrap();
         assert!(parsed.enrollment_token_file.is_none());
         assert_eq!(parsed.enrollment_min_interval_secs, 300);
         let parsed = SidecarConfig::try_parse_from([
@@ -249,10 +208,7 @@ mod tests {
             "60",
         ])
         .unwrap();
-        assert_eq!(
-            parsed.enrollment_token_file.unwrap(),
-            std::path::PathBuf::from("/run/secrets/enrollment")
-        );
+        assert_eq!(parsed.enrollment_token_file.unwrap(), std::path::PathBuf::from("/run/secrets/enrollment"));
         assert_eq!(parsed.enrollment_min_interval_secs, 60);
         for interval in ["0", "59", "86401"] {
             assert!(SidecarConfig::try_parse_from([
@@ -276,14 +232,9 @@ mod tests {
         assert_eq!(parsed.allowed_consumer_program_id, Some(consumer));
 
         let command = SidecarConfig::command();
-        let arg = command
-            .get_arguments()
-            .find(|argument| argument.get_id() == "allowed_consumer_program_id")
-            .expect("flag");
+        let arg =
+            command.get_arguments().find(|argument| argument.get_id() == "allowed_consumer_program_id").expect("flag");
         assert_eq!(arg.get_long(), Some("allowed-consumer-program-id"));
-        assert_eq!(
-            arg.get_env().and_then(|name| name.to_str()),
-            Some("SOLANA_CC_ALLOWED_CONSUMER_PROGRAM_ID")
-        );
+        assert_eq!(arg.get_env().and_then(|name| name.to_str()), Some("SOLANA_CC_ALLOWED_CONSUMER_PROGRAM_ID"));
     }
 }

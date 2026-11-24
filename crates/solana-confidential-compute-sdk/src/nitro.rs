@@ -14,8 +14,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::transaction::Transaction;
 
 use crate::builder::{
-    derive_policy_registry_pda, derive_signer_pda, ensure_ix_packet_fits, ensure_packet_fits,
-    SdkError,
+    derive_policy_registry_pda, derive_signer_pda, ensure_ix_packet_fits, ensure_packet_fits, SdkError,
 };
 
 pub use solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR;
@@ -60,9 +59,8 @@ fn nitro_accounts(
     let signer_bytes = workload_signer.to_bytes();
     let policy_registry = derive_policy_registry_pda(program_id);
     // Nitro instruction data does not carry bump bytes. The program derives them.
-    let (used_nonce, _) =
-        crate::nonce::derive_used_nonce_pda_for_source(program_id, 2, &signer_bytes, nonce)
-            .expect("fixed Nitro source");
+    let (used_nonce, _) = crate::nonce::derive_used_nonce_pda_for_source(program_id, 2, &signer_bytes, nonce)
+        .expect("fixed Nitro source");
     let attested_signer = if mode == VERIFY_NITRO_MODE_A {
         let (attested_signer, _) = derive_signer_pda(program_id, &signer_bytes);
         AccountMeta::new(attested_signer, false)
@@ -83,10 +81,7 @@ fn nitro_accounts(
         accounts.push(AccountMeta::new_readonly(*workload_signer, true));
     }
     if mode == VERIFY_NITRO_MODE_B {
-        accounts.push(AccountMeta::new_readonly(
-            solana_sdk::sysvar::instructions::ID,
-            false,
-        ));
+        accounts.push(AccountMeta::new_readonly(solana_sdk::sysvar::instructions::ID, false));
     }
     accounts
 }
@@ -289,21 +284,11 @@ mod oversized {
                 Instruction {
                     program_id: *program_id,
                     accounts: nitro_accounts(program_id, payer, workload_signer, mode, nonce),
-                    data: nitro_instruction_data(
-                        mode,
-                        nonce_slot,
-                        &expected_action_hash,
-                        document,
-                    )?,
+                    data: nitro_instruction_data(mode, nonce_slot, &expected_action_hash, document)?,
                 },
                 crate::backend_policy::NITRO_SOURCE,
             ),
-            crate::nonce::derive_legacy_used_nonce_pda(
-                program_id,
-                &workload_signer.to_bytes(),
-                nonce,
-            )
-            .0,
+            crate::nonce::derive_legacy_used_nonce_pda(program_id, &workload_signer.to_bytes(), nonce).0,
         ))
     }
 
@@ -366,13 +351,7 @@ mod oversized {
             document,
             nonce,
         )?;
-        pack_nitro_tx(
-            payer,
-            confidential_compute_ix,
-            mode,
-            consumer_ix,
-            recent_blockhash,
-        )
+        pack_nitro_tx(payer, confidential_compute_ix, mode, consumer_ix, recent_blockhash)
     }
 
     /// Quarantined Nitro transaction.
@@ -410,16 +389,12 @@ mod oversized {
 #[cfg(feature = "test-utils")]
 #[doc(hidden)]
 pub use oversized::{
-    build_verify_nitro_attestation_ix_for_program_oversized,
-    build_verify_nitro_attestation_ix_oversized,
-    build_verify_nitro_attestation_tx_for_program_oversized,
-    build_verify_nitro_attestation_tx_oversized,
+    build_verify_nitro_attestation_ix_for_program_oversized, build_verify_nitro_attestation_ix_oversized,
+    build_verify_nitro_attestation_tx_for_program_oversized, build_verify_nitro_attestation_tx_oversized,
 };
 #[cfg(not(feature = "test-utils"))]
 #[allow(unused_imports)]
 pub(crate) use oversized::{
-    build_verify_nitro_attestation_ix_for_program_oversized,
-    build_verify_nitro_attestation_ix_oversized,
-    build_verify_nitro_attestation_tx_for_program_oversized,
-    build_verify_nitro_attestation_tx_oversized,
+    build_verify_nitro_attestation_ix_for_program_oversized, build_verify_nitro_attestation_ix_oversized,
+    build_verify_nitro_attestation_tx_for_program_oversized, build_verify_nitro_attestation_tx_oversized,
 };

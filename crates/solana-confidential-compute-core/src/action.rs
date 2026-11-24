@@ -48,10 +48,7 @@ pub fn hash_instruction(instruction: &Instruction) -> [u8; 32] {
     hash_action_parts(
         &[],
         instruction.accounts.len(),
-        instruction
-            .accounts
-            .iter()
-            .map(|a| (&a.pubkey, a.is_signer, a.is_writable)),
+        instruction.accounts.iter().map(|a| (&a.pubkey, a.is_signer, a.is_writable)),
         &instruction.data,
     )
 }
@@ -66,10 +63,7 @@ mod tests {
         let key = Pubkey::new_unique();
         let ix = Instruction {
             program_id: Pubkey::new_unique(),
-            accounts: vec![
-                AccountMeta::new(key, true),
-                AccountMeta::new_readonly(key, false),
-            ],
+            accounts: vec![AccountMeta::new(key, true), AccountMeta::new_readonly(key, false)],
             data: vec![1, 2, 3, 4],
         };
         let expected = hash_instruction(&ix);
@@ -79,9 +73,7 @@ mod tests {
                 hash_action_parts(
                     &ix.data[..split],
                     ix.accounts.len(),
-                    ix.accounts
-                        .iter()
-                        .map(|a| (&a.pubkey, a.is_signer, a.is_writable)),
+                    ix.accounts.iter().map(|a| (&a.pubkey, a.is_signer, a.is_writable)),
                     &ix.data[split..]
                 )
             );

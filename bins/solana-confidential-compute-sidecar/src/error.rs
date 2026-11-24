@@ -19,10 +19,7 @@ pub enum SidecarError {
     ServerError(String),
 
     #[error("Attestation expired: current slot {current_slot} > expires slot {expires_slot}")]
-    AttestationExpired {
-        current_slot: u64,
-        expires_slot: u64,
-    },
+    AttestationExpired { current_slot: u64, expires_slot: u64 },
 
     #[error("Unauthorized signer in transaction: {0}")]
     UnauthorizedSigner(String),

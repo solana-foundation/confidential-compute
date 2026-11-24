@@ -21,16 +21,8 @@ fn explicit_xy_selects_vlek_address_and_missing_key_fails_closed() {
         report[0x50..0x70].copy_from_slice(signer.as_ref());
         report[0x1a0..0x1e0].fill(chip);
         let is_vlek = flags == 4 || chip == 0;
-        let identity = if is_vlek {
-            hash(&xy)
-        } else {
-            hash(&[chip; 64])
-        };
-        let expected = Pubkey::find_program_address(
-            &[b"vcek_v2", identity.as_ref(), &0u64.to_le_bytes()],
-            &pid,
-        )
-        .0;
+        let identity = if is_vlek { hash(&xy) } else { hash(&[chip; 64]) };
+        let expected = Pubkey::find_program_address(&[b"vcek_v2", identity.as_ref(), &0u64.to_le_bytes()], &pid).0;
         let a = build_register_signer_ix_for_program_oversized_with_endorsement(
             &pid,
             &payer,
@@ -62,9 +54,7 @@ fn explicit_xy_selects_vlek_address_and_missing_key_fails_closed() {
         assert_eq!(b.accounts.last(), Some(&revocation));
         if is_vlek {
             assert_eq!(
-                build_register_signer_ix_for_program_oversized(
-                    &pid, &payer, &signer, &report, 0, 0
-                ),
+                build_register_signer_ix_for_program_oversized(&pid, &payer, &signer, &report, 0, 0),
                 Err(SdkError::MissingEndorsementKey)
             );
             assert!(matches!(

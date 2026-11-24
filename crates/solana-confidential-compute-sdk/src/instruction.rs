@@ -13,8 +13,7 @@ use solana_sdk::pubkey::Pubkey;
 
 use crate::backend_policy::{derive_backend_policy_pda, NVIDIA_SOURCE};
 use crate::builder::{
-    compute_commitment, derive_policy_registry_pda, derive_signer_pda, ensure_ix_packet_fits,
-    SdkError,
+    compute_commitment, derive_policy_registry_pda, derive_signer_pda, ensure_ix_packet_fits, SdkError,
 };
 
 /// `sha256("global:verify_nvidia_attestation")[..8]`.
@@ -123,9 +122,8 @@ pub fn build_verify_nvidia_attestation_ix_for_program(
     } else {
         AccountMeta::new_readonly(MODE_B_ATTESTED_SIGNER_PLACEHOLDER, false)
     };
-    let backend = derive_backend_policy_pda(program_id, NVIDIA_SOURCE)
-        .expect("NVIDIA source 4 is a supported backend")
-        .0;
+    let backend =
+        derive_backend_policy_pda(program_id, NVIDIA_SOURCE).expect("NVIDIA source 4 is a supported backend").0;
     let mut data = Vec::with_capacity(VERIFY_NVIDIA_ATTESTATION_LEN);
     data.extend_from_slice(&VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR);
     data.push(mode);
@@ -144,17 +142,10 @@ pub fn build_verify_nvidia_attestation_ix_for_program(
     if mode == VERIFY_NVIDIA_MODE_A {
         accounts.push(AccountMeta::new_readonly(*workload_signer, true));
     } else {
-        accounts.push(AccountMeta::new_readonly(
-            solana_sdk::sysvar::instructions::ID,
-            false,
-        ));
+        accounts.push(AccountMeta::new_readonly(solana_sdk::sysvar::instructions::ID, false));
     }
     accounts.push(AccountMeta::new_readonly(backend, false));
-    let ix = Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    };
+    let ix = Instruction { program_id: *program_id, accounts, data };
     ensure_ix_packet_fits(payer, &ix)?;
     Ok(ix)
 }
@@ -169,14 +160,8 @@ mod tests {
             VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR,
             solana_confidential_compute_verifier::payload::VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR
         );
-        assert_eq!(
-            VERIFY_NVIDIA_MODE_A,
-            solana_confidential_compute_verifier::payload::VERIFY_NVIDIA_MODE_A
-        );
-        assert_eq!(
-            VERIFY_NVIDIA_MODE_B,
-            solana_confidential_compute_verifier::payload::VERIFY_NVIDIA_MODE_B
-        );
+        assert_eq!(VERIFY_NVIDIA_MODE_A, solana_confidential_compute_verifier::payload::VERIFY_NVIDIA_MODE_A);
+        assert_eq!(VERIFY_NVIDIA_MODE_B, solana_confidential_compute_verifier::payload::VERIFY_NVIDIA_MODE_B);
     }
 
     #[test]
@@ -207,9 +192,7 @@ mod tests {
         assert_eq!(&ix.data[49..81], &gpu);
         let (nonce, _) = derive_nvidia_nonce_pda(&program_id, &workload, &gpu, &slot_hash);
         let (signer, _) = derive_signer_pda(&program_id, &workload.to_bytes());
-        let backend = derive_backend_policy_pda(&program_id, NVIDIA_SOURCE)
-            .unwrap()
-            .0;
+        let backend = derive_backend_policy_pda(&program_id, NVIDIA_SOURCE).unwrap().0;
         assert_eq!(ix.accounts[0].pubkey, signer);
         assert!(ix.accounts[0].is_writable);
         assert_eq!(ix.accounts[2].pubkey, nonce);
@@ -263,10 +246,7 @@ mod tests {
         assert_eq!(ix.accounts[0].pubkey, MODE_B_ATTESTED_SIGNER_PLACEHOLDER);
         assert!(!ix.accounts[0].is_writable);
         assert_eq!(ix.accounts[7].pubkey, solana_sdk::sysvar::instructions::ID);
-        assert_ne!(
-            nonce,
-            derive_nvidia_nonce_pda(&program_id, &workload, &gpu, &slot_hash).0
-        );
+        assert_ne!(nonce, derive_nvidia_nonce_pda(&program_id, &workload, &gpu, &slot_hash).0);
     }
 
     #[test]

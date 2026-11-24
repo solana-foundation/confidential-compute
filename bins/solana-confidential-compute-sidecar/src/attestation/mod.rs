@@ -21,10 +21,7 @@ use crate::error::SidecarError;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AttestationReport {
     /// AMD SEV-SNP 1,184-byte report with optional VCEK certificate chain.
-    SevSnp {
-        report: Vec<u8>,
-        vcek_cert: Option<Vec<u8>>,
-    },
+    SevSnp { report: Vec<u8>, vcek_cert: Option<Vec<u8>> },
     /// Google Cloud Confidential Space OIDC / JWT attestation token.
     GcpJwt { jwt: String },
     /// AWS Nitro Enclaves tagged COSE Sign1 attestation document.
@@ -32,11 +29,7 @@ pub enum AttestationReport {
     AwsNitro { document: Vec<u8> },
     /// NVIDIA Confidential GPU (Hopper H100/H200) composite report.
     /// @spec SCC-NVIDIA-002
-    NvidiaH100 {
-        composite_report: Vec<u8>,
-        gpu_measurement: [u8; 32],
-        spdm_report: Vec<u8>,
-    },
+    NvidiaH100 { composite_report: Vec<u8>, gpu_measurement: [u8; 32], spdm_report: Vec<u8> },
     /// Intel TDX quote bound to the composite GPU challenge.
     ///
     /// `report_data` is the 64-byte `REPORTDATA` commitment. A quote that
@@ -89,9 +82,7 @@ mod serde_byte_array {
             fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
                 let mut out = [0u8; N];
                 for (index, slot) in out.iter_mut().enumerate() {
-                    *slot = seq
-                        .next_element()?
-                        .ok_or_else(|| Error::invalid_length(index, &self))?;
+                    *slot = seq.next_element()?.ok_or_else(|| Error::invalid_length(index, &self))?;
                 }
                 Ok(out)
             }
@@ -112,7 +103,5 @@ pub trait AttestationProvider: Send + Sync {
         &'a self,
         workload_signer: &'a Pubkey,
         slot_hash: &'a [u8; 32],
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<AttestationReport, SidecarError>> + Send + 'a>,
-    >;
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AttestationReport, SidecarError>> + Send + 'a>>;
 }

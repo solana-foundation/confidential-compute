@@ -38,25 +38,16 @@ fn tenant_policy_configuration_is_governed_exact_and_bounded() {
             AccountInfo::new(&policy, false, true, c, &mut pd, &pid, false),
             AccountInfo::new(&system, false, false, d, &mut sd, &system, true),
         ];
-        let call = [
-            accounts[0].clone(),
-            accounts[1].clone(),
-            accounts[2].clone(),
-            accounts[0].clone(),
-            accounts[3].clone(),
-        ];
+        let call =
+            [accounts[0].clone(), accounts[1].clone(), accounts[2].clone(), accounts[0].clone(), accounts[3].clone()];
         let mut ix = SET_GCP_TENANT_POLICY_DISCRIMINATOR.to_vec();
-        SetGcpTenantPolicyArgs {
-            expected_audience: aud.into(),
-            expected_subject: sub.into(),
-        }
-        .serialize(&mut ix)
-        .unwrap();
+        SetGcpTenantPolicyArgs { expected_audience: aud.into(), expected_subject: sub.into() }
+            .serialize(&mut ix)
+            .unwrap();
         let result = Processor::process(&pid, &call, &ix);
         if success {
             assert_eq!(result, Ok(()));
-            let saved =
-                GcpTenantPolicy::try_from_slice(&call[2].try_borrow_data().unwrap()).unwrap();
+            let saved = GcpTenantPolicy::try_from_slice(&call[2].try_borrow_data().unwrap()).unwrap();
             assert_eq!(saved.expected().unwrap(), (aud.as_bytes(), sub.as_bytes()));
             assert_eq!(saved.bump, pb);
         } else {

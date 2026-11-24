@@ -35,54 +35,35 @@ static LAUNCHER_SEQ: AtomicU64 = AtomicU64::new(0);
 
 impl Launcher {
     async fn start(status: StatusCode, response: String) -> Self {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let seq = LAUNCHER_SEQ.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "scc-295-{}-{unique}-{seq}.sock",
-            std::process::id()
-        ));
+        let path = std::env::temp_dir().join(format!("scc-295-{}-{unique}-{seq}.sock", std::process::id()));
         let listener = UnixListener::bind(&path).unwrap();
         let requests = Arc::new(Mutex::new(Vec::new()));
         let router = Router::new()
             .route(
                 "/v1/token",
-                post(
-                    move |State(requests): State<Arc<Mutex<Vec<Value>>>>,
-                          Json(body): Json<Value>| {
-                        let response = response.clone();
-                        async move {
-                            requests.lock().unwrap().push(body);
-                            let mut headers = HeaderMap::new();
-                            if status.is_redirection() {
-                                headers.insert(
-                                    header::LOCATION,
-                                    HeaderValue::from_static("http://localhost/redirected"),
-                                );
-                            }
-                            (status, headers, response)
+                post(move |State(requests): State<Arc<Mutex<Vec<Value>>>>, Json(body): Json<Value>| {
+                    let response = response.clone();
+                    async move {
+                        requests.lock().unwrap().push(body);
+                        let mut headers = HeaderMap::new();
+                        if status.is_redirection() {
+                            headers.insert(header::LOCATION, HeaderValue::from_static("http://localhost/redirected"));
                         }
-                    },
-                ),
+                        (status, headers, response)
+                    }
+                }),
             )
             .with_state(Arc::clone(&requests));
         let task = tokio::spawn(async move {
             axum::serve(listener, router).await.unwrap();
         });
-        Self {
-            path,
-            requests,
-            task,
-        }
+        Self { path, requests, task }
     }
 
     fn provider(&self) -> GcpOidcProvider {
-        GcpOidcProvider::new(
-            Some(self.path.to_str().unwrap()),
-            Some("solana-confidential-compute-verifier"),
-        )
+        GcpOidcProvider::new(Some(self.path.to_str().unwrap()), Some("solana-confidential-compute-verifier"))
     }
 }
 
@@ -97,11 +78,7 @@ fn controlled_token(signer: &Pubkey, slot_hash: &[u8; 32]) -> String {
     controlled_token_with(signer, slot_hash, |_| {})
 }
 
-fn controlled_token_with(
-    signer: &Pubkey,
-    slot_hash: &[u8; 32],
-    mutate: impl FnOnce(&mut Value),
-) -> String {
+fn controlled_token_with(signer: &Pubkey, slot_hash: &[u8; 32], mutate: impl FnOnce(&mut Value)) -> String {
     let (n0, n1) = mode_a_eat_nonces(signer, slot_hash);
     let mut payload = json!({
         "aud": "solana-confidential-compute-verifier", "dbgstat": "disabled-since-boot",
@@ -124,13 +101,11 @@ async fn launcher_socket_receives_oidc_audience_and_mode_a_nonces() {
     let slot_hash = [0x5a; 32];
     let jwt = controlled_token(&signer, &slot_hash);
     let launcher = Launcher::start(StatusCode::OK, jwt.clone()).await;
-    let report = tokio::time::timeout(
-        Duration::from_secs(3),
-        launcher.provider().request_attestation(&signer, &slot_hash),
-    )
-    .await
-    .expect("bounded socket request")
-    .expect("launcher token");
+    let report =
+        tokio::time::timeout(Duration::from_secs(3), launcher.provider().request_attestation(&signer, &slot_hash))
+            .await
+            .expect("bounded socket request")
+            .expect("launcher token");
     assert!(matches!(report, AttestationReport::GcpJwt { jwt: actual } if actual == jwt));
     let (n0, n1) = mode_a_eat_nonces(&signer, &slot_hash);
     assert_eq!(
@@ -145,27 +120,11 @@ async fn launcher_socket_receives_oidc_audience_and_mode_a_nonces() {
 async fn launcher_failure_and_mismatched_binding_fail_closed() {
     let signer = Pubkey::new_from_array([0x80; 32]);
     let slot_hash = [0x5a; 32];
-    let failed = Launcher::start(
-        StatusCode::SERVICE_UNAVAILABLE,
-        "controlled launcher failure".into(),
-    )
-    .await;
-    let err = failed
-        .provider()
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .unwrap_err();
+    let failed = Launcher::start(StatusCode::SERVICE_UNAVAILABLE, "controlled launcher failure".into()).await;
+    let err = failed.provider().request_attestation(&signer, &slot_hash).await.unwrap_err();
     assert!(err.to_string().contains("503"));
-    let wrong = Launcher::start(
-        StatusCode::OK,
-        controlled_token(&Pubkey::new_unique(), &slot_hash),
-    )
-    .await;
-    let err = wrong
-        .provider()
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .unwrap_err();
+    let wrong = Launcher::start(StatusCode::OK, controlled_token(&Pubkey::new_unique(), &slot_hash)).await;
+    let err = wrong.provider().request_attestation(&signer, &slot_hash).await.unwrap_err();
     assert!(err.to_string().contains("does not bind"));
     assert_eq!(wrong.requests.lock().unwrap().len(), 1);
 }
@@ -177,17 +136,10 @@ async fn launcher_response_requires_exact_requested_audience() {
     let custom = "solana-confidential-compute-verifier/custom";
     let jwt = controlled_token_with(&signer, &slot_hash, |claims| claims["aud"] = json!(custom));
     let launcher = Launcher::start(StatusCode::OK, jwt).await;
-    let err = launcher
-        .provider()
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .unwrap_err();
+    let err = launcher.provider().request_attestation(&signer, &slot_hash).await.unwrap_err();
     assert!(err.to_string().contains("audience"));
     let provider = GcpOidcProvider::new(Some(launcher.path.to_str().unwrap()), Some(custom));
-    provider
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .expect("exact custom audience");
+    provider.request_attestation(&signer, &slot_hash).await.expect("exact custom audience");
     assert_eq!(launcher.requests.lock().unwrap()[1]["audience"], custom);
 }
 
@@ -203,32 +155,16 @@ async fn launcher_claim_controls_reject_issuer_boot_and_nonce_substitution() {
     ] {
         let jwt = controlled_token_with(&signer, &slot_hash, |claims| claims[field] = value);
         let launcher = Launcher::start(StatusCode::OK, jwt).await;
-        assert!(
-            launcher
-                .provider()
-                .request_attestation(&signer, &slot_hash)
-                .await
-                .is_err(),
-            "{field}"
-        );
+        assert!(launcher.provider().request_attestation(&signer, &slot_hash).await.is_err(), "{field}");
         assert_eq!(launcher.requests.lock().unwrap().len(), 1);
     }
     let wrong_slot = Launcher::start(StatusCode::OK, controlled_token(&signer, &[0x5b; 32])).await;
-    let err = wrong_slot
-        .provider()
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .unwrap_err();
+    let err = wrong_slot.provider().request_attestation(&signer, &slot_hash).await.unwrap_err();
     assert!(err.to_string().contains("does not bind"));
-    let swapped = controlled_token_with(&signer, &slot_hash, |claims| {
-        claims["eat_nonce"].as_array_mut().unwrap().swap(0, 1)
-    });
+    let swapped =
+        controlled_token_with(&signer, &slot_hash, |claims| claims["eat_nonce"].as_array_mut().unwrap().swap(0, 1));
     let launcher = Launcher::start(StatusCode::OK, swapped).await;
-    assert!(launcher
-        .provider()
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .is_err());
+    assert!(launcher.provider().request_attestation(&signer, &slot_hash).await.is_err());
 }
 
 #[tokio::test]
@@ -236,25 +172,14 @@ async fn launcher_rejects_redirects_malformed_tokens_and_missing_socket() {
     let signer = Pubkey::new_from_array([0x80; 32]);
     let slot_hash = [0x5a; 32];
     let redirect = Launcher::start(StatusCode::TEMPORARY_REDIRECT, String::new()).await;
-    let err = redirect
-        .provider()
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .unwrap_err();
+    let err = redirect.provider().request_attestation(&signer, &slot_hash).await.unwrap_err();
     assert!(err.to_string().contains("307"));
     assert_eq!(redirect.requests.lock().unwrap().len(), 1);
     let malformed = Launcher::start(StatusCode::OK, "not a jwt".into()).await;
-    assert!(malformed
-        .provider()
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .is_err());
+    assert!(malformed.provider().request_attestation(&signer, &slot_hash).await.is_err());
     let unavailable_provider = malformed.provider();
     drop(malformed);
-    assert!(unavailable_provider
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .is_err());
+    assert!(unavailable_provider.request_attestation(&signer, &slot_hash).await.is_err());
 }
 
 #[tokio::test]
@@ -263,15 +188,8 @@ async fn launcher_token_must_match_configured_image_digest() {
     let slot_hash = [0x5a; 32];
     let launcher = Launcher::start(StatusCode::OK, controlled_token(&signer, &slot_hash)).await;
     let other_image = format!("sha256:{}", "cd".repeat(32));
-    let provider = GcpOidcProvider::with_image_digest(
-        Some(launcher.path.to_str().unwrap()),
-        None,
-        Some(&other_image),
-    )
-    .unwrap();
-    let err = provider
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .unwrap_err();
+    let provider =
+        GcpOidcProvider::with_image_digest(Some(launcher.path.to_str().unwrap()), None, Some(&other_image)).unwrap();
+    let err = provider.request_attestation(&signer, &slot_hash).await.unwrap_err();
     assert!(err.to_string().contains("image_digest"));
 }

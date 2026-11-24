@@ -2,9 +2,7 @@
 //! invalidating their signatures; this fake does not claim crypto feasibility.
 use axum::{routing::post, Json, Router};
 use serde_json::{json, Value};
-use solana_confidential_compute_sidecar::{
-    AttestationReport, EphemeralKeyManager, OnchainAttestor,
-};
+use solana_confidential_compute_sidecar::{AttestationReport, EphemeralKeyManager, OnchainAttestor};
 use solana_sdk::{hash::Hash, signature::Keypair, transaction::Transaction};
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
@@ -12,16 +10,11 @@ use tokio::net::TcpListener;
 async fn route(
     nitro: bool,
     fail_packet: Option<usize>,
-) -> (
-    Result<u64, solana_confidential_compute_sidecar::SidecarError>,
-    Vec<Transaction>,
-    Vec<u8>,
-) {
+) -> (Result<u64, solana_confidential_compute_sidecar::SidecarError>, Vec<Transaction>, Vec<u8>) {
     let workload = EphemeralKeyManager::new();
     let report = if nitro {
         let mut bytes = include_bytes!("../../../fixtures/nitro_hardware_document.cose").to_vec();
-        let (_, view) =
-            solana_confidential_compute_crypto::parse_nitro_attestation(&bytes).unwrap();
+        let (_, view) = solana_confidential_compute_crypto::parse_nitro_attestation(&bytes).unwrap();
         let at = bytes.windows(32).position(|w| w == view.user_data).unwrap();
         bytes[at..at + 32].copy_from_slice(workload.pubkey().as_ref());
         assert_eq!(bytes.len(), 4526);
@@ -30,10 +23,7 @@ async fn route(
         let mut bytes = include_bytes!("../../../fixtures/snp_hardware_report_milan.bin").to_vec();
         bytes[0x50..0x70].copy_from_slice(workload.pubkey().as_ref());
         assert_eq!(bytes.len(), 1184);
-        AttestationReport::SevSnp {
-            report: bytes,
-            vcek_cert: None,
-        }
+        AttestationReport::SevSnp { report: bytes, vcek_cert: None }
     };
     let evidence = match &report {
         AttestationReport::AwsNitro { document } => document.clone(),
@@ -74,17 +64,14 @@ async fn route(
         Json(json!({"jsonrpc":"2.0","id":request["id"],"result":result}))
     }}));
     let task = tokio::spawn(async move { axum::serve(listener, rpc).await.unwrap() });
-    let attestor =
-        OnchainAttestor::new(&format!("http://{addr}"), None, Some(Keypair::new()), false);
+    let attestor = OnchainAttestor::new(&format!("http://{addr}"), None, Some(Keypair::new()), false);
     let result = attestor.submit_attestation(&workload, 95, &report).await;
     task.abort();
     let transactions = submitted.lock().unwrap().clone();
     (result, transactions, evidence)
 }
 fn tags(txs: &[Transaction]) -> Vec<Vec<u8>> {
-    txs.iter()
-        .map(|tx| tx.message.instructions.last().unwrap().data[..8].to_vec())
-        .collect()
+    txs.iter().map(|tx| tx.message.instructions.last().unwrap().data[..8].to_vec()).collect()
 }
 #[tokio::test]
 async fn live_hardware_sizes_snp_use_ordered_bounded_packets() {
@@ -99,28 +86,15 @@ async fn assert_routing(nitro: bool) {
     assert!(result.is_ok(), "{result:?}");
     let t = tags(&txs);
     assert_eq!(t.first().unwrap(), b"stagebeg");
-    assert_eq!(
-        &t[t.len() - 3..],
-        &[
-            b"stagesea".to_vec(),
-            b"stageuse".to_vec(),
-            b"stagedel".to_vec()
-        ]
-    );
+    assert_eq!(&t[t.len() - 3..], &[b"stagesea".to_vec(), b"stageuse".to_vec(), b"stagedel".to_vec()]);
     let mut payload = Vec::<u8>::new();
     for tx in &txs[1..txs.len() - 3] {
         let ix = tx.message.instructions.last().unwrap();
         assert_eq!(&ix.data[..8], b"stageput");
-        assert_eq!(
-            u32::from_le_bytes(ix.data[8..12].try_into().unwrap()) as usize,
-            payload.len()
-        );
+        assert_eq!(u32::from_le_bytes(ix.data[8..12].try_into().unwrap()) as usize, payload.len());
         payload.extend_from_slice(&ix.data[12..]);
     }
-    assert_eq!(
-        &payload[if nitro { 53 } else { 16 }..][..evidence.len()],
-        evidence
-    );
+    assert_eq!(&payload[if nitro { 53 } else { 16 }..][..evidence.len()], evidence);
     for tx in txs {
         assert!(bincode::serialized_size(&tx).unwrap() <= 1232);
         assert!(tx.verify().is_ok());
@@ -130,10 +104,7 @@ async fn assert_routing(nitro: bool) {
 async fn partial_upload_failure_closes_without_consume_or_retry() {
     let (result, txs, _) = route(false, Some(2)).await;
     assert!(result.is_err());
-    assert_eq!(
-        tags(&txs),
-        [b"stagebeg", b"stageput", b"stageput", b"stagedel"].map(|x| x.to_vec())
-    );
+    assert_eq!(tags(&txs), [b"stagebeg", b"stageput", b"stageput", b"stagedel"].map(|x| x.to_vec()));
     assert!(result.unwrap_err().to_string().contains("cleanup"));
 }
 #[tokio::test]

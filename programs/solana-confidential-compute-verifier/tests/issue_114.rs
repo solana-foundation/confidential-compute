@@ -20,8 +20,7 @@ use solana_confidential_compute_core::types::{compute_action_commitment, VerifyA
 use solana_confidential_compute_core::SNP_REPORT_SIZE;
 use solana_confidential_compute_verifier::error::VerifierError;
 use solana_confidential_compute_verifier::payload::{
-    InitPolicyRegistryArgs, INIT_POLICY_REGISTRY_DISCRIMINATOR,
-    VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
+    InitPolicyRegistryArgs, INIT_POLICY_REGISTRY_DISCRIMINATOR, VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR,
 };
 use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
@@ -40,8 +39,8 @@ use solana_system_interface::instruction as system_instruction;
 mod sbf;
 
 use solana_confidential_compute_verifier::state::{
-    AmdIdentityRevocation, BackendPolicy, PolicyRegistry, VcekAccount,
-    POLICY_REGISTRY_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR, VCEK_ACCOUNT_DISCRIMINATOR,
+    AmdIdentityRevocation, BackendPolicy, PolicyRegistry, VcekAccount, POLICY_REGISTRY_DISCRIMINATOR,
+    USED_NONCE_DISCRIMINATOR, VCEK_ACCOUNT_DISCRIMINATOR,
 };
 
 fn tx_error(err: BanksClientError) -> TransactionError {
@@ -65,8 +64,8 @@ fn noop(_program_id: &Pubkey, _accounts: &[AccountInfo], _data: &[u8]) -> Progra
 /// `processor::EXPECTED_SIGVERIFY_PROGRAM_ID`, which is `cfg(target_os = "solana")`
 /// and so not nameable from a host test. ASCII `SECP384R1SIGVERIFY`, zero padded.
 const SIGVERIFY_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
-    0x53, 0x45, 0x43, 0x50, 0x33, 0x38, 0x34, 0x52, 0x31, 0x53, 0x49, 0x47, 0x56, 0x45, 0x52, 0x49,
-    0x46, 0x59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0x53, 0x45, 0x43, 0x50, 0x33, 0x38, 0x34, 0x52, 0x31, 0x53, 0x49, 0x47, 0x56, 0x45, 0x52, 0x49, 0x46, 0x59, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ]);
 
 /// `pubkey (96) || SHA-384(signed body) (48) || r_be || s_be (96)`.
@@ -85,11 +84,7 @@ fn sigverify_ix(report: &[u8; SNP_REPORT_SIZE], public_key_xy: &[u8; 96]) -> Ins
         be.reverse();
         data.extend_from_slice(&be);
     }
-    Instruction {
-        program_id: SIGVERIFY_PROGRAM_ID,
-        accounts: vec![],
-        data,
-    }
+    Instruction { program_id: SIGVERIFY_PROGRAM_ID, accounts: vec![], data }
 }
 
 fn init_ix(program_id: &Pubkey, payer: &Pubkey, registry: &Pubkey) -> Instruction {
@@ -114,11 +109,7 @@ fn init_ix(program_id: &Pubkey, payer: &Pubkey, registry: &Pubkey) -> Instructio
             AccountMeta::new(*registry, false),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
             AccountMeta::new_readonly(
-                Pubkey::find_program_address(
-                    &[program_id.as_ref()],
-                    &solana_sdk_ids::bpf_loader_upgradeable::id(),
-                )
-                .0,
+                Pubkey::find_program_address(&[program_id.as_ref()], &solana_sdk_ids::bpf_loader_upgradeable::id()).0,
                 false,
             ),
         ],
@@ -137,28 +128,13 @@ fn set_upgrade_authority(ctx: &mut solana_program_test::ProgramTestContext, prog
     data[13..45].copy_from_slice(ctx.payer.pubkey().as_ref());
     ctx.set_account(
         &key,
-        &Account {
-            lamports: 1_000_000,
-            data,
-            owner: loader,
-            executable: false,
-            rent_epoch: 0,
-        }
-        .into(),
+        &Account { lamports: 1_000_000, data, owner: loader, executable: false, rent_epoch: 0 }.into(),
     );
 }
 
-async fn send(
-    ctx: &mut solana_program_test::ProgramTestContext,
-    ix: Instruction,
-) -> Result<(), BanksClientError> {
+async fn send(ctx: &mut solana_program_test::ProgramTestContext, ix: Instruction) -> Result<(), BanksClientError> {
     let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&ctx.payer.pubkey()),
-        &[&ctx.payer],
-        blockhash,
-    );
+    let tx = Transaction::new_signed_with_payer(&[ix], Some(&ctx.payer.pubkey()), &[&ctx.payer], blockhash);
     ctx.banks_client.process_transaction(tx).await
 }
 
@@ -170,15 +146,8 @@ async fn unfunded_policy_registry_initializes() {
     let mut ctx = pt.start_with_context().await;
     set_upgrade_authority(&mut ctx, &program_id);
     let payer = ctx.payer.pubkey();
-    send(&mut ctx, init_ix(&program_id, &payer, &registry))
-        .await
-        .expect("unfunded create_account");
-    let account = ctx
-        .banks_client
-        .get_account(registry)
-        .await
-        .unwrap()
-        .expect("registry");
+    send(&mut ctx, init_ix(&program_id, &payer, &registry)).await.expect("unfunded create_account");
+    let account = ctx.banks_client.get_account(registry).await.unwrap().expect("registry");
     assert_eq!(account.owner, program_id);
     assert_eq!(account.data.len(), PolicyRegistry::SIZE);
     assert_eq!(&account.data[..8], &POLICY_REGISTRY_DISCRIMINATOR);
@@ -202,26 +171,15 @@ async fn prefunded_policy_registry_initializes() {
     let mut ctx = pt.start_with_context().await;
     set_upgrade_authority(&mut ctx, &program_id);
     let payer = ctx.payer.pubkey();
-    send(&mut ctx, init_ix(&program_id, &payer, &registry))
-        .await
-        .expect("prefunded allocate+assign");
-    let account = ctx
-        .banks_client
-        .get_account(registry)
-        .await
-        .unwrap()
-        .expect("registry");
+    send(&mut ctx, init_ix(&program_id, &payer, &registry)).await.expect("prefunded allocate+assign");
+    let account = ctx.banks_client.get_account(registry).await.unwrap().expect("registry");
     assert_eq!(account.owner, program_id);
     assert_eq!(account.data.len(), PolicyRegistry::SIZE);
     assert_eq!(&account.data[..8], &POLICY_REGISTRY_DISCRIMINATOR);
     assert!(account.lamports > 1);
 }
 
-fn sign_report(
-    workload: [u8; 32],
-    nonce: [u8; 32],
-    measurement: [u8; 48],
-) -> ([u8; SNP_REPORT_SIZE], [u8; 96]) {
+fn sign_report(workload: [u8; 32], nonce: [u8; 32], measurement: [u8; 48]) -> ([u8; SNP_REPORT_SIZE], [u8; 96]) {
     let mut seed = [0u8; 48];
     seed[47] = 0x21;
     let signing_key = SigningKey::from_slice(&seed).expect("scalar");
@@ -271,8 +229,7 @@ impl ModeBBoot {
     /// plus the three accounts the program resolves by address: the AMD denylist,
     /// the source-1 backend policy, and the pre-namespace legacy nonce.
     fn verify_accounts(&self, nonce_pda: Pubkey, commitment: &[u8; 32]) -> Vec<AccountMeta> {
-        let (legacy_nonce, _) =
-            Pubkey::find_program_address(&[b"nonce", &self.workload, commitment], &self.program_id);
+        let (legacy_nonce, _) = Pubkey::find_program_address(&[b"nonce", &self.workload, commitment], &self.program_id);
         vec![
             AccountMeta::new(self.ctx.payer.pubkey(), true),
             AccountMeta::new_readonly(self.registry_pda, false),
@@ -314,12 +271,9 @@ async fn boot_mode_b() -> ModeBBoot {
     vcek_xy[48..].copy_from_slice(encoded.y().unwrap());
     let chip_id_hash = hashv(&[&vcek_xy]).to_bytes();
     let tcb_version = 0u64;
-    let (vcek_pda, vcek_bump) = Pubkey::find_program_address(
-        &[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()],
-        &program_id,
-    );
-    let (registry_pda, registry_bump) =
-        Pubkey::find_program_address(&[b"policy_registry"], &program_id);
+    let (vcek_pda, vcek_bump) =
+        Pubkey::find_program_address(&[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()], &program_id);
+    let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &program_id);
 
     let mut measurements = [[0u8; 48]; 8];
     measurements[0] = measurement;
@@ -355,27 +309,14 @@ async fn boot_mode_b() -> ModeBBoot {
     .unwrap();
     pt.add_account(
         registry_pda,
-        Account {
-            lamports: 10_000_000,
-            data: registry_data,
-            owner: program_id,
-            executable: false,
-            rent_epoch: 0,
-        },
+        Account { lamports: 10_000_000, data: registry_data, owner: program_id, executable: false, rent_epoch: 0 },
     );
     pt.add_account(
         vcek_pda,
-        Account {
-            lamports: 10_000_000,
-            data: vcek_data,
-            owner: program_id,
-            executable: false,
-            rent_epoch: 0,
-        },
+        Account { lamports: 10_000_000, data: vcek_data, owner: program_id, executable: false, rent_epoch: 0 },
     );
     // AMD SNP admission reads the source-1 backend policy by address.
-    let (policy_pda, policy_bump) =
-        Pubkey::find_program_address(&[BackendPolicy::SEED, &[1]], &program_id);
+    let (policy_pda, policy_bump) = Pubkey::find_program_address(&[BackendPolicy::SEED, &[1]], &program_id);
     pt.add_account(
         policy_pda,
         Account {
@@ -394,17 +335,12 @@ async fn boot_mode_b() -> ModeBBoot {
         },
     );
     // Left uncreated: an absent, system-owned denylist entry is "not revoked".
-    let (denylist_pda, _) =
-        Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, &chip_id_hash], &program_id);
+    let (denylist_pda, _) = Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, &chip_id_hash], &program_id);
 
     let ctx = pt.start_with_context().await;
-    let slot_hashes_sysvar: solana_sdk::slot_hashes::SlotHashes =
-        ctx.banks_client.get_sysvar().await.unwrap();
-    let (nonce_slot, slot_hash) = slot_hashes_sysvar
-        .iter()
-        .next()
-        .map(|(slot, hash)| (*slot, hash.to_bytes()))
-        .expect("slot hash");
+    let slot_hashes_sysvar: solana_sdk::slot_hashes::SlotHashes = ctx.banks_client.get_sysvar().await.unwrap();
+    let (nonce_slot, slot_hash) =
+        slot_hashes_sysvar.iter().next().map(|(slot, hash)| (*slot, hash.to_bytes())).expect("slot hash");
     let action_hash = canonical_consumer_hash();
     let commitment = compute_action_commitment(&slot_hash, &action_hash, &consumer.to_bytes());
     let (report, _) = sign_report(workload, commitment, measurement);
@@ -437,10 +373,8 @@ fn alternate_off_curve_nonce(
             continue;
         }
         let bump_seed = [bump];
-        if let Ok(pda) = Pubkey::create_program_address(
-            &[b"nonce", &[1], workload, commitment, &bump_seed],
-            program_id,
-        ) {
+        if let Ok(pda) = Pubkey::create_program_address(&[b"nonce", &[1], workload, commitment, &bump_seed], program_id)
+        {
             return (bump, pda);
         }
     }
@@ -450,65 +384,31 @@ fn alternate_off_curve_nonce(
 #[tokio::test]
 async fn mode_b_binds_next_consumer_and_accepts_prefunded_nonce() {
     let boot = boot_mode_b().await;
-    let ModeBBoot {
-        ref ctx,
-        program_id,
-        consumer,
-        other,
-        workload,
-        nonce_slot,
-        commitment,
-        ref report,
-        ..
-    } = boot;
+    let ModeBBoot { ref ctx, program_id, consumer, other, workload, nonce_slot, commitment, ref report, .. } = boot;
     let action_hash = canonical_consumer_hash();
-    let (nonce_pda, nonce_bump) =
-        Pubkey::find_program_address(&[b"nonce", &[1], &workload, &commitment], &program_id);
+    let (nonce_pda, nonce_bump) = Pubkey::find_program_address(&[b"nonce", &[1], &workload, &commitment], &program_id);
 
     let mut ix_data = Vec::from(VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
-    VerifyAtomicHeader {
-        nonce_slot,
-        action_hash,
-        consumer_program_id: consumer.to_bytes(),
-    }
-    .serialize(&mut ix_data)
-    .unwrap();
+    VerifyAtomicHeader { nonce_slot, action_hash, consumer_program_id: consumer.to_bytes() }
+        .serialize(&mut ix_data)
+        .unwrap();
     ix_data.extend_from_slice(report);
     ix_data.push(nonce_bump);
 
-    let verify_ix = Instruction {
-        program_id,
-        accounts: boot.verify_accounts(nonce_pda, &commitment),
-        data: ix_data,
-    };
-    let consumer_ix = Instruction {
-        program_id: consumer,
-        accounts: vec![],
-        data: vec![1],
-    };
-    let other_ix = Instruction {
-        program_id: other,
-        accounts: vec![],
-        data: vec![1],
-    };
+    let verify_ix = Instruction { program_id, accounts: boot.verify_accounts(nonce_pda, &commitment), data: ix_data };
+    let consumer_ix = Instruction { program_id: consumer, accounts: vec![], data: vec![1] };
+    let other_ix = Instruction { program_id: other, accounts: vec![], data: vec![1] };
     let sigverify = sigverify_ix(report, &boot.vcek_xy);
 
     let rent: Rent = ctx.banks_client.get_sysvar().await.unwrap();
     let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
     let fund = Transaction::new_signed_with_payer(
-        &[system_instruction::transfer(
-            &ctx.payer.pubkey(),
-            &nonce_pda,
-            rent.minimum_balance(0),
-        )],
+        &[system_instruction::transfer(&ctx.payer.pubkey(), &nonce_pda, rent.minimum_balance(0))],
         Some(&ctx.payer.pubkey()),
         &[&ctx.payer],
         blockhash,
     );
-    ctx.banks_client
-        .process_transaction(fund)
-        .await
-        .expect("prefund");
+    ctx.banks_client.process_transaction(fund).await.expect("prefund");
 
     let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
     let grief = Transaction::new_signed_with_payer(
@@ -517,15 +417,8 @@ async fn mode_b_binds_next_consumer_and_accepts_prefunded_nonce() {
         &[&ctx.payer],
         blockhash,
     );
-    let grief_err = ctx
-        .banks_client
-        .process_transaction(grief)
-        .await
-        .unwrap_err();
-    assert_eq!(
-        instruction_error(grief_err),
-        InstructionError::InvalidArgument
-    );
+    let grief_err = ctx.banks_client.process_transaction(grief).await.unwrap_err();
+    assert_eq!(instruction_error(grief_err), InstructionError::InvalidArgument);
 
     let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
     let mismatch = Transaction::new_signed_with_payer(
@@ -534,15 +427,8 @@ async fn mode_b_binds_next_consumer_and_accepts_prefunded_nonce() {
         &[&ctx.payer],
         blockhash,
     );
-    let mismatch_err = ctx
-        .banks_client
-        .process_transaction(mismatch)
-        .await
-        .unwrap_err();
-    assert_eq!(
-        instruction_error(mismatch_err),
-        InstructionError::Custom(12)
-    );
+    let mismatch_err = ctx.banks_client.process_transaction(mismatch).await.unwrap_err();
+    assert_eq!(instruction_error(mismatch_err), InstructionError::Custom(12));
 
     let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
     let ok = Transaction::new_signed_with_payer(
@@ -551,16 +437,8 @@ async fn mode_b_binds_next_consumer_and_accepts_prefunded_nonce() {
         &[&ctx.payer],
         blockhash,
     );
-    ctx.banks_client
-        .process_transaction(ok)
-        .await
-        .expect("mode b with prefunded nonce");
-    let nonce = ctx
-        .banks_client
-        .get_account(nonce_pda)
-        .await
-        .unwrap()
-        .expect("nonce");
+    ctx.banks_client.process_transaction(ok).await.expect("mode b with prefunded nonce");
+    let nonce = ctx.banks_client.get_account(nonce_pda).await.unwrap().expect("nonce");
     assert_eq!(nonce.owner, program_id);
     assert_eq!(&nonce.data[..8], &USED_NONCE_DISCRIMINATOR);
     assert!(nonce.lamports > 1);
@@ -572,20 +450,12 @@ async fn mode_b_binds_next_consumer_and_accepts_prefunded_nonce() {
         &[&ctx.payer],
         blockhash,
     );
-    let replay_err = ctx
-        .banks_client
-        .process_transaction(replay)
-        .await
-        .unwrap_err();
+    let replay_err = ctx.banks_client.process_transaction(replay).await.unwrap_err();
     assert_eq!(instruction_error(replay_err), InstructionError::Custom(5));
 }
 
 fn consumer_ix_again(consumer: &Pubkey) -> Instruction {
-    Instruction {
-        program_id: *consumer,
-        accounts: vec![],
-        data: vec![1],
-    }
+    Instruction { program_id: *consumer, accounts: vec![], data: vec![1] }
 }
 
 /// Alternate off-curve bumps derive a second UsedNonceAccount for the same report.
@@ -594,16 +464,10 @@ fn consumer_ix_again(consumer: &Pubkey) -> Instruction {
 #[tokio::test]
 async fn verify_atomic_with_nonce_rejects_alternate_off_curve_bump() {
     let boot = boot_mode_b().await;
-    let (canonical_pda, canonical_bump) = Pubkey::find_program_address(
-        &[b"nonce", &[1], &boot.workload, &boot.commitment],
-        &boot.program_id,
-    );
-    let (alt_bump, alt_pda) = alternate_off_curve_nonce(
-        &boot.workload,
-        &boot.commitment,
-        &boot.program_id,
-        canonical_bump,
-    );
+    let (canonical_pda, canonical_bump) =
+        Pubkey::find_program_address(&[b"nonce", &[1], &boot.workload, &boot.commitment], &boot.program_id);
+    let (alt_bump, alt_pda) =
+        alternate_off_curve_nonce(&boot.workload, &boot.commitment, &boot.program_id, canonical_bump);
     assert_ne!(alt_bump, canonical_bump);
     assert_ne!(alt_pda, canonical_pda);
 
@@ -623,32 +487,16 @@ async fn verify_atomic_with_nonce_rejects_alternate_off_curve_bump() {
         accounts: boot.verify_accounts(alt_pda, &boot.commitment),
         data: ix_data,
     };
-    let consumer_ix = Instruction {
-        program_id: boot.consumer,
-        accounts: vec![],
-        data: vec![1],
-    };
+    let consumer_ix = Instruction { program_id: boot.consumer, accounts: vec![], data: vec![1] };
     let blockhash = boot.ctx.banks_client.get_latest_blockhash().await.unwrap();
     let tx = Transaction::new_signed_with_payer(
-        &[
-            sigverify_ix(&boot.report, &boot.vcek_xy),
-            verify_ix,
-            consumer_ix,
-        ],
+        &[sigverify_ix(&boot.report, &boot.vcek_xy), verify_ix, consumer_ix],
         Some(&boot.ctx.payer.pubkey()),
         &[&boot.ctx.payer],
         blockhash,
     );
-    let err = boot
-        .ctx
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .expect_err("alternate bump must be rejected");
-    assert_eq!(
-        instruction_error(err),
-        InstructionError::Custom(VerifierError::InvalidAccountAddress as u32),
-    );
+    let err = boot.ctx.banks_client.process_transaction(tx).await.expect_err("alternate bump must be rejected");
+    assert_eq!(instruction_error(err), InstructionError::Custom(VerifierError::InvalidAccountAddress as u32),);
 }
 
 /// Controlled signed SNP report + native production processor. The preloaded
@@ -657,89 +505,49 @@ async fn verify_atomic_with_nonce_rejects_alternate_off_curve_bump() {
 async fn issue_300_copied_verifier_cannot_burn_nonce_with_other_consumer_action() {
     let boot = boot_mode_b().await;
     // Independent encoder for action hash
-    let action_hash = hashv(&[
-        b"solana-confidential-compute:action:v1\0",
-        &0u32.to_le_bytes(),
-        &1u32.to_le_bytes(),
-        &[1],
-    ])
-    .to_bytes();
-    let hashes: solana_sdk::slot_hashes::SlotHashes =
-        boot.ctx.banks_client.get_sysvar().await.unwrap();
+    let action_hash =
+        hashv(&[b"solana-confidential-compute:action:v1\0", &0u32.to_le_bytes(), &1u32.to_le_bytes(), &[1]]).to_bytes();
+    let hashes: solana_sdk::slot_hashes::SlotHashes = boot.ctx.banks_client.get_sysvar().await.unwrap();
     let slot_hash = hashes.get(&boot.nonce_slot).unwrap().to_bytes();
     let commitment = compute_action_commitment(&slot_hash, &action_hash, &boot.consumer.to_bytes());
     let (report, _) = sign_report(boot.workload, commitment, [0x42; 48]);
-    let (nonce, bump) = Pubkey::find_program_address(
-        &[b"nonce", &[1], &boot.workload, &commitment],
-        &boot.program_id,
-    );
+    let (nonce, bump) = Pubkey::find_program_address(&[b"nonce", &[1], &boot.workload, &commitment], &boot.program_id);
     let mut data = VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
-    VerifyAtomicHeader {
-        nonce_slot: boot.nonce_slot,
-        action_hash,
-        consumer_program_id: boot.consumer.to_bytes(),
-    }
-    .serialize(&mut data)
-    .unwrap();
+    VerifyAtomicHeader { nonce_slot: boot.nonce_slot, action_hash, consumer_program_id: boot.consumer.to_bytes() }
+        .serialize(&mut data)
+        .unwrap();
     data.extend_from_slice(&report);
     data.push(bump);
-    let verify = Instruction {
-        program_id: boot.program_id,
-        accounts: boot.verify_accounts(nonce, &commitment),
-        data,
-    };
+    let verify = Instruction { program_id: boot.program_id, accounts: boot.verify_accounts(nonce, &commitment), data };
     for changed_data in [vec![2], vec![], vec![1, 0]] {
         let tx = Transaction::new_signed_with_payer(
             &[
                 sigverify_ix(&report, &boot.vcek_xy),
                 verify.clone(),
-                Instruction {
-                    program_id: boot.consumer,
-                    accounts: vec![],
-                    data: changed_data,
-                },
+                Instruction { program_id: boot.consumer, accounts: vec![], data: changed_data },
             ],
             Some(&boot.ctx.payer.pubkey()),
             &[&boot.ctx.payer],
             boot.ctx.last_blockhash,
         );
         let result = boot.ctx.banks_client.process_transaction(tx).await;
-        assert!(
-            result.is_err(),
-            "copied verifier burned nonce with substitute action"
-        );
+        assert!(result.is_err(), "copied verifier burned nonce with substitute action");
         assert_eq!(
             instruction_error(result.unwrap_err()),
             InstructionError::Custom(VerifierError::ActionHashMismatch as u32)
         );
-        assert!(boot
-            .ctx
-            .banks_client
-            .get_account(nonce)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(boot.ctx.banks_client.get_account(nonce).await.unwrap().is_none());
     }
     let tx = Transaction::new_signed_with_payer(
         &[
             sigverify_ix(&report, &boot.vcek_xy),
             verify,
-            Instruction {
-                program_id: boot.consumer,
-                accounts: vec![],
-                data: vec![1],
-            },
+            Instruction { program_id: boot.consumer, accounts: vec![], data: vec![1] },
         ],
         Some(&boot.ctx.payer.pubkey()),
         &[&boot.ctx.payer],
         boot.ctx.last_blockhash,
     );
     boot.ctx.banks_client.process_transaction(tx).await.unwrap();
-    assert!(boot
-        .ctx
-        .banks_client
-        .get_account(nonce)
-        .await
-        .unwrap()
-        .is_some());
+    assert!(boot.ctx.banks_client.get_account(nonce).await.unwrap().is_some());
 }

@@ -21,10 +21,7 @@ fn legacy_update_warns_while_emergency_halt_exports_the_runtime_control() {
             assert!(stderr.contains("emergency-halt --source"));
         }
         let stdout = String::from_utf8(output.stdout).unwrap();
-        let encoded = stdout
-            .lines()
-            .find_map(|line| line.strip_prefix("unsigned_transaction_hex="))
-            .unwrap();
+        let encoded = stdout.lines().find_map(|line| line.strip_prefix("unsigned_transaction_hex=")).unwrap();
         let tx: Transaction = bincode::deserialize(&hex::decode(encoded).unwrap()).unwrap();
         let disc = if deprecated {
             solana_confidential_compute_sdk::governance::UPDATE_POLICY_DISCRIMINATOR
@@ -32,14 +29,8 @@ fn legacy_update_warns_while_emergency_halt_exports_the_runtime_control() {
             solana_confidential_compute_sdk::backend_policy::SET_BACKEND_POLICY_DISCRIMINATOR
         };
         assert_eq!(&tx.message.instructions[0].data[..8], &disc);
-        assert_eq!(
-            tx.message.recent_blockhash,
-            solana_sdk::hash::Hash::default()
-        );
-        assert!(tx
-            .signatures
-            .iter()
-            .all(|sig| *sig == solana_sdk::signature::Signature::default()));
+        assert_eq!(tx.message.recent_blockhash, solana_sdk::hash::Hash::default());
+        assert!(tx.signatures.iter().all(|sig| *sig == solana_sdk::signature::Signature::default()));
         assert!(stdout.contains("before submission"));
     }
 }

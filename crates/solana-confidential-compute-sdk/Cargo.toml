@@ -9,6 +9,9 @@ description = "Rust client SDK for Solana Confidential Compute publishers and on
 keywords = ["solana", "attestation", "tee"]
 categories = ["cryptography"]
 
+[lints]
+workspace = true
+
 [dependencies]
 bincode = "1.3.3"
 solana-confidential-compute-core = { workspace = true, features = ["std"] }

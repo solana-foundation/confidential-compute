@@ -98,8 +98,7 @@ fn replay<A: AnchorSerialize>(
 ) -> Result<()> {
     let mut data = Vec::with_capacity(8 + 256);
     data.extend_from_slice(discriminator);
-    args.serialize(&mut data)
-        .map_err(|_| error!(AnchorFrontEndError::ArgumentReencode))?;
+    args.serialize(&mut data).map_err(|_| error!(AnchorFrontEndError::ArgumentReencode))?;
     to_anchor_result(Processor::process(program_id, accounts, &data))
 }
 
@@ -134,10 +133,7 @@ impl<T: borsh::BorshDeserialize> borsh::BorshDeserialize for Strict<T> {
         if reader.read(&mut probe)? == 0 {
             Ok(Self(value))
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "trailing instruction bytes",
-            ))
+            Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "trailing instruction bytes"))
         }
     }
 }
@@ -153,9 +149,7 @@ impl<T: anchor_lang::IdlBuild> anchor_lang::IdlBuild for Strict<T> {
     fn create_type() -> Option<anchor_lang::idl::types::IdlTypeDef> {
         T::create_type()
     }
-    fn insert_types(
-        types: &mut std::collections::BTreeMap<String, anchor_lang::idl::types::IdlTypeDef>,
-    ) {
+    fn insert_types(types: &mut std::collections::BTreeMap<String, anchor_lang::idl::types::IdlTypeDef>) {
         T::insert_types(types)
     }
     fn get_full_path() -> String {
@@ -172,64 +166,27 @@ pub mod solana_confidential_compute_verifier {
         ctx: Context<Passthrough>,
         args: Strict<native_ix::InitPolicyRegistryArgs>,
     ) -> Result<()> {
-        replay(
-            &native_ix::INIT_POLICY_REGISTRY_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+        replay(&native_ix::INIT_POLICY_REGISTRY_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     #[instruction(discriminator = &native_ix::UPDATE_POLICY_DISCRIMINATOR)]
-    pub fn update_policy(
-        ctx: Context<Passthrough>,
-        args: Strict<native_ix::UpdatePolicyArgs>,
-    ) -> Result<()> {
-        replay(
-            &native_ix::UPDATE_POLICY_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+    pub fn update_policy(ctx: Context<Passthrough>, args: Strict<native_ix::UpdatePolicyArgs>) -> Result<()> {
+        replay(&native_ix::UPDATE_POLICY_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     #[instruction(discriminator = &native_ix::ROTATE_ROOT_CERT_DISCRIMINATOR)]
-    pub fn rotate_root_cert(
-        ctx: Context<Passthrough>,
-        args: Strict<native_ix::RotateRootCertArgs>,
-    ) -> Result<()> {
-        replay(
-            &native_ix::ROTATE_ROOT_CERT_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+    pub fn rotate_root_cert(ctx: Context<Passthrough>, args: Strict<native_ix::RotateRootCertArgs>) -> Result<()> {
+        replay(&native_ix::ROTATE_ROOT_CERT_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     #[instruction(discriminator = &native_ix::REVOKE_VCEK_DISCRIMINATOR)]
-    pub fn revoke_vcek(
-        ctx: Context<Passthrough>,
-        args: Strict<native_ix::RevokeVcekArgs>,
-    ) -> Result<()> {
-        replay(
-            &native_ix::REVOKE_VCEK_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+    pub fn revoke_vcek(ctx: Context<Passthrough>, args: Strict<native_ix::RevokeVcekArgs>) -> Result<()> {
+        replay(&native_ix::REVOKE_VCEK_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     #[instruction(discriminator = &native_ix::SET_BACKEND_POLICY_DISCRIMINATOR)]
-    pub fn set_backend_policy(
-        ctx: Context<Passthrough>,
-        args: Strict<native_ix::SetBackendPolicyArgs>,
-    ) -> Result<()> {
-        replay(
-            &native_ix::SET_BACKEND_POLICY_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+    pub fn set_backend_policy(ctx: Context<Passthrough>, args: Strict<native_ix::SetBackendPolicyArgs>) -> Result<()> {
+        replay(&native_ix::SET_BACKEND_POLICY_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     #[instruction(discriminator = &native_ix::SET_GCP_TENANT_POLICY_DISCRIMINATOR)]
@@ -237,12 +194,7 @@ pub mod solana_confidential_compute_verifier {
         ctx: Context<Passthrough>,
         args: Strict<native_ix::SetGcpTenantPolicyArgs>,
     ) -> Result<()> {
-        replay(
-            &native_ix::SET_GCP_TENANT_POLICY_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+        replay(&native_ix::SET_GCP_TENANT_POLICY_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     #[instruction(discriminator = &native_ix::REVOKE_ATTESTED_SIGNER_DISCRIMINATOR)]
@@ -250,49 +202,24 @@ pub mod solana_confidential_compute_verifier {
         ctx: Context<Passthrough>,
         args: Strict<native_ix::RevokeAttestedSignerArgs>,
     ) -> Result<()> {
-        replay(
-            &native_ix::REVOKE_ATTESTED_SIGNER_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+        replay(&native_ix::REVOKE_ATTESTED_SIGNER_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     #[instruction(discriminator = &native_ix::REGISTER_JWKS_KEY_DISCRIMINATOR)]
-    pub fn register_jwks_key(
-        ctx: Context<Passthrough>,
-        args: Strict<native_ix::RegisterJwksKeyArgs>,
-    ) -> Result<()> {
-        replay(
-            &native_ix::REGISTER_JWKS_KEY_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+    pub fn register_jwks_key(ctx: Context<Passthrough>, args: Strict<native_ix::RegisterJwksKeyArgs>) -> Result<()> {
+        replay(&native_ix::REGISTER_JWKS_KEY_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     #[instruction(discriminator = &native_ix::REVOKE_JWKS_KEY_DISCRIMINATOR)]
-    pub fn revoke_jwks_key(
-        ctx: Context<Passthrough>,
-        args: Strict<native_ix::RevokeJwksKeyArgs>,
-    ) -> Result<()> {
-        replay(
-            &native_ix::REVOKE_JWKS_KEY_DISCRIMINATOR,
-            ctx.program_id,
-            ctx.remaining_accounts,
-            &args.0,
-        )
+    pub fn revoke_jwks_key(ctx: Context<Passthrough>, args: Strict<native_ix::RevokeJwksKeyArgs>) -> Result<()> {
+        replay(&native_ix::REVOKE_JWKS_KEY_DISCRIMINATOR, ctx.program_id, ctx.remaining_accounts, &args.0)
     }
 
     /// Serves every instruction that is not declared above: the attestation
     /// verification paths, the TDX sequence, and the two no-argument account
     /// closures. The payload is forwarded verbatim, so their zero-copy parsing
     /// and compute-budget behaviour are unchanged.
-    pub fn fallback<'info>(
-        program_id: &Pubkey,
-        accounts: &'info [AccountInfo<'info>],
-        data: &[u8],
-    ) -> Result<()> {
+    pub fn fallback<'info>(program_id: &Pubkey, accounts: &'info [AccountInfo<'info>], data: &[u8]) -> Result<()> {
         to_anchor_result(Processor::process(program_id, accounts, data))
     }
 }
@@ -314,21 +241,9 @@ mod tests {
                 instruction::InitPolicyRegistry::DISCRIMINATOR,
                 native_ix::INIT_POLICY_REGISTRY_DISCRIMINATOR,
             ),
-            (
-                "update_policy",
-                instruction::UpdatePolicy::DISCRIMINATOR,
-                native_ix::UPDATE_POLICY_DISCRIMINATOR,
-            ),
-            (
-                "rotate_root_cert",
-                instruction::RotateRootCert::DISCRIMINATOR,
-                native_ix::ROTATE_ROOT_CERT_DISCRIMINATOR,
-            ),
-            (
-                "revoke_vcek",
-                instruction::RevokeVcek::DISCRIMINATOR,
-                native_ix::REVOKE_VCEK_DISCRIMINATOR,
-            ),
+            ("update_policy", instruction::UpdatePolicy::DISCRIMINATOR, native_ix::UPDATE_POLICY_DISCRIMINATOR),
+            ("rotate_root_cert", instruction::RotateRootCert::DISCRIMINATOR, native_ix::ROTATE_ROOT_CERT_DISCRIMINATOR),
+            ("revoke_vcek", instruction::RevokeVcek::DISCRIMINATOR, native_ix::REVOKE_VCEK_DISCRIMINATOR),
             (
                 "set_backend_policy",
                 instruction::SetBackendPolicy::DISCRIMINATOR,
@@ -349,19 +264,11 @@ mod tests {
                 instruction::RegisterJwksKey::DISCRIMINATOR,
                 native_ix::REGISTER_JWKS_KEY_DISCRIMINATOR,
             ),
-            (
-                "revoke_jwks_key",
-                instruction::RevokeJwksKey::DISCRIMINATOR,
-                native_ix::REVOKE_JWKS_KEY_DISCRIMINATOR,
-            ),
+            ("revoke_jwks_key", instruction::RevokeJwksKey::DISCRIMINATOR, native_ix::REVOKE_JWKS_KEY_DISCRIMINATOR),
         ];
 
         for (name, generated, native) in expected {
-            assert_eq!(
-                generated,
-                &native[..],
-                "{name}: Anchor discriminator drifted from the deployed constant"
-            );
+            assert_eq!(generated, &native[..], "{name}: Anchor discriminator drifted from the deployed constant");
         }
     }
 
@@ -371,10 +278,7 @@ mod tests {
     /// which program the front end claims to be.
     #[test]
     fn program_id_is_unchanged_under_the_anchor_front_end() {
-        assert_eq!(
-            crate::ID.to_string(),
-            "EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh"
-        );
+        assert_eq!(crate::ID.to_string(), "EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh");
     }
 
     /// Anchor's own decode is lenient; the trailing [`NoTrailingBytes`]
@@ -421,24 +325,14 @@ mod tests {
 
         for (name, native) in [
             ("update_policy", native_ix::UPDATE_POLICY_DISCRIMINATOR),
-            (
-                "register_jwks_key",
-                native_ix::REGISTER_JWKS_KEY_DISCRIMINATOR,
-            ),
+            ("register_jwks_key", native_ix::REGISTER_JWKS_KEY_DISCRIMINATOR),
             ("revoke_jwks_key", native_ix::REVOKE_JWKS_KEY_DISCRIMINATOR),
         ] {
-            assert_ne!(
-                derived(name),
-                native,
-                "{name}: expected the deployed constant to need pinning"
-            );
+            assert_ne!(derived(name), native, "{name}: expected the deployed constant to need pinning");
         }
 
         // Control: the majority of instructions do match the derived value, so a
         // blanket mismatch would mean the hashing itself is wrong.
-        assert_eq!(
-            derived("verify_atomic"),
-            native_ix::VERIFY_ATOMIC_DISCRIMINATOR
-        );
+        assert_eq!(derived("verify_atomic"), native_ix::VERIFY_ATOMIC_DISCRIMINATOR);
     }
 }

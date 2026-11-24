@@ -58,20 +58,11 @@ async fn signing_onchain_with_deadline(workload: Pubkey, deadline: i64) -> Arc<O
     tokio::spawn(async move {
         axum::serve(listener, rpc).await.unwrap();
     });
-    Arc::new(OnchainAttestor::new(
-        &format!("http://{addr}"),
-        None,
-        None,
-        false,
-    ))
+    Arc::new(OnchainAttestor::new(&format!("http://{addr}"), None, None, false))
 }
 
-async fn spawn_test_server(
-    state: Arc<SidecarAppState>,
-) -> (SocketAddr, tokio::task::JoinHandle<()>) {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind loopback port 0");
+async fn spawn_test_server(state: Arc<SidecarAppState>) -> (SocketAddr, tokio::task::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind loopback port 0");
     let addr = listener.local_addr().expect("local addr");
     let app = create_router(state);
     let handle = tokio::spawn(async move {
@@ -106,9 +97,7 @@ async fn test_status_and_renew_endpoints() {
 
     let state = Arc::new(SidecarAppState {
         enrollment: solana_confidential_compute_sidecar::control::EnrollmentControl::new(
-            Some(zeroize::Zeroizing::new(
-                "test-operator-token-0123456789abcdef".into(),
-            )),
+            Some(zeroize::Zeroizing::new("test-operator-token-0123456789abcdef".into())),
             300,
         )
         .unwrap(),
@@ -124,11 +113,7 @@ async fn test_status_and_renew_endpoints() {
     let client = Client::new();
 
     // 1. GET /v1/status
-    let res = client
-        .get(format!("http://{addr}/v1/status"))
-        .send()
-        .await
-        .expect("status request");
+    let res = client.get(format!("http://{addr}/v1/status")).send().await.expect("status request");
     assert_eq!(res.status(), 200);
 
     let json: Value = res.json().await.expect("json");
@@ -153,17 +138,10 @@ async fn test_status_and_renew_endpoints() {
     assert!(renew_json["expires_slot"].is_u64());
     let submitted = onchain.mock_cluster().expect("mock").submitted();
     assert_eq!(submitted.len(), 1);
-    assert_eq!(
-        submitted[0].message.account_keys.first().copied(),
-        Some(payer_pubkey)
-    );
+    assert_eq!(submitted[0].message.account_keys.first().copied(), Some(payer_pubkey));
 
     // 3. GET /v1/status confirms new key
-    let res2 = client
-        .get(format!("http://{addr}/v1/status"))
-        .send()
-        .await
-        .expect("status request 2");
+    let res2 = client.get(format!("http://{addr}/v1/status")).send().await.expect("status request 2");
     let json2: Value = res2.json().await.expect("json");
     assert_eq!(json2["public_key"], renew_json["new_key"]);
 
@@ -239,10 +217,7 @@ async fn test_sign_endpoint_happy_path() {
     let message = VersionedMessage::V0(
         Message::try_compile(&Pubkey::new_unique(), &[ix], &[], Hash::default()).expect("compile"),
     );
-    let tx = VersionedTransaction {
-        signatures: vec![Signature::default(); 2],
-        message,
-    };
+    let tx = VersionedTransaction { signatures: vec![Signature::default(); 2], message };
     let tx_bytes = bincode::serialize(&tx).expect("serialize");
     let tx_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &tx_bytes);
 
@@ -259,10 +234,8 @@ async fn test_sign_endpoint_happy_path() {
     let returned_tx_b64 = json["transaction"].as_str().expect("tx string");
 
     let returned_tx_bytes =
-        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, returned_tx_b64)
-            .expect("decode");
-    let returned_tx: VersionedTransaction =
-        bincode::deserialize(&returned_tx_bytes).expect("deser");
+        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, returned_tx_b64).expect("decode");
+    let returned_tx: VersionedTransaction = bincode::deserialize(&returned_tx_bytes).expect("deser");
 
     // Verify signature matches
     let signature: Signature = sig_str.parse().expect("parse sig");
@@ -300,13 +273,8 @@ async fn test_sign_endpoint_rejects_missing_signer() {
     // Transaction only requiring other_key as signer
     let recipient = Pubkey::new_unique();
     let ix = system_instruction::transfer(&other_key, &recipient, 5_000);
-    let message = VersionedMessage::V0(
-        Message::try_compile(&other_key, &[ix], &[], Hash::default()).expect("compile"),
-    );
-    let tx = VersionedTransaction {
-        signatures: vec![Signature::default()],
-        message,
-    };
+    let message = VersionedMessage::V0(Message::try_compile(&other_key, &[ix], &[], Hash::default()).expect("compile"));
+    let tx = VersionedTransaction { signatures: vec![Signature::default()], message };
     let tx_bytes = bincode::serialize(&tx).expect("serialize");
     let tx_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &tx_bytes);
 
@@ -320,10 +288,7 @@ async fn test_sign_endpoint_rejects_missing_signer() {
     assert_eq!(res.status(), 400);
     let json: Value = res.json().await.expect("json");
     let error = json["error"].as_str().unwrap_or("");
-    assert!(
-        error.contains("not allowlisted") || error.contains("Unauthorized signer"),
-        "{error}"
-    );
+    assert!(error.contains("not allowlisted") || error.contains("Unauthorized signer"), "{error}");
 
     handle.abort();
 }
@@ -355,13 +320,8 @@ async fn test_sign_endpoint_rejects_system_transfer() {
 
     let recipient = Pubkey::new_unique();
     let ix = system_instruction::transfer(&pubkey, &recipient, 5_000);
-    let message = VersionedMessage::V0(
-        Message::try_compile(&pubkey, &[ix], &[], Hash::default()).expect("compile"),
-    );
-    let tx = VersionedTransaction {
-        signatures: vec![Signature::default()],
-        message,
-    };
+    let message = VersionedMessage::V0(Message::try_compile(&pubkey, &[ix], &[], Hash::default()).expect("compile"));
+    let tx = VersionedTransaction { signatures: vec![Signature::default()], message };
     let tx_bytes = bincode::serialize(&tx).expect("serialize");
     let tx_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &tx_bytes);
 
@@ -421,17 +381,11 @@ async fn test_mock_attestation_providers_emit_valid_challenges() {
 
     // 1. SEV-SNP mock provider
     let snp_provider = MockAttestationProvider::new_sev_snp();
-    let snp_report = snp_provider
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .expect("attest snp");
+    let snp_report = snp_provider.request_attestation(&signer, &slot_hash).await.expect("attest snp");
 
     match snp_report {
         AttestationReport::SevSnp { report, .. } => {
-            assert_eq!(
-                report.len(),
-                solana_confidential_compute_core::SNP_REPORT_SIZE
-            );
+            assert_eq!(report.len(), solana_confidential_compute_core::SNP_REPORT_SIZE);
             // Verify user_data binds signer and slot_hash at offset 80..144
             assert_eq!(&report[80..112], signer.as_ref());
             assert_eq!(&report[112..144], &slot_hash);
@@ -441,18 +395,13 @@ async fn test_mock_attestation_providers_emit_valid_challenges() {
 
     // 2. GCP Confidential Space mock provider
     let gcp_provider = MockAttestationProvider::new_gcp(None);
-    let gcp_report = gcp_provider
-        .request_attestation(&signer, &slot_hash)
-        .await
-        .expect("attest gcp");
+    let gcp_report = gcp_provider.request_attestation(&signer, &slot_hash).await.expect("attest gcp");
 
     match gcp_report {
         AttestationReport::GcpJwt { jwt } => {
-            let view =
-                solana_confidential_compute_crypto::jwt::JwtView::parse(&jwt).expect("jwt view");
+            let view = solana_confidential_compute_crypto::jwt::JwtView::parse(&jwt).expect("jwt view");
             let claims =
-                solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64)
-                    .expect("claims");
+                solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64).expect("claims");
             assert!(claims.secboot);
             assert_eq!(claims.dbgstat(), b"disabled-since-boot");
             let raw = claims.decode_mode_a_binding().expect("mode a nonces");
@@ -482,28 +431,18 @@ async fn test_heartbeat_reattests_the_same_key() {
     let expires = reattest_current_key(&state).await.expect("reattest");
     assert_eq!(state.keys.read().await.pubkey(), pubkey);
     assert_eq!(state.status.read().await.expires_slot, Some(expires));
-    assert_eq!(
-        state
-            .onchain
-            .mock_cluster()
-            .expect("mock")
-            .submitted()
-            .len(),
-        1
-    );
+    assert_eq!(state.onchain.mock_cluster().expect("mock").submitted().len(), 1);
 }
 
 fn canonical_action_hash(payer: &Pubkey, action: &Instruction) -> [u8; 32] {
-    let message = VersionedMessage::V0(
-        Message::try_compile(payer, std::slice::from_ref(action), &[], Hash::default()).unwrap(),
-    );
+    let message =
+        VersionedMessage::V0(Message::try_compile(payer, std::slice::from_ref(action), &[], Hash::default()).unwrap());
     solana_confidential_compute_sdk::hash_compiled_action(&message, 0, 0).expect("complete action")
 }
 
 fn b64_tx(_payer: &Pubkey, ixs: &[Instruction]) -> String {
-    let message = VersionedMessage::V0(
-        Message::try_compile(&Pubkey::new_unique(), ixs, &[], Hash::default()).expect("compile"),
-    );
+    let message =
+        VersionedMessage::V0(Message::try_compile(&Pubkey::new_unique(), ixs, &[], Hash::default()).expect("compile"));
     let tx = VersionedTransaction {
         signatures: vec![Signature::default(); message.header().num_required_signatures as usize],
         message,
@@ -542,21 +481,15 @@ async fn test_sign_endpoint_screens_allowlisted_consumer() {
         accounts: vec![AccountMeta::new_readonly(pubkey, true)],
         data: solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec(),
     };
-    let consumer_ix = Instruction {
-        program_id: consumer,
-        accounts: vec![AccountMeta::new(pubkey, true)],
-        data: vec![1, 2, 3, 4],
-    };
+    let consumer_ix =
+        Instruction { program_id: consumer, accounts: vec![AccountMeta::new(pubkey, true)], data: vec![1, 2, 3, 4] };
 
     let hash = canonical_action_hash(&pubkey, &consumer_ix);
-    verifier.data =
-        solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
+    verifier.data = solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
     verifier.data.extend_from_slice(&95u64.to_le_bytes());
     verifier.data.extend_from_slice(&hash);
     verifier.data.extend_from_slice(consumer.as_ref());
-    verifier
-        .data
-        .resize(80 + solana_confidential_compute_core::SNP_REPORT_SIZE, 0);
+    verifier.data.resize(80 + solana_confidential_compute_core::SNP_REPORT_SIZE, 0);
     verifier.data[80 + 0x50..80 + 0x70].copy_from_slice(pubkey.as_ref());
 
     let accepted = client
@@ -598,17 +531,11 @@ async fn test_sign_endpoint_screens_allowlisted_consumer() {
         .expect("sign governance");
     assert_eq!(rejected_governance.status(), 400);
     let governance_json: Value = rejected_governance.json().await.expect("json");
-    assert_eq!(
-        governance_json["error"],
-        "verifier instruction is not allowlisted"
-    );
+    assert_eq!(governance_json["error"], "verifier instruction is not allowlisted");
 
     let stranger = Pubkey::new_unique();
-    let stranger_ix = Instruction {
-        program_id: stranger,
-        accounts: vec![AccountMeta::new_readonly(pubkey, true)],
-        data: vec![7],
-    };
+    let stranger_ix =
+        Instruction { program_id: stranger, accounts: vec![AccountMeta::new_readonly(pubkey, true)], data: vec![7] };
     let rejected_stranger = client
         .post(format!("http://{addr}/v1/sign"))
         .json(&serde_json::json!({
@@ -642,21 +569,15 @@ async fn simulated_gcp_registration_cannot_authorize_signing() {
             slot_hash: &'a [u8; 32],
         ) -> Pin<
             Box<
-                dyn Future<
-                        Output = Result<
-                            AttestationReport,
-                            solana_confidential_compute_sidecar::error::SidecarError,
-                        >,
-                    > + Send
+                dyn Future<Output = Result<AttestationReport, solana_confidential_compute_sidecar::error::SidecarError>>
+                    + Send
                     + 'a,
             >,
         > {
             Box::pin(async move {
                 use base64::Engine;
                 let (n0, n1) =
-                    solana_confidential_compute_sidecar::attestation::gcp_oidc::mode_a_eat_nonces(
-                        signer, slot_hash,
-                    );
+                    solana_confidential_compute_sidecar::attestation::gcp_oidc::mode_a_eat_nonces(signer, slot_hash);
                 let payload = serde_json::json!({"aud":"solana-confidential-compute-verifier","dbgstat":"disabled-since-boot","eat_nonce":[n0,n1],"exp":4102444800u64,"iat":1700000000,"iss":"https://confidentialcomputing.googleapis.com","secboot":true,"sub":"s","submods":{"container":{"image_digest":format!("sha256:{}","ab".repeat(32))}}});
                 let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
                 let jwt = format!(
@@ -686,19 +607,10 @@ async fn simulated_gcp_registration_cannot_authorize_signing() {
             status: RwLock::new(AttestationSessionStatus::default()),
             allowed_consumer_program_id: None,
         });
-        solana_confidential_compute_sidecar::server::attest_current_key(&state)
-            .await
-            .expect("simulate");
+        solana_confidential_compute_sidecar::server::attest_current_key(&state).await.expect("simulate");
         let (addr, handle) = spawn_test_server(state).await;
         let client = Client::new();
-        let status: Value = client
-            .get(format!("http://{addr}/v1/status"))
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
+        let status: Value = client.get(format!("http://{addr}/v1/status")).send().await.unwrap().json().await.unwrap();
         assert_eq!(status["attestation_status"], "simulated");
         let ix = Instruction {
             program_id: solana_confidential_compute_cpi::ID,
@@ -707,14 +619,10 @@ async fn simulated_gcp_registration_cannot_authorize_signing() {
         };
         let tx = VersionedTransaction {
             signatures: vec![Signature::default()],
-            message: VersionedMessage::V0(
-                Message::try_compile(&pubkey, &[ix], &[], Hash::default()).unwrap(),
-            ),
+            message: VersionedMessage::V0(Message::try_compile(&pubkey, &[ix], &[], Hash::default()).unwrap()),
         };
-        let encoded = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            bincode::serialize(&tx).unwrap(),
-        );
+        let encoded =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bincode::serialize(&tx).unwrap());
         let response = client
             .post(format!("http://{addr}/v1/sign"))
             .json(&serde_json::json!({"transaction":encoded}))
@@ -749,11 +657,8 @@ async fn signing_binds_each_consumer_action() {
         allowed_consumer_program_id: Some(consumer),
     });
     let (addr, handle) = spawn_test_server(state).await;
-    let action = Instruction {
-        program_id: consumer,
-        accounts: vec![AccountMeta::new(pubkey, true)],
-        data: vec![1, 9, 9],
-    };
+    let action =
+        Instruction { program_id: consumer, accounts: vec![AccountMeta::new(pubkey, true)], data: vec![1, 9, 9] };
     let hash = canonical_action_hash(&pubkey, &action);
     let mut data = solana_confidential_compute_cpi::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.to_vec();
     data.extend_from_slice(&95u64.to_le_bytes());
@@ -781,10 +686,8 @@ async fn signing_binds_each_consumer_action() {
                 Message::try_compile(&Pubkey::new_unique(), &ixs, &[], Hash::default()).unwrap(),
             ),
         };
-        let encoded = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            bincode::serialize(&tx).unwrap(),
-        );
+        let encoded =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bincode::serialize(&tx).unwrap());
         let response = Client::new()
             .post(format!("http://{addr}/v1/sign"))
             .json(&serde_json::json!({"transaction":encoded}))
@@ -838,10 +741,7 @@ async fn expired_confirmed_unix_deadline_cannot_release_signature() {
         .unwrap();
     assert_eq!(response.status(), 403);
     let body: Value = response.json().await.unwrap();
-    assert!(body["error"]
-        .as_str()
-        .unwrap()
-        .contains("invalid or expired"));
+    assert!(body["error"].as_str().unwrap().contains("invalid or expired"));
     assert!(body.get("signature").is_none());
     assert!(body.get("transaction").is_none());
     handle.abort();
@@ -868,14 +768,8 @@ async fn status_does_not_claim_active_at_confirmed_unix_expiry() {
         allowed_consumer_program_id: None,
     });
     let (addr, handle) = spawn_test_server(state).await;
-    let response: Value = Client::new()
-        .get(format!("http://{addr}/v1/status"))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+    let response: Value =
+        Client::new().get(format!("http://{addr}/v1/status")).send().await.unwrap().json().await.unwrap();
     assert_ne!(response["attestation_status"], "active");
     handle.abort();
 }
@@ -901,9 +795,8 @@ async fn heartbeat_renews_at_unix_buffer_and_preserves_failed_refresh() {
         });
         // Provider refresh cannot complete: local RPC intentionally serves only
         // confirmed record + Clock, and no SlotHashes. No real RPC is contacted.
-        let heartbeat =
-            solana_confidential_compute_sidecar::HeartbeatDaemon::new(state.clone(), 1, 0)
-                .with_renewal_buffer_seconds(1);
+        let heartbeat = solana_confidential_compute_sidecar::HeartbeatDaemon::new(state.clone(), 1, 0)
+            .with_renewal_buffer_seconds(1);
         let result = heartbeat.poll_once().await;
         if expected_renewal {
             assert!(result.is_err());
@@ -929,10 +822,7 @@ impl AttestationProvider for ForbiddenMetadata {
     ) -> std::pin::Pin<
         Box<
             dyn std::future::Future<
-                    Output = Result<
-                        AttestationReport,
-                        solana_confidential_compute_sidecar::SidecarError,
-                    >,
+                    Output = Result<AttestationReport, solana_confidential_compute_sidecar::SidecarError>,
                 > + Send
                 + 'a,
         >,
@@ -944,9 +834,7 @@ impl AttestationProvider for ForbiddenMetadata {
 async fn gcp_dry_run_http_enrolls_without_metadata_and_cannot_sign() {
     let state = Arc::new(SidecarAppState {
         enrollment: solana_confidential_compute_sidecar::control::EnrollmentControl::new(
-            Some(zeroize::Zeroizing::new(
-                "test-operator-token-0123456789abcdef".into(),
-            )),
+            Some(zeroize::Zeroizing::new("test-operator-token-0123456789abcdef".into())),
             300,
         )
         .unwrap(),
@@ -966,14 +854,7 @@ async fn gcp_dry_run_http_enrolls_without_metadata_and_cannot_sign() {
         .await
         .unwrap();
     assert_eq!(enrolled.status(), 200);
-    let status: Value = client
-        .get(format!("http://{addr}/v1/status"))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+    let status: Value = client.get(format!("http://{addr}/v1/status")).send().await.unwrap().json().await.unwrap();
     assert_eq!(status["attestation_status"], "simulated");
     let denied = client
         .post(format!("http://{addr}/v1/sign"))
@@ -1003,25 +884,18 @@ async fn issue_292_heartbeat_recovers_initial_and_repeated_enrollment_failures()
         ) -> std::pin::Pin<
             Box<
                 dyn std::future::Future<
-                        Output = Result<
-                            AttestationReport,
-                            solana_confidential_compute_sidecar::error::SidecarError,
-                        >,
+                        Output = Result<AttestationReport, solana_confidential_compute_sidecar::error::SidecarError>,
                     > + Send
                     + 'a,
             >,
         > {
             Box::pin(async move {
                 if self.0.fetch_add(1, Ordering::SeqCst) < 2 {
-                    return Err(
-                        solana_confidential_compute_sidecar::error::SidecarError::OnchainError(
-                            "controlled transient failure".into(),
-                        ),
-                    );
+                    return Err(solana_confidential_compute_sidecar::error::SidecarError::OnchainError(
+                        "controlled transient failure".into(),
+                    ));
                 }
-                MockAttestationProvider::default()
-                    .request_attestation(key, hash)
-                    .await
+                MockAttestationProvider::default().request_attestation(key, hash).await
             })
         }
     }
@@ -1040,12 +914,8 @@ async fn issue_292_heartbeat_recovers_initial_and_repeated_enrollment_failures()
     });
     assert!(reattest_current_key(&state).await.is_err());
     assert!(state.status.read().await.expires_slot.is_none());
-    let heartbeat = solana_confidential_compute_sidecar::heartbeat::HeartbeatDaemon::new(
-        state.clone(),
-        1,
-        5000,
-    )
-    .spawn();
+    let heartbeat =
+        solana_confidential_compute_sidecar::heartbeat::HeartbeatDaemon::new(state.clone(), 1, 5000).spawn();
     let recovered = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             if state.status.read().await.expires_slot.is_some() {
@@ -1056,10 +926,7 @@ async fn issue_292_heartbeat_recovers_initial_and_repeated_enrollment_failures()
     })
     .await;
     heartbeat.abort();
-    assert!(
-        recovered.is_ok(),
-        "heartbeat must retry while unattested after each transient failure"
-    );
+    assert!(recovered.is_ok(), "heartbeat must retry while unattested after each transient failure");
     assert_eq!(state.keys.read().await.pubkey(), original);
     assert_eq!(provider.0.load(Ordering::SeqCst), 3);
     assert_eq!(onchain.mock_cluster().unwrap().submitted().len(), 1);
@@ -1072,16 +939,8 @@ async fn issue_301_foreign_mode_b_cannot_authorize_sidecar_session() {
     let keys = EphemeralKeyManager::new();
     let own = keys.pubkey();
     let consumer = Pubkey::new_unique();
-    let action = Instruction {
-        program_id: consumer,
-        accounts: vec![AccountMeta::new(own, true)],
-        data: vec![0],
-    };
-    let hash = solana_confidential_compute_cpi::hash_action(
-        &action.data,
-        &[AccountMeta::new(own, true)],
-        &[],
-    );
+    let action = Instruction { program_id: consumer, accounts: vec![AccountMeta::new(own, true)], data: vec![0] };
+    let hash = solana_confidential_compute_cpi::hash_action(&action.data, &[AccountMeta::new(own, true)], &[]);
     let state = Arc::new(SidecarAppState {
         enrollment: solana_confidential_compute_sidecar::control::EnrollmentControl::default(),
         enclave_mode: EnclaveMode::AmdSevSnp,
@@ -1114,8 +973,7 @@ async fn issue_301_foreign_mode_b_cannot_authorize_sidecar_session() {
     gcp.extend_from_slice(&1u32.to_le_bytes());
     gcp.push(b'x');
     let document = include_bytes!("../../../fixtures/nitro_hardware_document.cose");
-    let mut nitro =
-        solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR.to_vec();
+    let mut nitro = solana_confidential_compute_cpi::VERIFY_NITRO_ATTESTATION_DISCRIMINATOR.to_vec();
     nitro.push(1);
     nitro.extend_from_slice(&95u64.to_le_bytes());
     nitro.extend_from_slice(&hash);

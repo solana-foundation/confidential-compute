@@ -33,19 +33,14 @@ pub fn verify_p384_signature(
     sec1_bytes[0] = 0x04;
     sec1_bytes[1..97].copy_from_slice(public_key_xy);
 
-    let encoded_point =
-        EncodedPoint::from_bytes(sec1_bytes).map_err(|_| CryptoError::InvalidP384PublicKey)?;
+    let encoded_point = EncodedPoint::from_bytes(sec1_bytes).map_err(|_| CryptoError::InvalidP384PublicKey)?;
 
-    let verifying_key = VerifyingKey::from_encoded_point(&encoded_point)
-        .map_err(|_| CryptoError::InvalidP384PublicKey)?;
+    let verifying_key =
+        VerifyingKey::from_encoded_point(&encoded_point).map_err(|_| CryptoError::InvalidP384PublicKey)?;
 
-    let signature = Signature::from_slice(signature_rs.as_slice())
-        .map_err(|_| CryptoError::InvalidP384Signature)?;
+    let signature = Signature::from_slice(signature_rs.as_slice()).map_err(|_| CryptoError::InvalidP384Signature)?;
 
-    verifying_key
-        .verify_prehash(hash_sha384, &signature)
-        .map(|_| true)
-        .map_err(|_| CryptoError::InvalidP384Signature)
+    verifying_key.verify_prehash(hash_sha384, &signature).map(|_| true).map_err(|_| CryptoError::InvalidP384Signature)
 }
 
 /// Computes SHA-384 over the 672-byte signed body of an AMD SEV-SNP report
@@ -96,9 +91,7 @@ mod tests {
         msg_hash[0] = 0xAA;
 
         // Sign precomputed hash
-        let (signature, _) = signing_key
-            .sign_prehash(&msg_hash)
-            .expect("signing succeeds");
+        let (signature, _) = signing_key.sign_prehash(&msg_hash).expect("signing succeeds");
         let sig_bytes = signature.to_bytes();
         let mut sig_rs = [0u8; 96];
         sig_rs.copy_from_slice(sig_bytes.as_slice());

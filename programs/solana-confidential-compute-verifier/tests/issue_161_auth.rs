@@ -1,16 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_confidential_compute_verifier::{
-    payload::*, processor::Processor, state::PolicyRegistry,
-};
+use solana_confidential_compute_verifier::{payload::*, processor::Processor, state::PolicyRegistry};
 use solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
-fn account(
-    key: Pubkey,
-    owner: Pubkey,
-    signer: bool,
-    writable: bool,
-    data: Vec<u8>,
-) -> AccountInfo<'static> {
+fn account(key: Pubkey, owner: Pubkey, signer: bool, writable: bool, data: Vec<u8>) -> AccountInfo<'static> {
     AccountInfo::new(
         Box::leak(Box::new(key)),
         signer,
@@ -40,13 +32,7 @@ fn init_accounts(pid: Pubkey, authority: Pubkey) -> Vec<AccountInfo<'static>> {
     vec![
         account(authority, pid, true, true, vec![]),
         account(reg, pid, false, true, vec![0; PolicyRegistry::SIZE]),
-        account(
-            solana_sdk_ids::system_program::id(),
-            pid,
-            false,
-            false,
-            vec![],
-        ),
+        account(solana_sdk_ids::system_program::id(), pid, false, false, vec![]),
         account(pd, loader, false, false, data),
     ]
 }
@@ -75,10 +61,7 @@ fn init_requires_authenticated_program_data_and_preserves_state_on_failure() {
     let accounts = init_accounts(pid, auth);
     assert_eq!(Processor::process(&pid, &accounts, &ix), Ok(()));
     assert_eq!(saved(&accounts[1]).authority, auth.to_bytes());
-    assert_eq!(
-        Processor::process(&pid, &accounts, &ix),
-        Err(ProgramError::AccountAlreadyInitialized)
-    );
+    assert_eq!(Processor::process(&pid, &accounts, &ix), Err(ProgramError::AccountAlreadyInitialized));
     for case in 0..9 {
         let mut a = init_accounts(pid, auth);
         match case {
@@ -98,8 +81,7 @@ fn init_requires_authenticated_program_data_and_preserves_state_on_failure() {
                 a[3].try_borrow_mut_data().unwrap()[12] = 2;
             } // invalid Option tag
             5 => {
-                a[3].try_borrow_mut_data().unwrap()[13..45]
-                    .copy_from_slice(Pubkey::new_unique().as_ref());
+                a[3].try_borrow_mut_data().unwrap()[13..45].copy_from_slice(Pubkey::new_unique().as_ref());
             }
             6 => {
                 let data = a[3].data.borrow().to_vec();
@@ -115,14 +97,7 @@ fn init_requires_authenticated_program_data_and_preserves_state_on_failure() {
             _ => unreachable!(),
         }
         let before = a[1].data.borrow().to_vec();
-        assert!(
-            Processor::process(&pid, &a, &ix).is_err(),
-            "invalid ProgramData case {case} accepted"
-        );
-        assert_eq!(
-            *a[1].data.borrow(),
-            before.as_slice(),
-            "case {case} mutated registry"
-        );
+        assert!(Processor::process(&pid, &a, &ix).is_err(), "invalid ProgramData case {case} accepted");
+        assert_eq!(*a[1].data.borrow(), before.as_slice(), "case {case} mutated registry");
     }
 }

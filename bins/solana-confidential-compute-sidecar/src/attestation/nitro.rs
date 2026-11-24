@@ -4,9 +4,7 @@
 
 #[cfg(test)]
 use solana_confidential_compute_core::NITRO_PCR_LEN;
-use solana_confidential_compute_core::{
-    types::EnclaveType, MAX_NITRO_DOCUMENT_LEN, NITRO_USER_DATA_LEN,
-};
+use solana_confidential_compute_core::{types::EnclaveType, MAX_NITRO_DOCUMENT_LEN, NITRO_USER_DATA_LEN};
 #[cfg(any(test, target_os = "linux"))]
 use solana_confidential_compute_crypto::cbor::CborCursor;
 use solana_confidential_compute_crypto::parse_nitro_attestation;
@@ -51,9 +49,7 @@ pub struct AwsNitroProvider {
 
 impl AwsNitroProvider {
     pub fn new(device_path: Option<&str>) -> Self {
-        Self {
-            device_path: device_path.unwrap_or("/dev/nsm").to_string(),
-        }
+        Self { device_path: device_path.unwrap_or("/dev/nsm").to_string() }
     }
 }
 
@@ -93,10 +89,7 @@ impl AwsNitroProvider {
         #[cfg(target_os = "linux")]
         {
             if !std::path::Path::new(&self.device_path).exists() {
-                return Err(SidecarError::IoctlError(format!(
-                    "NSM device is missing: {}",
-                    self.device_path
-                )));
+                return Err(SidecarError::IoctlError(format!("NSM device is missing: {}", self.device_path)));
             }
             request_from_nsm(&self.device_path, user_data, nonce)
         }
@@ -126,13 +119,10 @@ fn accept_nitro_document(
             document.len()
         )));
     }
-    let (_cose, view) = parse_nitro_attestation(&document).map_err(|e| {
-        SidecarError::AttestationError(format!("Nitro COSE Sign1 parse failed: {e:?}"))
-    })?;
+    let (_cose, view) = parse_nitro_attestation(&document)
+        .map_err(|e| SidecarError::AttestationError(format!("Nitro COSE Sign1 parse failed: {e:?}")))?;
     if view.pcrs.pcr0_is_zero() {
-        return Err(SidecarError::AttestationError(
-            "Nitro document PCR0 measurement is all zeros".to_string(),
-        ));
+        return Err(SidecarError::AttestationError("Nitro document PCR0 measurement is all zeros".to_string()));
     }
     if view.user_data != workload_signer.to_bytes() {
         return Err(SidecarError::AttestationError(
@@ -140,9 +130,7 @@ fn accept_nitro_document(
         ));
     }
     if &view.nonce != slot_hash {
-        return Err(SidecarError::AttestationError(
-            "Nitro document nonce does not bind the slot hash".to_string(),
-        ));
+        return Err(SidecarError::AttestationError("Nitro document nonce does not bind the slot hash".to_string()));
     }
     Ok(AttestationReport::AwsNitro { document })
 }
@@ -165,61 +153,46 @@ fn encode_nsm_attestation_request(user_data: &[u8; 32], nonce: &[u8; 32]) -> Vec
 #[cfg(any(test, target_os = "linux"))]
 fn decode_nsm_attestation_response(buf: &[u8]) -> Result<Vec<u8>, SidecarError> {
     let mut cur = CborCursor::new(buf);
-    let n = cur
-        .read_map_len()
-        .map_err(|e| SidecarError::IoctlError(format!("NSM response is not a CBOR map: {e:?}")))?;
+    let n =
+        cur.read_map_len().map_err(|e| SidecarError::IoctlError(format!("NSM response is not a CBOR map: {e:?}")))?;
     if n != 1 {
-        return Err(SidecarError::IoctlError(
-            "NSM response map must contain exactly one key".to_string(),
-        ));
+        return Err(SidecarError::IoctlError("NSM response map must contain exactly one key".to_string()));
     }
-    let key = cur
-        .read_tstr()
-        .map_err(|e| SidecarError::IoctlError(format!("NSM response key is not text: {e:?}")))?;
+    let key = cur.read_tstr().map_err(|e| SidecarError::IoctlError(format!("NSM response key is not text: {e:?}")))?;
     match key {
         "Error" => {
-            let msg = cur.read_tstr().map_err(|e| {
-                SidecarError::IoctlError(format!("NSM error payload is not text: {e:?}"))
-            })?;
-            Err(SidecarError::IoctlError(format!(
-                "NSM returned error: {msg}"
-            )))
+            let msg = cur
+                .read_tstr()
+                .map_err(|e| SidecarError::IoctlError(format!("NSM error payload is not text: {e:?}")))?;
+            Err(SidecarError::IoctlError(format!("NSM returned error: {msg}")))
         }
         "Attestation" => {
-            let inner_n = cur.read_map_len().map_err(|e| {
-                SidecarError::IoctlError(format!("NSM Attestation value is not a map: {e:?}"))
-            })?;
+            let inner_n = cur
+                .read_map_len()
+                .map_err(|e| SidecarError::IoctlError(format!("NSM Attestation value is not a map: {e:?}")))?;
             if inner_n != 1 {
-                return Err(SidecarError::IoctlError(
-                    "NSM Attestation map must contain exactly one key".to_string(),
-                ));
+                return Err(SidecarError::IoctlError("NSM Attestation map must contain exactly one key".to_string()));
             }
-            let inner_key = cur.read_tstr().map_err(|e| {
-                SidecarError::IoctlError(format!("NSM Attestation key is not text: {e:?}"))
-            })?;
+            let inner_key = cur
+                .read_tstr()
+                .map_err(|e| SidecarError::IoctlError(format!("NSM Attestation key is not text: {e:?}")))?;
             if inner_key != "document" {
                 return Err(SidecarError::IoctlError(format!(
                     "NSM Attestation map is missing document (got {inner_key})"
                 )));
             }
-            let document = cur.read_bstr().map_err(|e| {
-                SidecarError::IoctlError(format!("NSM document is not a byte string: {e:?}"))
-            })?;
+            let document = cur
+                .read_bstr()
+                .map_err(|e| SidecarError::IoctlError(format!("NSM document is not a byte string: {e:?}")))?;
             if document.is_empty() {
-                return Err(SidecarError::IoctlError(
-                    "NSM attestation document is empty".to_string(),
-                ));
+                return Err(SidecarError::IoctlError("NSM attestation document is empty".to_string()));
             }
             if cur.remaining().iter().any(|&b| b != 0) {
-                return Err(SidecarError::IoctlError(
-                    "NSM response has trailing non-zero bytes".to_string(),
-                ));
+                return Err(SidecarError::IoctlError("NSM response has trailing non-zero bytes".to_string()));
             }
             Ok(document.to_vec())
         }
-        other => Err(SidecarError::IoctlError(format!(
-            "NSM response has unknown key {other}"
-        ))),
+        other => Err(SidecarError::IoctlError(format!("NSM response has unknown key {other}"))),
     }
 }
 
@@ -232,11 +205,7 @@ pub(crate) fn synthetic_cose_sign1(user_data: &[u8; 32], nonce: &[u8; 32]) -> Ve
 }
 
 #[cfg(test)]
-fn synthetic_cose_sign1_with_pcr0(
-    user_data: &[u8; 32],
-    nonce: &[u8; 32],
-    pcr0: &[u8; NITRO_PCR_LEN],
-) -> Vec<u8> {
+fn synthetic_cose_sign1_with_pcr0(user_data: &[u8; 32], nonce: &[u8; 32], pcr0: &[u8; NITRO_PCR_LEN]) -> Vec<u8> {
     let payload = synthetic_attestation_payload(user_data, nonce, pcr0);
     let mut doc = Vec::new();
     doc.push(COSE_SIGN1_TAG);
@@ -249,11 +218,7 @@ fn synthetic_cose_sign1_with_pcr0(
 }
 
 #[cfg(test)]
-fn synthetic_attestation_payload(
-    user_data: &[u8; 32],
-    nonce: &[u8; 32],
-    pcr0: &[u8; NITRO_PCR_LEN],
-) -> Vec<u8> {
+fn synthetic_attestation_payload(user_data: &[u8; 32], nonce: &[u8; 32], pcr0: &[u8; NITRO_PCR_LEN]) -> Vec<u8> {
     let pcr1 = [0x01u8; NITRO_PCR_LEN];
     let pcr2 = [0x02u8; NITRO_PCR_LEN];
     let pcr8 = [0x08u8; NITRO_PCR_LEN];
@@ -337,11 +302,7 @@ fn push_cbor_bstr(out: &mut Vec<u8>, b: &[u8]) {
 }
 
 #[cfg(target_os = "linux")]
-fn request_from_nsm(
-    device_path: &str,
-    user_data: &[u8; 32],
-    nonce: &[u8; 32],
-) -> Result<Vec<u8>, SidecarError> {
+fn request_from_nsm(device_path: &str, user_data: &[u8; 32], nonce: &[u8; 32]) -> Result<Vec<u8>, SidecarError> {
     use std::fs::OpenOptions;
     use std::os::unix::io::AsRawFd;
 
@@ -349,15 +310,11 @@ fn request_from_nsm(
         .read(true)
         .write(true)
         .open(device_path)
-        .map_err(|e| {
-            SidecarError::IoctlError(format!("Failed to open NSM device {device_path}: {e}"))
-        })?;
+        .map_err(|e| SidecarError::IoctlError(format!("Failed to open NSM device {device_path}: {e}")))?;
 
     let request = encode_nsm_attestation_request(user_data, nonce);
     if request.len() > NSM_REQUEST_MAX_SIZE {
-        return Err(SidecarError::IoctlError(
-            "NSM attestation request exceeds NSM_REQUEST_MAX_SIZE".to_string(),
-        ));
+        return Err(SidecarError::IoctlError("NSM attestation request exceeds NSM_REQUEST_MAX_SIZE".to_string()));
     }
 
     let mut request_buf = [0u8; NSM_REQUEST_MAX_SIZE];
@@ -377,37 +334,20 @@ fn request_from_nsm(
     }
 
     let mut message = NsmMessage {
-        request: NsmIovec {
-            iov_base: request_buf.as_ptr() as usize as u64,
-            iov_len: request.len() as u64,
-        },
-        response: NsmIovec {
-            iov_base: response_buf.as_mut_ptr() as usize as u64,
-            iov_len: response_buf.len() as u64,
-        },
+        request: NsmIovec { iov_base: request_buf.as_ptr() as usize as u64, iov_len: request.len() as u64 },
+        response: NsmIovec { iov_base: response_buf.as_mut_ptr() as usize as u64, iov_len: response_buf.len() as u64 },
     };
 
-    let ret = unsafe {
-        libc::ioctl(
-            file.as_raw_fd(),
-            NSM_REQUEST_ATTESTATION as libc::c_ulong,
-            &mut message,
-        )
-    };
+    let ret = unsafe { libc::ioctl(file.as_raw_fd(), NSM_REQUEST_ATTESTATION as libc::c_ulong, &mut message) };
     if ret != 0 {
         let err = std::io::Error::last_os_error();
-        return Err(SidecarError::IoctlError(format!(
-            "NSM_REQUEST_ATTESTATION ioctl failed (ret={ret}): {err}"
-        )));
+        return Err(SidecarError::IoctlError(format!("NSM_REQUEST_ATTESTATION ioctl failed (ret={ret}): {err}")));
     }
 
-    let resp_len = usize::try_from(message.response.iov_len).map_err(|_| {
-        SidecarError::IoctlError("NSM response length does not fit usize".to_string())
-    })?;
+    let resp_len = usize::try_from(message.response.iov_len)
+        .map_err(|_| SidecarError::IoctlError("NSM response length does not fit usize".to_string()))?;
     if resp_len == 0 || resp_len > NSM_RESPONSE_MAX_SIZE {
-        return Err(SidecarError::IoctlError(format!(
-            "NSM response length {resp_len} is invalid"
-        )));
+        return Err(SidecarError::IoctlError(format!("NSM response length {resp_len} is invalid")));
     }
     decode_nsm_attestation_response(&response_buf[..resp_len])
 }
@@ -492,8 +432,7 @@ mod tests {
     fn reject_zero_pcr0() {
         let signer = Pubkey::new_from_array([0x80; 32]);
         let slot_hash = [0x5au8; 32];
-        let document =
-            synthetic_cose_sign1_with_pcr0(&signer.to_bytes(), &slot_hash, &[0u8; NITRO_PCR_LEN]);
+        let document = synthetic_cose_sign1_with_pcr0(&signer.to_bytes(), &slot_hash, &[0u8; NITRO_PCR_LEN]);
         let err = accept_nitro_document(document, &signer, &slot_hash).unwrap_err();
         match err {
             SidecarError::AttestationError(msg) => {
@@ -522,8 +461,7 @@ mod tests {
     fn reject_oversized_document() {
         let signer = Pubkey::new_unique();
         let slot_hash = [0u8; 32];
-        let err = accept_nitro_document(vec![0u8; MAX_NITRO_DOCUMENT_LEN + 1], &signer, &slot_hash)
-            .unwrap_err();
+        let err = accept_nitro_document(vec![0u8; MAX_NITRO_DOCUMENT_LEN + 1], &signer, &slot_hash).unwrap_err();
         match err {
             SidecarError::AttestationError(msg) => {
                 assert!(msg.contains("outside"));
@@ -534,15 +472,11 @@ mod tests {
 
     #[tokio::test]
     async fn provider_fails_closed_without_nsm() {
-        let provider =
-            AwsNitroProvider::new(Some("/dev/nsm-missing-confidential-compute-issue-50"));
+        let provider = AwsNitroProvider::new(Some("/dev/nsm-missing-confidential-compute-issue-50"));
         assert_eq!(provider.enclave_type(), EnclaveType::AwsNitro);
         let signer = Pubkey::new_from_array([0x80; 32]);
         let slot_hash = [0x11u8; 32];
-        let err = provider
-            .request_attestation(&signer, &slot_hash)
-            .await
-            .unwrap_err();
+        let err = provider.request_attestation(&signer, &slot_hash).await.unwrap_err();
         match err {
             SidecarError::IoctlError(_) => {}
             other => panic!("expected IoctlError, got {other:?}"),

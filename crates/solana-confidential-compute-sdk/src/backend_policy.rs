@@ -17,19 +17,13 @@ pub enum BackendPolicyError {
     #[error("at most eight 48-byte measurements are supported")]
     InvalidMeasurements,
 }
-pub fn derive_backend_policy_pda(
-    program_id: &Pubkey,
-    source: u8,
-) -> Result<(Pubkey, u8), BackendPolicyError> {
+pub fn derive_backend_policy_pda(program_id: &Pubkey, source: u8) -> Result<(Pubkey, u8), BackendPolicyError> {
     // 5 is Intel TDX. Without it a caller has to hand-encode the
     // governance transaction that seats the TDX policy.
     if !(1..=5).contains(&source) {
         return Err(BackendPolicyError::InvalidSource);
     }
-    Ok(Pubkey::find_program_address(
-        &[BACKEND_POLICY_SEED, &[source]],
-        program_id,
-    ))
+    Ok(Pubkey::find_program_address(&[BACKEND_POLICY_SEED, &[source]], program_id))
 }
 /// An empty list halts new admission for this backend. Set all three backend
 /// lists empty to halt all backends. Existing Mode A signers must be revoked
@@ -55,10 +49,7 @@ pub fn build_set_backend_policy_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new_readonly(*authority, true),
-            AccountMeta::new_readonly(
-                Pubkey::find_program_address(&[b"policy_registry"], program_id).0,
-                false,
-            ),
+            AccountMeta::new_readonly(Pubkey::find_program_address(&[b"policy_registry"], program_id).0, false),
             AccountMeta::new(backend, false),
             AccountMeta::new(*payer, true),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
@@ -68,9 +59,7 @@ pub fn build_set_backend_policy_ix(
 }
 /// Builder-internal source tags are fixed constants, not caller-controlled.
 pub(crate) fn with_backend_policy(mut ix: Instruction, source: u8) -> Instruction {
-    let address = derive_backend_policy_pda(&ix.program_id, source)
-        .expect("fixed supported verification backend")
-        .0;
+    let address = derive_backend_policy_pda(&ix.program_id, source).expect("fixed supported verification backend").0;
     ix.accounts.push(AccountMeta::new_readonly(address, false));
     ix
 }

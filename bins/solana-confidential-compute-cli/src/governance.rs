@@ -7,9 +7,7 @@
 const GOVERNABLE_SOURCES: [u8; 4] = [1, 2, 3, 5];
 
 fn parse_backend_source(value: &str) -> Result<u8, String> {
-    let source: u8 = value
-        .parse()
-        .map_err(|_| format!("`{value}` is not a backend source"))?;
+    let source: u8 = value.parse().map_err(|_| format!("`{value}` is not a backend source"))?;
     if !GOVERNABLE_SOURCES.contains(&source) {
         return Err(format!(
             "backend source must be one of {GOVERNABLE_SOURCES:?} \
@@ -133,88 +131,43 @@ fn argument(e: sdk::GovernanceError) -> CliError {
 pub fn build_transaction(args: &GovernanceArgs) -> Result<Transaction, CliError> {
     let pid = parse_pubkey(&args.program_id)?;
     let authority = parse_pubkey(&args.authority)?;
-    let payer = args
-        .fee_payer
-        .as_deref()
-        .map(parse_pubkey)
-        .transpose()?
-        .unwrap_or(authority);
+    let payer = args.fee_payer.as_deref().map(parse_pubkey).transpose()?.unwrap_or(authority);
     let ix: Instruction = match &args.command {
         GovernanceCommand::EmergencyHalt { source } => {
             backend_policy::build_set_backend_policy_ix(&pid, &authority, &payer, *source, &[])
                 .map_err(|e| CliError::InvalidArgument(e.to_string()))?
         }
-        GovernanceCommand::SetBackendPolicy {
-            source,
-            measurement,
-        } => {
-            let measurements = measurement
-                .iter()
-                .map(|m| fixed::<48>(m))
-                .collect::<Result<Vec<_>, _>>()?;
-            backend_policy::build_set_backend_policy_ix(
-                &pid,
-                &authority,
-                &payer,
-                *source,
-                &measurements,
-            )
-            .map_err(|e| CliError::InvalidArgument(e.to_string()))?
+        GovernanceCommand::SetBackendPolicy { source, measurement } => {
+            let measurements = measurement.iter().map(|m| fixed::<48>(m)).collect::<Result<Vec<_>, _>>()?;
+            backend_policy::build_set_backend_policy_ix(&pid, &authority, &payer, *source, &measurements)
+                .map_err(|e| CliError::InvalidArgument(e.to_string()))?
         }
         GovernanceCommand::SetGcpTenantPolicy { audience, subject } => {
             gcp_policy::build_set_gcp_tenant_policy_ix(&pid, &authority, &payer, audience, subject)
                 .map_err(|e| CliError::InvalidArgument(e.to_string()))?
         }
-        GovernanceCommand::RevokeVcek {
-            chip_id_hash,
-            tcb_version,
-        } => sdk::build_revoke_vcek_ix(
-            &pid,
-            &authority,
-            &payer,
-            &fixed::<32>(chip_id_hash)?,
-            *tcb_version,
-        ),
-        GovernanceCommand::UpdatePolicy {
-            min_tcb,
-            measurement,
-        } => {
-            let min_tcb: [u8; 4] = min_tcb
-                .clone()
-                .try_into()
-                .map_err(|_| CliError::InvalidArgument("four TCB bytes required".into()))?;
-            let measurements = measurement
-                .iter()
-                .map(|m| fixed::<48>(m))
-                .collect::<Result<Vec<_>, _>>()?;
-            sdk::build_update_policy_ix(
-                &pid,
-                &authority,
-                &sdk::PolicyUpdate {
-                    min_tcb,
-                    measurements,
-                },
-            )
-            .map_err(argument)?
+        GovernanceCommand::RevokeVcek { chip_id_hash, tcb_version } => {
+            sdk::build_revoke_vcek_ix(&pid, &authority, &payer, &fixed::<32>(chip_id_hash)?, *tcb_version)
+        }
+        GovernanceCommand::UpdatePolicy { min_tcb, measurement } => {
+            let min_tcb: [u8; 4] =
+                min_tcb.clone().try_into().map_err(|_| CliError::InvalidArgument("four TCB bytes required".into()))?;
+            let measurements = measurement.iter().map(|m| fixed::<48>(m)).collect::<Result<Vec<_>, _>>()?;
+            sdk::build_update_policy_ix(&pid, &authority, &sdk::PolicyUpdate { min_tcb, measurements })
+                .map_err(argument)?
         }
         GovernanceCommand::RotateRootCert { root } => {
             sdk::build_rotate_root_cert_ix(&pid, &authority, &fixed::<96>(root)?)
         }
-        GovernanceCommand::RegisterJwksKey { kid, modulus } => sdk::build_register_jwks_key_ix(
-            &pid,
-            &authority,
-            &payer,
-            kid.as_bytes(),
-            &fixed::<256>(modulus)?,
-            65537,
-        )
-        .map_err(argument)?,
+        GovernanceCommand::RegisterJwksKey { kid, modulus } => {
+            sdk::build_register_jwks_key_ix(&pid, &authority, &payer, kid.as_bytes(), &fixed::<256>(modulus)?, 65537)
+                .map_err(argument)?
+        }
         GovernanceCommand::RevokeJwksKey { kid_hash } => {
             sdk::build_revoke_jwks_key_ix(&pid, &authority, fixed::<32>(kid_hash)?)
         }
         GovernanceCommand::RotateAuthority { new_authority } => {
-            sdk::build_rotate_authority_ix(&pid, &authority, &parse_pubkey(new_authority)?)
-                .map_err(argument)?
+            sdk::build_rotate_authority_ix(&pid, &authority, &parse_pubkey(new_authority)?).map_err(argument)?
         }
         GovernanceCommand::RevokeAttestedSigner { signer } => {
             sdk::build_revoke_attested_signer_ix(&pid, &authority, &parse_pubkey(signer)?)
@@ -242,9 +195,7 @@ mod tests {
             pid.to_string(),
         ];
         argv.extend(command.iter().map(|s| s.to_string()));
-        let Commands::Governance(args) = Cli::try_parse_from(argv).unwrap().command else {
-            panic!("wrong command")
-        };
+        let Commands::Governance(args) = Cli::try_parse_from(argv).unwrap().command else { panic!("wrong command") };
         build_transaction(&args).unwrap()
     }
 
@@ -267,30 +218,16 @@ mod tests {
                         command.extend(["--measurement", &measurement_arg]);
                     }
                     let tx = export(authority, payer, pid, &command);
-                    let expected = backend_policy::build_set_backend_policy_ix(
-                        &pid,
-                        &authority,
-                        &payer,
-                        source,
-                        &measurements,
-                    )
-                    .unwrap();
+                    let expected =
+                        backend_policy::build_set_backend_policy_ix(&pid, &authority, &payer, source, &measurements)
+                            .unwrap();
                     assert_eq!(tx, Transaction::new_with_payer(&[expected], Some(&payer)));
                     // Serializing the unsigned transaction reserves every signature's space.
-                    assert!(
-                        bincode::serialized_size(&tx).unwrap()
-                            <= solana_packet::PACKET_DATA_SIZE as u64
-                    );
-                    assert_eq!(
-                        tx.message.header.num_required_signatures,
-                        if payer == authority { 1 } else { 2 }
-                    );
+                    assert!(bincode::serialized_size(&tx).unwrap() <= solana_packet::PACKET_DATA_SIZE as u64);
+                    assert_eq!(tx.message.header.num_required_signatures, if payer == authority { 1 } else { 2 });
                     assert_eq!(tx.message.instructions.len(), 1);
                     assert_eq!(tx.message.instructions[0].data[8], source);
-                    assert_eq!(
-                        &tx.message.instructions[0].data[9..13],
-                        &(measurements.len() as u32).to_le_bytes()
-                    );
+                    assert_eq!(&tx.message.instructions[0].data[9..13], &(measurements.len() as u32).to_le_bytes());
                 }
             }
         }
@@ -306,24 +243,12 @@ mod tests {
                 authority,
                 payer,
                 pid,
-                &[
-                    "revoke-vcek",
-                    "--chip-id-hash",
-                    &hex::encode([7; 32]),
-                    "--tcb-version",
-                    &u64::MAX.to_string(),
-                ],
+                &["revoke-vcek", "--chip-id-hash", &hex::encode([7; 32]), "--tcb-version", &u64::MAX.to_string()],
             );
             assert_eq!(
                 tx,
                 Transaction::new_with_payer(
-                    &[sdk::build_revoke_vcek_ix(
-                        &pid,
-                        &authority,
-                        &payer,
-                        &[7; 32],
-                        u64::MAX
-                    ),],
+                    &[sdk::build_revoke_vcek_ix(&pid, &authority, &payer, &[7; 32], u64::MAX),],
                     Some(&payer)
                 )
             );
@@ -368,16 +293,15 @@ mod tests {
             vec!["revoke-vcek", "--chip-id-hash", "aa"],
             vec!["set-gcp-tenant-policy", "--audience", "aud"],
         ] {
-            let mut argv = vec![
-                "solana-confidential-compute",
-                "governance",
-                "--authority",
-                &authority,
-            ];
+            let mut argv = vec!["solana-confidential-compute", "governance", "--authority", &authority];
             argv.extend(command);
             assert!(Cli::try_parse_from(argv).is_err());
         }
-        let too_many = ["--measurement", "424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242"].repeat(9);
+        let too_many = [
+            "--measurement",
+            "424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242",
+        ]
+        .repeat(9);
         let mut oversized = vec!["set-backend-policy", "--source", "1"];
         oversized.extend(too_many);
         let long_aud = "é".repeat(65);
@@ -386,38 +310,13 @@ mod tests {
             vec!["set-backend-policy", "--source", "1", "--measurement", "aa"],
             oversized,
             vec!["revoke-vcek", "--chip-id-hash", "zz", "--tcb-version", "0"],
-            vec![
-                "set-gcp-tenant-policy",
-                "--audience",
-                "",
-                "--subject",
-                "sub",
-            ],
-            vec![
-                "set-gcp-tenant-policy",
-                "--audience",
-                &long_aud,
-                "--subject",
-                "sub",
-            ],
-            vec![
-                "set-gcp-tenant-policy",
-                "--audience",
-                "aud",
-                "--subject",
-                &long_sub,
-            ],
+            vec!["set-gcp-tenant-policy", "--audience", "", "--subject", "sub"],
+            vec!["set-gcp-tenant-policy", "--audience", &long_aud, "--subject", "sub"],
+            vec!["set-gcp-tenant-policy", "--audience", "aud", "--subject", &long_sub],
         ] {
-            let mut argv = vec![
-                "solana-confidential-compute",
-                "governance",
-                "--authority",
-                &authority,
-            ];
+            let mut argv = vec!["solana-confidential-compute", "governance", "--authority", &authority];
             argv.extend(command);
-            let Commands::Governance(args) = Cli::try_parse_from(argv).unwrap().command else {
-                panic!()
-            };
+            let Commands::Governance(args) = Cli::try_parse_from(argv).unwrap().command else { panic!() };
             assert!(build_transaction(&args).is_err());
         }
     }
@@ -435,35 +334,23 @@ mod tests {
                 &source.to_string(),
             ])
             .unwrap();
-            let Commands::Governance(args) = cli.command else {
-                panic!("wrong command")
-            };
+            let Commands::Governance(args) = cli.command else { panic!("wrong command") };
             let tx = build_transaction(&args).unwrap();
             let data = &tx.message.instructions[0].data;
-            assert_eq!(
-                &data[..8],
-                &solana_confidential_compute_sdk::backend_policy::SET_BACKEND_POLICY_DISCRIMINATOR
-            );
+            assert_eq!(&data[..8], &solana_confidential_compute_sdk::backend_policy::SET_BACKEND_POLICY_DISCRIMINATOR);
             assert_eq!(data[8], source);
             assert_eq!(&data[9..13], &0u32.to_le_bytes());
             assert_eq!(data.len(), 8 + 1 + 4 + 8 * 48);
             assert!(data[13..].iter().all(|b| *b == 0));
-            let backend =
-                solana_confidential_compute_sdk::backend_policy::derive_backend_policy_pda(
-                    &parse_pubkey(DEFAULT_PROGRAM_ID).unwrap(),
-                    source,
-                )
-                .unwrap()
-                .0;
+            let backend = solana_confidential_compute_sdk::backend_policy::derive_backend_policy_pda(
+                &parse_pubkey(DEFAULT_PROGRAM_ID).unwrap(),
+                source,
+            )
+            .unwrap()
+            .0;
             assert!(tx.message.account_keys.contains(&backend));
-            assert!(tx
-                .signatures
-                .iter()
-                .all(|s| *s == solana_sdk::signature::Signature::default()));
-            assert_eq!(
-                tx.message.recent_blockhash,
-                solana_sdk::hash::Hash::default()
-            );
+            assert!(tx.signatures.iter().all(|s| *s == solana_sdk::signature::Signature::default()));
+            assert_eq!(tx.message.recent_blockhash, solana_sdk::hash::Hash::default());
         }
     }
 
@@ -482,27 +369,16 @@ mod tests {
                 &target.to_string(),
             ])
             .unwrap();
-            let Commands::Governance(args) = cli.command else {
-                panic!("wrong command")
-            };
+            let Commands::Governance(args) = cli.command else { panic!("wrong command") };
             let result = build_transaction(&args);
             if target == authority {
                 assert!(result.is_err());
             } else {
                 let tx = result.unwrap();
                 assert_eq!(tx.message.header.num_required_signatures, 2);
-                assert_eq!(
-                    tx.message.instructions[0].data,
-                    sdk::ROTATE_AUTHORITY_DISCRIMINATOR
-                );
-                assert!(tx
-                    .signatures
-                    .iter()
-                    .all(|s| *s == solana_sdk::signature::Signature::default()));
-                assert_eq!(
-                    tx.message.recent_blockhash,
-                    solana_sdk::hash::Hash::default()
-                );
+                assert_eq!(tx.message.instructions[0].data, sdk::ROTATE_AUTHORITY_DISCRIMINATOR);
+                assert!(tx.signatures.iter().all(|s| *s == solana_sdk::signature::Signature::default()));
+                assert_eq!(tx.message.recent_blockhash, solana_sdk::hash::Hash::default());
             }
         }
     }
@@ -535,9 +411,7 @@ mod tests {
             "aa",
         ])
         .unwrap();
-        let Commands::Governance(args) = cli.command else {
-            panic!()
-        };
+        let Commands::Governance(args) = cli.command else { panic!() };
         assert!(build_transaction(&args).is_err());
     }
 }

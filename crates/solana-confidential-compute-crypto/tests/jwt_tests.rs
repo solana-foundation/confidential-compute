@@ -3,10 +3,9 @@
 //! @spec SCC-JWT-001 SCC-JWT-002 SCC-JWT-003 SCC-JWT-004 SCC-JWT-005 SCC-JWT-006
 
 use solana_confidential_compute_crypto::jwt::{
-    compute_n0_and_r2, decode_b64url, eat_nonce_tombstone_seed, enforce_google_policy,
-    es256_is_low_s, kid_hash, parse_es256_signature, parse_google_claims, parse_header_kid_b64,
-    verify_jwt_rs256, verify_jwt_rs256_at, verify_jwt_rs256_with_montgomery, JwtView,
-    P256_HALF_ORDER, RSA_EXPONENT,
+    compute_n0_and_r2, decode_b64url, eat_nonce_tombstone_seed, enforce_google_policy, es256_is_low_s, kid_hash,
+    parse_es256_signature, parse_google_claims, parse_header_kid_b64, verify_jwt_rs256, verify_jwt_rs256_at,
+    verify_jwt_rs256_with_montgomery, JwtView, P256_HALF_ORDER, RSA_EXPONENT,
 };
 use solana_confidential_compute_crypto::CryptoError;
 
@@ -81,14 +80,8 @@ fn hex32(s: &str) -> [u8; 32] {
 fn test_verify_jwt_rs256_happy_path() {
     let n = modulus();
     let claims = verify_jwt_rs256(VALID_JWT, &n, RSA_EXPONENT).expect("valid RS256 jwt");
-    assert_eq!(
-        claims.iss(),
-        b"https://confidentialcomputing.googleapis.com"
-    );
-    assert_eq!(
-        claims.sub(),
-        b"https://www.googleapis.com/compute/v1/projects/teton/zones/us/instances/vm"
-    );
+    assert_eq!(claims.iss(), b"https://confidentialcomputing.googleapis.com");
+    assert_eq!(claims.sub(), b"https://www.googleapis.com/compute/v1/projects/teton/zones/us/instances/vm");
     assert_eq!(claims.aud(), b"teton-verifier");
     assert_eq!(claims.exp, 4_102_444_800);
     assert_eq!(claims.iat, 1_700_000_000);
@@ -98,15 +91,13 @@ fn test_verify_jwt_rs256_happy_path() {
     assert_eq!(claims.eat_nonce(), EAT_NONCE);
     assert_eq!(claims.kid(), b"teton-test");
 
-    let at = verify_jwt_rs256_at(VALID_JWT, &n, RSA_EXPONENT, Some(1_700_000_100))
-        .expect("freshness window");
+    let at = verify_jwt_rs256_at(VALID_JWT, &n, RSA_EXPONENT, Some(1_700_000_100)).expect("freshness window");
     assert_eq!(at.exp, claims.exp);
     assert_eq!(at.iat, claims.iat);
 
     let (n0, r2) = compute_n0_and_r2(&n).expect("montgomery constants");
-    let mont =
-        verify_jwt_rs256_with_montgomery(VALID_JWT, &n, RSA_EXPONENT, n0, &r2, Some(1_700_000_100))
-            .expect("precomputed montgomery");
+    let mont = verify_jwt_rs256_with_montgomery(VALID_JWT, &n, RSA_EXPONENT, n0, &r2, Some(1_700_000_100))
+        .expect("precomputed montgomery");
     assert_eq!(mont.kid(), claims.kid());
     assert_eq!(mont.eat_nonce(), claims.eat_nonce());
 }
@@ -119,39 +110,21 @@ fn test_rejects_tampered_signature_and_payload() {
     let sig_off = view.signing_input.len() + 1;
     sig_tampered[sig_off] ^= 0x01;
     let sig_jwt = std::str::from_utf8(&sig_tampered).expect("ascii");
-    assert_eq!(
-        verify_jwt_rs256(sig_jwt, &n, RSA_EXPONENT),
-        Err(CryptoError::InvalidJwtSignature)
-    );
+    assert_eq!(verify_jwt_rs256(sig_jwt, &n, RSA_EXPONENT), Err(CryptoError::InvalidJwtSignature));
 
     let mut payload_tampered = VALID_JWT.as_bytes().to_vec();
     payload_tampered[view.header_b64.len() + 2] ^= 0x01;
     let payload_jwt = std::str::from_utf8(&payload_tampered).expect("ascii");
-    assert_eq!(
-        verify_jwt_rs256(payload_jwt, &n, RSA_EXPONENT),
-        Err(CryptoError::InvalidJwtSignature)
-    );
+    assert_eq!(verify_jwt_rs256(payload_jwt, &n, RSA_EXPONENT), Err(CryptoError::InvalidJwtSignature));
 }
 
 #[test]
 fn test_rejects_security_policy_violations() {
     let n = modulus();
-    assert_eq!(
-        verify_jwt_rs256(NOSEC_JWT, &n, RSA_EXPONENT),
-        Err(CryptoError::PolicyViolation)
-    );
-    assert_eq!(
-        verify_jwt_rs256(DEBUG_JWT, &n, RSA_EXPONENT),
-        Err(CryptoError::PolicyViolation)
-    );
-    assert_eq!(
-        verify_jwt_rs256(EXP_LE_IAT_JWT, &n, RSA_EXPONENT),
-        Err(CryptoError::PolicyViolation)
-    );
-    assert_eq!(
-        verify_jwt_rs256_at(EXPIRED_JWT, &n, RSA_EXPONENT, Some(2_000)),
-        Err(CryptoError::PolicyViolation)
-    );
+    assert_eq!(verify_jwt_rs256(NOSEC_JWT, &n, RSA_EXPONENT), Err(CryptoError::PolicyViolation));
+    assert_eq!(verify_jwt_rs256(DEBUG_JWT, &n, RSA_EXPONENT), Err(CryptoError::PolicyViolation));
+    assert_eq!(verify_jwt_rs256(EXP_LE_IAT_JWT, &n, RSA_EXPONENT), Err(CryptoError::PolicyViolation));
+    assert_eq!(verify_jwt_rs256_at(EXPIRED_JWT, &n, RSA_EXPONENT, Some(2_000)), Err(CryptoError::PolicyViolation));
     // iat = 1_700_000_000; now + 120 must be < iat.
     assert_eq!(
         verify_jwt_rs256_at(VALID_JWT, &n, RSA_EXPONENT, Some(1_699_999_879)),
@@ -163,33 +136,18 @@ fn test_rejects_security_policy_violations() {
 fn test_rejects_duplicate_claim_keys() {
     let n = modulus();
     let header_dup = compact_jwt(r#"{"alg":"RS256","alg":"RS256"}"#, r#"{"aud":"x"}"#);
-    assert_eq!(
-        verify_jwt_rs256(&header_dup, &n, RSA_EXPONENT),
-        Err(CryptoError::DuplicateJwtClaim)
-    );
+    assert_eq!(verify_jwt_rs256(&header_dup, &n, RSA_EXPONENT), Err(CryptoError::DuplicateJwtClaim));
 
     let payload = br#"{"exp":1,"exp":2,"iss":"https://confidentialcomputing.googleapis.com","sub":"s","aud":"a","iat":1,"secboot":true,"dbgstat":"disabled-since-boot","eat_nonce":"n","image_digest":"sha256:abababababababababababababababababababababababababababababababab"}"#;
-    assert_eq!(
-        parse_google_claims(payload).err(),
-        Some(CryptoError::DuplicateJwtClaim)
-    );
+    assert_eq!(parse_google_claims(payload).err(), Some(CryptoError::DuplicateJwtClaim));
 }
 
 #[test]
 fn test_rejects_unsupported_alg() {
     let n = modulus();
-    let hs256 = compact_jwt(
-        r#"{"alg":"HS256","typ":"JWT"}"#,
-        r#"{"aud":"teton-verifier"}"#,
-    );
-    assert_eq!(
-        verify_jwt_rs256(&hs256, &n, RSA_EXPONENT),
-        Err(CryptoError::UnsupportedJwtAlgorithm)
-    );
-    assert_eq!(
-        verify_jwt_rs256(VALID_JWT, &n, 3),
-        Err(CryptoError::UnsupportedJwtAlgorithm)
-    );
+    let hs256 = compact_jwt(r#"{"alg":"HS256","typ":"JWT"}"#, r#"{"aud":"teton-verifier"}"#);
+    assert_eq!(verify_jwt_rs256(&hs256, &n, RSA_EXPONENT), Err(CryptoError::UnsupportedJwtAlgorithm));
+    assert_eq!(verify_jwt_rs256(VALID_JWT, &n, 3), Err(CryptoError::UnsupportedJwtAlgorithm));
 }
 
 #[test]
@@ -208,15 +166,9 @@ fn test_es256_signature_parser_and_low_s() {
     high[32..].copy_from_slice(&P256_HALF_ORDER);
     high[63] = high[63].wrapping_add(1);
     assert!(!es256_is_low_s(high[32..].try_into().expect("s")));
-    assert_eq!(
-        parse_es256_signature(b64url_encode(&high).as_bytes()),
-        Err(CryptoError::InvalidJwtSignature)
-    );
+    assert_eq!(parse_es256_signature(b64url_encode(&high).as_bytes()), Err(CryptoError::InvalidJwtSignature));
 
-    assert_eq!(
-        parse_es256_signature(b64url_encode(&[0u8; 64]).as_bytes()),
-        Err(CryptoError::InvalidJwtSignature)
-    );
+    assert_eq!(parse_es256_signature(b64url_encode(&[0u8; 64]).as_bytes()), Err(CryptoError::InvalidJwtSignature));
 }
 
 #[test]
@@ -235,10 +187,7 @@ fn test_kid_hash_and_nonce_seed() {
 fn test_rejects_wrong_issuer() {
     let payload = br#"{"aud":"teton-verifier","dbgstat":"disabled-since-boot","eat_nonce":"nnnnnnnnnn","exp":4102444800,"iat":1700000000,"iss":"https://evil.example","secboot":true,"sub":"s","image_digest":"sha256:abababababababababababababababababababababababababababababababab"}"#;
     let claims = parse_google_claims(payload).expect("json claims");
-    assert_eq!(
-        enforce_google_policy(&claims, None),
-        Err(CryptoError::PolicyViolation)
-    );
+    assert_eq!(enforce_google_policy(&claims, None), Err(CryptoError::PolicyViolation));
 }
 
 #[test]
@@ -281,58 +230,35 @@ fn test_eat_nonce_array_decodes_mode_a_binding() {
     raw[32..].copy_from_slice(&slot);
     let binding = claims.decode_mode_a_binding().expect("binding");
     assert_eq!(binding, raw);
-    assert_eq!(
-        eat_nonce_tombstone_seed(&raw),
-        eat_nonce_tombstone_seed(&binding)
-    );
+    assert_eq!(eat_nonce_tombstone_seed(&raw), eat_nonce_tombstone_seed(&binding));
 }
 
 #[test]
 fn test_eat_nonce_and_image_digest_fail_closed() {
     let digest = r#""sha256:abababababababababababababababababababababababababababababababab""#;
     let short = google_shell(r#""nnnnnnnnn""#, digest);
-    assert_eq!(
-        parse_google_claims(&short).err(),
-        Some(CryptoError::MalformedJwt)
-    );
+    assert_eq!(parse_google_claims(&short).err(), Some(CryptoError::MalformedJwt));
     let one = google_shell(r#"["nnnnnnnnnn"]"#, digest);
-    assert_eq!(
-        parse_google_claims(&one).err(),
-        Some(CryptoError::MalformedJwt)
-    );
+    assert_eq!(parse_google_claims(&one).err(), Some(CryptoError::MalformedJwt));
     let three = google_shell(r#"["nnnnnnnnnn","nnnnnnnnnn","nnnnnnnnnn"]"#, digest);
-    assert_eq!(
-        parse_google_claims(&three).err(),
-        Some(CryptoError::MalformedJwt)
-    );
-    let single = google_shell(
-        r#""nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn""#,
-        digest,
-    );
+    assert_eq!(parse_google_claims(&three).err(), Some(CryptoError::MalformedJwt));
+    let single = google_shell(r#""nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn""#, digest);
     let claims = parse_google_claims(&single).expect("single string");
     assert_eq!(claims.eat_nonce_count(), 1);
     assert!(claims.decode_mode_a_binding().is_err());
 
     let nonce = r#""nnnnnnnnnn""#;
-    let array_digest = google_shell(
-        nonce,
-        r#"["sha256:abababababababababababababababababababababababababababababababab"]"#,
-    );
+    let array_digest =
+        google_shell(nonce, r#"["sha256:abababababababababababababababababababababababababababababababab"]"#);
     let claims = parse_google_claims(&array_digest).expect("one-element digest");
     assert_eq!(claims.image_digest, [0xab; 32]);
     let two_digests = google_shell(
         nonce,
         r#"["sha256:abababababababababababababababababababababababababababababababab","sha256:abababababababababababababababababababababababababababababababab"]"#,
     );
-    assert_eq!(
-        parse_google_claims(&two_digests).err(),
-        Some(CryptoError::MalformedJwt)
-    );
+    assert_eq!(parse_google_claims(&two_digests).err(), Some(CryptoError::MalformedJwt));
     let empty_digest = google_shell(nonce, "[]");
-    assert_eq!(
-        parse_google_claims(&empty_digest).err(),
-        Some(CryptoError::MalformedJwt)
-    );
+    assert_eq!(parse_google_claims(&empty_digest).err(), Some(CryptoError::MalformedJwt));
 }
 
 #[test]
@@ -351,20 +277,11 @@ fn test_mode_b_high_bit_commitment_decodes_before_tombstone() {
     assert_eq!(claims.eat_nonce_count(), 1);
     let raw = claims.decode_mode_b_commitment().expect("decode");
     assert_eq!(raw, commitment);
-    assert_eq!(
-        eat_nonce_tombstone_seed(&raw),
-        eat_nonce_tombstone_seed(&commitment)
-    );
-    assert_ne!(
-        eat_nonce_tombstone_seed(&raw),
-        eat_nonce_tombstone_seed(encoded.as_bytes())
-    );
+    assert_eq!(eat_nonce_tombstone_seed(&raw), eat_nonce_tombstone_seed(&commitment));
+    assert_ne!(eat_nonce_tombstone_seed(&raw), eat_nonce_tombstone_seed(encoded.as_bytes()));
     assert!(claims.decode_mode_a_binding().is_err());
 
-    let long = google_shell(
-        r#""nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn""#,
-        digest,
-    );
+    let long = google_shell(r#""nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn""#, digest);
     let long_claims = parse_google_claims(&long).expect("long single nonce still parses");
     assert!(long_claims.decode_mode_b_commitment().is_err());
 }
@@ -373,48 +290,26 @@ fn test_mode_b_high_bit_commitment_decodes_before_tombstone() {
 fn explicit_tenant_policy_rejects_cross_tenant_and_empty_configuration() {
     use solana_confidential_compute_crypto::jwt::enforce_google_tenant;
     let claims = parse_google_claims(PAYLOAD_JSON).unwrap();
-    assert_eq!(
-        enforce_google_tenant(&claims, claims.aud(), claims.sub()),
-        Ok(())
-    );
+    assert_eq!(enforce_google_tenant(&claims, claims.aud(), claims.sub()), Ok(()));
     for (aud, sub) in [
         (b"other-audience".as_slice(), claims.sub()),
         (claims.aud(), b"other-subject".as_slice()),
         (b"".as_slice(), claims.sub()),
         (claims.aud(), b"".as_slice()),
     ] {
-        assert_eq!(
-            enforce_google_tenant(&claims, aud, sub),
-            Err(CryptoError::PolicyViolation)
-        );
+        assert_eq!(enforce_google_tenant(&claims, aud, sub), Err(CryptoError::PolicyViolation));
     }
-    let wrong = std::str::from_utf8(PAYLOAD_JSON)
-        .unwrap()
-        .replace("teton-verifier", "other-tenant");
+    let wrong = std::str::from_utf8(PAYLOAD_JSON).unwrap().replace("teton-verifier", "other-tenant");
     let wrong_claims = parse_google_claims(wrong.as_bytes()).unwrap();
     // The generic Google authenticity policy cannot determine the deployment tenant.
-    assert_eq!(
-        enforce_google_policy(&wrong_claims, Some(1_700_000_100)),
-        Ok(())
-    );
-    assert_eq!(
-        enforce_google_tenant(&wrong_claims, claims.aud(), claims.sub()),
-        Err(CryptoError::PolicyViolation)
-    );
+    assert_eq!(enforce_google_policy(&wrong_claims, Some(1_700_000_100)), Ok(()));
+    assert_eq!(enforce_google_tenant(&wrong_claims, claims.aud(), claims.sub()), Err(CryptoError::PolicyViolation));
 }
 
 #[test]
 fn runtime_verifier_does_not_trust_legacy_montgomery_parameters() {
     let n = modulus();
-    assert!(verify_jwt_rs256_with_montgomery(
-        VALID_JWT,
-        &n,
-        RSA_EXPONENT,
-        0,
-        &[0; 256],
-        Some(1_700_000_100)
-    )
-    .is_ok());
+    assert!(verify_jwt_rs256_with_montgomery(VALID_JWT, &n, RSA_EXPONENT, 0, &[0; 256], Some(1_700_000_100)).is_ok());
     let mut bad = VALID_JWT.as_bytes().to_vec();
     let i = VALID_JWT.rfind('.').unwrap() + 1;
     bad[i] = if bad[i] == b'A' { b'B' } else { b'A' };
@@ -435,31 +330,22 @@ fn runtime_verifier_does_not_trust_legacy_montgomery_parameters() {
 fn nested_security_claims_cannot_supply_root_claims() {
     let original = std::str::from_utf8(PAYLOAD_JSON).unwrap();
     for (key, value) in [
-        (
-            "eat_nonce",
-            format!("\"{}\"", std::str::from_utf8(EAT_NONCE).unwrap()),
-        ),
+        ("eat_nonce", format!("\"{}\"", std::str::from_utf8(EAT_NONCE).unwrap())),
         ("aud", "\"teton-verifier\"".into()),
         ("exp", "4102444800".into()),
         ("secboot", "true".into()),
     ] {
         let member = format!("\"{key}\":{value},");
         let without = original.replace(&member, "");
-        let nested = without.replace(
-            "\"container\":{",
-            &format!("\"container\":{{\"env\":{{{member}\"other\":0}},"),
-        );
-        assert!(
-            parse_google_claims(nested.as_bytes()).is_err(),
-            "nested {key} supplied root claim"
-        );
+        let nested = without.replace("\"container\":{", &format!("\"container\":{{\"env\":{{{member}\"other\":0}},"));
+        assert!(parse_google_claims(nested.as_bytes()).is_err(), "nested {key} supplied root claim");
         let encoded = b64url_encode(nested.as_bytes());
-        assert!(
-            solana_confidential_compute_crypto::jwt::parse_google_claims_b64(encoded.as_bytes())
-                .is_err()
-        );
+        assert!(solana_confidential_compute_crypto::jwt::parse_google_claims_b64(encoded.as_bytes()).is_err());
     }
-    let shadow = original.replace("\"container\":{", "\"container\":{\"env\":{\"eat_nonce\":\"host-value-long-enough\",\"aud\":\"host-audience\"},");
+    let shadow = original.replace(
+        "\"container\":{",
+        "\"container\":{\"env\":{\"eat_nonce\":\"host-value-long-enough\",\"aud\":\"host-audience\"},",
+    );
     let claims = parse_google_claims(shadow.as_bytes()).unwrap();
     assert_eq!(claims.eat_nonce(), EAT_NONCE);
     assert_eq!(claims.aud(), b"teton-verifier");
@@ -469,9 +355,7 @@ fn nested_security_claims_cannot_supply_root_claims() {
 #[test]
 fn image_digest_requires_an_explicit_supported_path() {
     let original = std::str::from_utf8(PAYLOAD_JSON).unwrap();
-    let wrong = original
-        .replace("\"container\":{", "\"container\":{\"env\":{")
-        .replace("}}}", "}}}}");
+    let wrong = original.replace("\"container\":{", "\"container\":{\"env\":{").replace("}}}", "}}}}");
     assert!(parse_google_claims(wrong.as_bytes()).is_err());
     assert!(parse_google_claims(PAYLOAD_JSON).is_ok());
 }
@@ -479,26 +363,13 @@ fn image_digest_requires_an_explicit_supported_path() {
 #[test]
 fn header_identifiers_reject_decoded_nul() {
     use solana_confidential_compute_crypto::jwt::claims::parse_header_alg_b64;
-    for kid in [
-        r#"teton-test\u0000suffix"#,
-        r#"\u0000teton-test"#,
-        r#"teton-test\u0000"#,
-    ] {
+    for kid in [r#"teton-test\u0000suffix"#, r#"\u0000teton-test"#, r#"teton-test\u0000"#] {
         let header = format!(r#"{{"alg":"RS256","kid":"{kid}"}}"#);
-        assert_eq!(
-            parse_header_kid_b64(b64url_encode(header.as_bytes()).as_bytes()),
-            Err(CryptoError::MalformedJwt)
-        );
+        assert_eq!(parse_header_kid_b64(b64url_encode(header.as_bytes()).as_bytes()), Err(CryptoError::MalformedJwt));
     }
     let header = b64url_encode(br#"{"alg":"RS256\u0000ES256","kid":"teton-test"}"#);
-    assert_eq!(
-        parse_header_alg_b64(header.as_bytes()),
-        Err(CryptoError::MalformedJwt)
-    );
+    assert_eq!(parse_header_alg_b64(header.as_bytes()), Err(CryptoError::MalformedJwt));
     let header = b64url_encode(br#"{"alg":"RS256","kid":"teton-test"}"#);
     assert!(parse_header_alg_b64(header.as_bytes()).is_ok());
-    assert_eq!(
-        &parse_header_kid_b64(header.as_bytes()).unwrap()[..10],
-        b"teton-test"
-    );
+    assert_eq!(&parse_header_kid_b64(header.as_bytes()).unwrap()[..10], b"teton-test");
 }

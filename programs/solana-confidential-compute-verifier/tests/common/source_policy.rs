@@ -3,11 +3,7 @@ use solana_confidential_compute_core::SignatureVerifier;
 use solana_confidential_compute_verifier::state::{BackendPolicy, PolicyRegistry};
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
 pub struct TestProcessor;
-fn with_policies<'a>(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo<'a>],
-    data: &[u8],
-) -> Vec<AccountInfo<'a>> {
+fn with_policies<'a>(program_id: &Pubkey, accounts: &[AccountInfo<'a>], data: &[u8]) -> Vec<AccountInfo<'a>> {
     let mut output = accounts.to_vec();
     if ![
         solana_confidential_compute_verifier::payload::VERIFY_AND_REGISTER_DISCRIMINATOR,
@@ -32,10 +28,7 @@ fn with_policies<'a>(
             .and_then(|d| borsh::from_slice::<solana_confidential_compute_verifier::state::VcekAccount>(&d).ok())
         {
             let key = Pubkey::find_program_address(
-                &[
-                    solana_confidential_compute_verifier::state::AmdIdentityRevocation::SEED,
-                    &cache.chip_id_hash,
-                ],
+                &[solana_confidential_compute_verifier::state::AmdIdentityRevocation::SEED, &cache.chip_id_hash],
                 program_id,
             )
             .0;
@@ -53,18 +46,15 @@ fn with_policies<'a>(
         }
     }
     let (global, _) = Pubkey::find_program_address(&[b"policy_registry"], program_id);
-    let registry = accounts.iter().find(|a| a.key == &global).and_then(|a| {
-        a.try_borrow_data()
-            .ok()
-            .and_then(|d| borsh::from_slice::<PolicyRegistry>(&d).ok())
-    });
-    if let Some(registry) = registry.filter(|r| {
-        r.discriminator
-            == solana_confidential_compute_verifier::state::POLICY_REGISTRY_DISCRIMINATOR
-    }) {
+    let registry = accounts
+        .iter()
+        .find(|a| a.key == &global)
+        .and_then(|a| a.try_borrow_data().ok().and_then(|d| borsh::from_slice::<PolicyRegistry>(&d).ok()));
+    if let Some(registry) = registry
+        .filter(|r| r.discriminator == solana_confidential_compute_verifier::state::POLICY_REGISTRY_DISCRIMINATOR)
+    {
         for source in 1..=3 {
-            let (key, bump) =
-                Pubkey::find_program_address(&[BackendPolicy::SEED, &[source]], program_id);
+            let (key, bump) = Pubkey::find_program_address(&[BackendPolicy::SEED, &[source]], program_id);
             if output.iter().any(|a| a.key == &key) {
                 continue;
             }

@@ -9,9 +9,9 @@ use solana_confidential_compute_sdk::nitro::{
 use solana_confidential_compute_sdk::{
     build_verify_nitro_attestation_ix, build_verify_nitro_attestation_ix_for_program,
     build_verify_nitro_attestation_tx, ConfidentialComputeClient, SdkError,
-    ID as SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, NITRO_MODE_B_ATTESTED_SIGNER_PLACEHOLDER,
-    PACKET_DATA_SIZE, VERIFY_NITRO_ATTESTATION_DISCRIMINATOR, VERIFY_NITRO_ATTESTATION_HEADER_LEN,
-    VERIFY_NITRO_MODE_A, VERIFY_NITRO_MODE_B,
+    ID as SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, NITRO_MODE_B_ATTESTED_SIGNER_PLACEHOLDER, PACKET_DATA_SIZE,
+    VERIFY_NITRO_ATTESTATION_DISCRIMINATOR, VERIFY_NITRO_ATTESTATION_HEADER_LEN, VERIFY_NITRO_MODE_A,
+    VERIFY_NITRO_MODE_B,
 };
 use solana_sdk::{
     hash::Hash,
@@ -30,11 +30,7 @@ fn sample_document(len: usize) -> Vec<u8> {
 }
 
 fn consumer_ix(payer: Pubkey) -> Instruction {
-    Instruction {
-        program_id: Pubkey::new_unique(),
-        accounts: vec![AccountMeta::new(payer, true)],
-        data: vec![1, 2, 3],
-    }
+    Instruction { program_id: Pubkey::new_unique(), accounts: vec![AccountMeta::new(payer, true)], data: vec![1, 2, 3] }
 }
 
 fn read_u32_le(data: &[u8], offset: usize) -> u32 {
@@ -62,10 +58,7 @@ fn mode_a_instruction_packs_header_and_writable_signer_pda() {
     .expect("mode a ix");
 
     assert_eq!(ix.program_id, SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID);
-    assert_eq!(
-        ix.data.len(),
-        VERIFY_NITRO_ATTESTATION_HEADER_LEN + document.len()
-    );
+    assert_eq!(ix.data.len(), VERIFY_NITRO_ATTESTATION_HEADER_LEN + document.len());
     assert_eq!(&ix.data[..8], &VERIFY_NITRO_ATTESTATION_DISCRIMINATOR);
     assert_eq!(ix.data[8], VERIFY_NITRO_MODE_A);
     assert_eq!(read_u64_le(&ix.data, 9), 95);
@@ -76,23 +69,15 @@ fn mode_a_instruction_packs_header_and_writable_signer_pda() {
     let client = ConfidentialComputeClient::new(SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID);
     let (policy_registry, _) = client.derive_policy_registry_pda();
     let (attested_signer, _) = client.derive_signer_pda(&workload.to_bytes());
-    let (used_nonce, _) = client
-        .derive_used_nonce_pda_for_source(2, &workload.to_bytes(), &NONCE)
-        .unwrap();
+    let (used_nonce, _) = client.derive_used_nonce_pda_for_source(2, &workload.to_bytes(), &NONCE).unwrap();
     assert_eq!(ix.accounts.len(), 10);
-    assert_eq!(
-        ix.accounts[7],
-        solana_sdk::instruction::AccountMeta::new_readonly(workload, true)
-    );
+    assert_eq!(ix.accounts[7], solana_sdk::instruction::AccountMeta::new_readonly(workload, true));
     assert_eq!(
         ix.accounts[8],
         solana_sdk::instruction::AccountMeta::new_readonly(
-            solana_confidential_compute_sdk::derive_backend_policy_pda(
-                &SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-                2
-            )
-            .unwrap()
-            .0,
+            solana_confidential_compute_sdk::derive_backend_policy_pda(&SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, 2)
+                .unwrap()
+                .0,
             false
         )
     );
@@ -119,10 +104,8 @@ fn mode_a_instruction_packs_header_and_writable_signer_pda() {
     assert_eq!(ix.accounts[4].pubkey, slot_hashes::ID);
     assert_eq!(ix.accounts[5].pubkey, clock::ID);
     assert_eq!(ix.accounts[6].pubkey, solana_sdk_ids::system_program::ID);
-    let (backend, _) = Pubkey::find_program_address(
-        &[b"backend_policy", &[2]],
-        &SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-    );
+    let (backend, _) =
+        Pubkey::find_program_address(&[b"backend_policy", &[2]], &SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID);
     assert_eq!(
         ix.accounts,
         vec![
@@ -165,28 +148,18 @@ fn mode_b_placeholder_is_read_only_and_adds_instructions_sysvar() {
 
     assert_eq!(ix.data[8], VERIFY_NITRO_MODE_B);
     assert_eq!(ix.accounts.len(), 10);
-    assert_eq!(
-        ix.accounts[2].pubkey,
-        NITRO_MODE_B_ATTESTED_SIGNER_PLACEHOLDER
-    );
+    assert_eq!(ix.accounts[2].pubkey, NITRO_MODE_B_ATTESTED_SIGNER_PLACEHOLDER);
     assert!(!ix.accounts[2].is_writable);
     assert!(!ix.accounts[2].is_signer);
-    assert_eq!(
-        NITRO_MODE_B_ATTESTED_SIGNER_PLACEHOLDER.to_bytes(),
-        [0xff; 32]
-    );
+    assert_eq!(NITRO_MODE_B_ATTESTED_SIGNER_PLACEHOLDER.to_bytes(), [0xff; 32]);
     assert_eq!(ix.accounts[7].pubkey, sysvar::instructions::ID);
     assert!(!ix.accounts[7].is_writable);
     let client = ConfidentialComputeClient::new(SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID);
-    let (used_nonce, _) = client
-        .derive_used_nonce_pda_for_source(2, &workload.to_bytes(), &NONCE)
-        .unwrap();
+    let (used_nonce, _) = client.derive_used_nonce_pda_for_source(2, &workload.to_bytes(), &NONCE).unwrap();
     assert_eq!(ix.accounts[3].pubkey, used_nonce);
     let (policy_registry, _) = client.derive_policy_registry_pda();
-    let (backend, _) = Pubkey::find_program_address(
-        &[b"backend_policy", &[2]],
-        &SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-    );
+    let (backend, _) =
+        Pubkey::find_program_address(&[b"backend_policy", &[2]], &SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID);
     assert_eq!(
         ix.accounts,
         vec![
@@ -250,10 +223,7 @@ fn mode_a_transaction_appends_consumer_when_provided() {
     .expect("mode a with consumer");
     assert_eq!(with_consumer.message.instructions.len(), 2);
     let consumer_ix = &with_consumer.message.instructions[1];
-    assert_eq!(
-        with_consumer.message.account_keys[consumer_ix.program_id_index as usize],
-        consumer.program_id
-    );
+    assert_eq!(with_consumer.message.account_keys[consumer_ix.program_id_index as usize], consumer.program_id);
     assert_eq!(consumer_ix.data, consumer.data);
 }
 
@@ -280,10 +250,7 @@ fn mode_b_transaction_places_consumer_at_index_1() {
         SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID
     );
     assert_eq!(tx.message.instructions[0].data[8], VERIFY_NITRO_MODE_B);
-    assert_eq!(
-        tx.message.account_keys[tx.message.instructions[1].program_id_index as usize],
-        consumer.program_id
-    );
+    assert_eq!(tx.message.account_keys[tx.message.instructions[1].program_id_index as usize], consumer.program_id);
 }
 
 #[test]
@@ -291,15 +258,7 @@ fn builders_reject_bad_mode_empty_document_and_missing_mode_b_consumer() {
     let payer = Pubkey::new_unique();
     let workload = Pubkey::new_unique();
     assert_eq!(
-        build_verify_nitro_attestation_ix(
-            &payer,
-            &workload,
-            2,
-            1,
-            ACTION_HASH,
-            &sample_document(8),
-            &NONCE,
-        ),
+        build_verify_nitro_attestation_ix(&payer, &workload, 2, 1, ACTION_HASH, &sample_document(8), &NONCE,),
         Err(SdkError::InvalidNitroMode)
     );
     assert_eq!(
@@ -347,15 +306,8 @@ fn max_document_fails_closed_above_packet_data_size() {
     let payer = Pubkey::new_unique();
     let workload = Pubkey::new_unique();
     let document = sample_document(MAX_NITRO_DOCUMENT_LEN);
-    let err = build_verify_nitro_attestation_ix(
-        &payer,
-        &workload,
-        VERIFY_NITRO_MODE_A,
-        1,
-        ACTION_HASH,
-        &document,
-        &NONCE,
-    );
+    let err =
+        build_verify_nitro_attestation_ix(&payer, &workload, VERIFY_NITRO_MODE_A, 1, ACTION_HASH, &document, &NONCE);
     assert!(matches!(err, Err(SdkError::PacketTooLarge { len }) if len > PACKET_DATA_SIZE));
 
     let oversized = build_verify_nitro_attestation_ix_oversized(
@@ -368,10 +320,7 @@ fn max_document_fails_closed_above_packet_data_size() {
         &NONCE,
     )
     .expect("oversized");
-    assert_eq!(
-        oversized.data.len(),
-        VERIFY_NITRO_ATTESTATION_HEADER_LEN + MAX_NITRO_DOCUMENT_LEN
-    );
+    assert_eq!(oversized.data.len(), VERIFY_NITRO_ATTESTATION_HEADER_LEN + MAX_NITRO_DOCUMENT_LEN);
 
     let program_id = Pubkey::new_unique();
     let for_program = build_verify_nitro_attestation_ix_for_program(

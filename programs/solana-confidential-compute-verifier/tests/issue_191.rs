@@ -47,12 +47,7 @@ type Events = Vec<Vec<Vec<u8>>>;
 fn decode(logs: &[String]) -> Events {
     logs.iter()
         .filter_map(|line| line.strip_prefix("Program data: "))
-        .map(|fields| {
-            fields
-                .split_whitespace()
-                .map(|field| STANDARD.decode(field).unwrap())
-                .collect()
-        })
+        .map(|fields| fields.split_whitespace().map(|field| STANDARD.decode(field).unwrap()).collect())
         .collect()
 }
 
@@ -65,19 +60,11 @@ fn ix_err(err: InstructionError) -> TransactionError {
 }
 
 fn funded() -> Account {
-    Account {
-        lamports: 10_000_000,
-        ..Account::default()
-    }
+    Account { lamports: 10_000_000, ..Account::default() }
 }
 
 fn owned(program_id: Pubkey, data: Vec<u8>) -> Account {
-    Account {
-        lamports: 10_000_000,
-        data,
-        owner: program_id,
-        ..Account::default()
-    }
+    Account { lamports: 10_000_000, data, owner: program_id, ..Account::default() }
 }
 
 fn registry_account(program_id: Pubkey, authority: &Pubkey, bump: u8) -> Account {
@@ -110,14 +97,7 @@ fn set_upgrade_authority(ctx: &mut ProgramTestContext, program_id: &Pubkey, auth
     data[13..45].copy_from_slice(authority.as_ref());
     ctx.set_account(
         &key,
-        &Account {
-            lamports: 1_000_000,
-            data,
-            owner: loader,
-            executable: false,
-            rent_epoch: 0,
-        }
-        .into(),
+        &Account { lamports: 1_000_000, data, owner: loader, executable: false, rent_epoch: 0 }.into(),
     );
 }
 
@@ -128,39 +108,19 @@ async fn send(
 ) -> (Result<(), TransactionError>, Events) {
     let mut signers: Vec<&Keypair> = vec![&ctx.payer];
     signers.extend_from_slice(extra);
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&ctx.payer.pubkey()),
-        &signers,
-        ctx.last_blockhash,
-    );
+    let tx = Transaction::new_signed_with_payer(&[ix], Some(&ctx.payer.pubkey()), &signers, ctx.last_blockhash);
     drop(signers);
-    let out = ctx
-        .banks_client
-        .process_transaction_with_metadata(tx)
-        .await
-        .unwrap();
+    let out = ctx.banks_client.process_transaction_with_metadata(tx).await.unwrap();
     let logs = out.metadata.expect("transaction metadata").log_messages;
     (out.result, decode(&logs))
 }
 
 async fn state(ctx: &mut ProgramTestContext, key: Pubkey) -> Option<Vec<u8>> {
-    ctx.banks_client
-        .get_account(key)
-        .await
-        .unwrap()
-        .map(|account| account.data)
+    ctx.banks_client.get_account(key).await.unwrap().map(|account| account.data)
 }
 
 /// Exactly one version 1 governance event, bound to the account's real bytes.
-fn assert_event(
-    events: &Events,
-    operation: &[u8],
-    actor: &Pubkey,
-    account: &Pubkey,
-    before: &[u8],
-    after: &[u8],
-) {
+fn assert_event(events: &Events, operation: &[u8], actor: &Pubkey, account: &Pubkey, before: &[u8], after: &[u8]) {
     let label = String::from_utf8_lossy(operation).into_owned();
     assert_ne!(before, after, "{label}: no write");
     assert_eq!(events.len(), 1, "{label}");
@@ -198,36 +158,21 @@ async fn governed_write(
     let mut unsigned = base.clone();
     unsigned.accounts[0].is_signer = false;
     let (result, events) = send(ctx, unsigned, &[]).await;
-    assert_eq!(
-        result,
-        Err(ix_err(InstructionError::MissingRequiredSignature)),
-        "{label}: unsigned"
-    );
+    assert_eq!(result, Err(ix_err(InstructionError::MissingRequiredSignature)), "{label}: unsigned");
     assert!(events.is_empty(), "{label}: unsigned");
     assert_eq!(state(ctx, account).await, pre, "{label}: unsigned");
 
     let mut impostor = base.clone();
     impostor.accounts[0].pubkey = stranger.pubkey();
     let (result, events) = send(ctx, impostor, &[stranger]).await;
-    assert_eq!(
-        result,
-        Err(custom(VerifierError::InvalidAuthority)),
-        "{label}: impostor"
-    );
+    assert_eq!(result, Err(custom(VerifierError::InvalidAuthority)), "{label}: impostor");
     assert!(events.is_empty(), "{label}: impostor");
     assert_eq!(state(ctx, account).await, pre, "{label}: impostor");
 
     let (result, events) = send(ctx, base.clone(), &[authority]).await;
     assert_eq!(result, Ok(()), "{label}");
     let after = state(ctx, account).await.expect(&label);
-    assert_event(
-        &events,
-        operation,
-        &authority.pubkey(),
-        &account,
-        logged_before,
-        &after,
-    );
+    assert_event(&events, operation, &authority.pubkey(), &account, logged_before, &after);
 }
 
 fn init_ix(program_id: &Pubkey, registry: &Pubkey, authority: &Pubkey) -> Instruction {
@@ -252,11 +197,7 @@ fn init_ix(program_id: &Pubkey, registry: &Pubkey, authority: &Pubkey) -> Instru
             AccountMeta::new(*registry, false),
             AccountMeta::new_readonly(SYSTEM, false),
             AccountMeta::new_readonly(
-                Pubkey::find_program_address(
-                    &[program_id.as_ref()],
-                    &solana_sdk_ids::bpf_loader_upgradeable::id(),
-                )
-                .0,
+                Pubkey::find_program_address(&[program_id.as_ref()], &solana_sdk_ids::bpf_loader_upgradeable::id()).0,
                 false,
             ),
         ],
@@ -304,13 +245,9 @@ fn register_jwks_ix(
     kid: &[u8],
 ) -> Instruction {
     let mut data = REGISTER_JWKS_KEY_DISCRIMINATOR.to_vec();
-    RegisterJwksKeyArgs {
-        kid: kid.to_vec(),
-        modulus: [0xff; 256],
-        exponent: RSA_EXPONENT,
-    }
-    .serialize(&mut data)
-    .unwrap();
+    RegisterJwksKeyArgs { kid: kid.to_vec(), modulus: [0xff; 256], exponent: RSA_EXPONENT }
+        .serialize(&mut data)
+        .unwrap();
     Instruction {
         program_id: *program_id,
         data,
@@ -332,9 +269,7 @@ fn revoke_jwks_ix(
     hash: [u8; 32],
 ) -> Instruction {
     let mut data = REVOKE_JWKS_KEY_DISCRIMINATOR.to_vec();
-    RevokeJwksKeyArgs { kid_hash: hash }
-        .serialize(&mut data)
-        .unwrap();
+    RevokeJwksKeyArgs { kid_hash: hash }.serialize(&mut data).unwrap();
     Instruction {
         program_id: *program_id,
         data,
@@ -364,10 +299,7 @@ async fn jwks_and_policy_writes_emit_one_event_each_and_refuse_foreign_accounts(
     pt.add_account(authority.pubkey(), funded());
     pt.add_account(stranger.pubkey(), funded());
     // Canonical JWKS address, foreign owner: never this program's key material.
-    pt.add_account(
-        alien,
-        owned(Pubkey::new_unique(), vec![0; JwksAccount::SIZE]),
-    );
+    pt.add_account(alien, owned(Pubkey::new_unique(), vec![0; JwksAccount::SIZE]));
     let mut ctx = pt.start_with_context().await;
     let payer = ctx.payer.pubkey();
 
@@ -383,14 +315,7 @@ async fn jwks_and_policy_writes_emit_one_event_each_and_refuse_foreign_accounts(
     .await;
 
     let before = state(&mut ctx, alien).await.unwrap();
-    let ix = register_jwks_ix(
-        &pid,
-        &authority.pubkey(),
-        &registry,
-        &alien,
-        &payer,
-        alien_kid,
-    );
+    let ix = register_jwks_ix(&pid, &authority.pubkey(), &registry, &alien, &payer, alien_kid);
     let (result, events) = send(&mut ctx, ix, &[&authority]).await;
     assert_eq!(result, Err(ix_err(InstructionError::IllegalOwner)));
     assert!(events.is_empty());
@@ -410,22 +335,10 @@ async fn jwks_and_policy_writes_emit_one_event_each_and_refuse_foreign_accounts(
     let update = Instruction {
         program_id: pid,
         data,
-        accounts: vec![
-            AccountMeta::new_readonly(authority.pubkey(), true),
-            AccountMeta::new(registry, false),
-        ],
+        accounts: vec![AccountMeta::new_readonly(authority.pubkey(), true), AccountMeta::new(registry, false)],
     };
     let before = state(&mut ctx, registry).await.unwrap();
-    governed_write(
-        &mut ctx,
-        &update,
-        &authority,
-        &stranger,
-        registry,
-        b"update_policy",
-        &before,
-    )
-    .await;
+    governed_write(&mut ctx, &update, &authority, &stranger, registry, b"update_policy", &before).await;
 
     let before = state(&mut ctx, jwks).await.unwrap();
     governed_write(
@@ -448,19 +361,12 @@ async fn jwks_and_policy_writes_emit_one_event_each_and_refuse_foreign_accounts(
 
     // Root rotation is refused even for the authority: no write, so no event.
     let mut data = ROTATE_ROOT_CERT_DISCRIMINATOR.to_vec();
-    RotateRootCertArgs {
-        new_ark_pubkey_xy: [2; 96],
-    }
-    .serialize(&mut data)
-    .unwrap();
+    RotateRootCertArgs { new_ark_pubkey_xy: [2; 96] }.serialize(&mut data).unwrap();
     let before = state(&mut ctx, registry).await.unwrap();
     let ix = Instruction {
         program_id: pid,
         data,
-        accounts: vec![
-            AccountMeta::new_readonly(authority.pubkey(), true),
-            AccountMeta::new(registry, false),
-        ],
+        accounts: vec![AccountMeta::new_readonly(authority.pubkey(), true), AccountMeta::new(registry, false)],
     };
     let (result, events) = send(&mut ctx, ix, &[&authority]).await;
     assert_eq!(result, Err(custom(VerifierError::InvalidInstruction)));
@@ -515,24 +421,13 @@ async fn authority_handover_needs_both_signatures_and_emits_one_event() {
         let (result, events) = send(&mut ctx, ix, &signers).await;
         assert_eq!(result, Err(expected), "case {case}");
         assert!(events.is_empty(), "case {case}");
-        assert_eq!(
-            state(&mut ctx, registry).await.unwrap(),
-            before,
-            "case {case}"
-        );
+        assert_eq!(state(&mut ctx, registry).await.unwrap(), before, "case {case}");
     }
 
     let (result, events) = send(&mut ctx, base, &[&authority, &new_authority]).await;
     assert_eq!(result, Ok(()));
     let after = state(&mut ctx, registry).await.unwrap();
-    assert_event(
-        &events,
-        b"rotate_authority",
-        &authority.pubkey(),
-        &registry,
-        &before,
-        &after,
-    );
+    assert_event(&events, b"rotate_authority", &authority.pubkey(), &registry, &before, &after);
 }
 
 #[tokio::test]
@@ -542,8 +437,7 @@ async fn revoke_attested_signer_requires_the_authority_and_emits_one_event() {
     let stranger = Keypair::new();
     let signer_pubkey = [7u8; 32];
     let (registry, bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
-    let (signer, signer_bump) =
-        Pubkey::find_program_address(&[b"attested_signer_v2", &signer_pubkey], &pid);
+    let (signer, signer_bump) = Pubkey::find_program_address(&[b"attested_signer_v2", &signer_pubkey], &pid);
     let live = AttestedSignerAccount::new(
         AttestedSigner {
             signer_pubkey,
@@ -575,16 +469,7 @@ async fn revoke_attested_signer_requires_the_authority_and_emits_one_event() {
         ],
     };
     let before = state(&mut ctx, signer).await.unwrap();
-    governed_write(
-        &mut ctx,
-        &ix,
-        &authority,
-        &stranger,
-        signer,
-        b"revoke_attested_signer",
-        &before,
-    )
-    .await;
+    governed_write(&mut ctx, &ix, &authority, &stranger, signer, b"revoke_attested_signer", &before).await;
 }
 
 fn gcp_ix(
@@ -596,12 +481,9 @@ fn gcp_ix(
     audience: &str,
 ) -> Instruction {
     let mut data = SET_GCP_TENANT_POLICY_DISCRIMINATOR.to_vec();
-    SetGcpTenantPolicyArgs {
-        expected_audience: audience.into(),
-        expected_subject: "tenant".into(),
-    }
-    .serialize(&mut data)
-    .unwrap();
+    SetGcpTenantPolicyArgs { expected_audience: audience.into(), expected_subject: "tenant".into() }
+        .serialize(&mut data)
+        .unwrap();
     Instruction {
         program_id: *program_id,
         data,
@@ -679,23 +561,9 @@ async fn gcp_tenant_policy_emits_one_event_per_change_and_nothing_for_a_no_op() 
     assert_eq!(state(&mut ctx, policy).await.unwrap(), seated);
 
     // A changed policy emits exactly one event over the previous bytes.
-    let ix = gcp_ix(
-        &pid,
-        &authority.pubkey(),
-        &registry,
-        &policy,
-        &payer,
-        "aud2",
-    );
+    let ix = gcp_ix(&pid, &authority.pubkey(), &registry, &policy, &payer, "aud2");
     let (result, events) = send(&mut ctx, ix, &[&authority]).await;
     assert_eq!(result, Ok(()));
     let after = state(&mut ctx, policy).await.unwrap();
-    assert_event(
-        &events,
-        b"set_gcp_tenant_policy",
-        &authority.pubkey(),
-        &policy,
-        &seated,
-        &after,
-    );
+    assert_event(&events, b"set_gcp_tenant_policy", &authority.pubkey(), &policy, &seated, &after);
 }

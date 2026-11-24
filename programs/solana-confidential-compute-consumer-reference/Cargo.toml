@@ -8,6 +8,9 @@ homepage.workspace = true
 description = "Reference consumer program for Mode A and Mode B Solana Confidential Compute attestations."
 publish = false
 
+[lints]
+workspace = true
+
 [lib]
 crate-type = ["cdylib", "lib"]
 

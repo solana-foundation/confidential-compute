@@ -79,16 +79,10 @@ pub fn hash_compiled_action(
 ) -> Result<[u8; 32], ActionCommitmentError> {
     use ActionCommitmentError::*;
     message.sanitize().map_err(|_| InvalidMessage)?;
-    if message
-        .address_table_lookups()
-        .is_some_and(|t| !t.is_empty())
-    {
+    if message.address_table_lookups().is_some_and(|t| !t.is_empty()) {
         return Err(InvalidMessage);
     }
-    let ix = message
-        .instructions()
-        .get(consumer_index)
-        .ok_or(InvalidMessage)?;
+    let ix = message.instructions().get(consumer_index).ok_or(InvalidMessage)?;
     let keys = message.static_account_keys();
     let reserved = reserved_account_keys_all_activated();
     let header = message.header();
@@ -115,11 +109,7 @@ pub fn hash_compiled_action(
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(solana_confidential_compute_cpi::hash_action(
-        &[],
-        &accounts,
-        &ix.data,
-    ))
+    Ok(solana_confidential_compute_cpi::hash_action(&[], &accounts, &ix.data))
 }
 
 /// Final-message guard over the complete consumer wire data.
@@ -147,20 +137,12 @@ mod tests {
     /// is prerelease only), so both SDKs vendor the list. Pin them together.
     #[test]
     fn vendored_reserved_keys_match_the_typescript_sdk() {
-        let ts_path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../sdks/typescript/src/index.ts"
-        );
-        let ts_src =
-            std::fs::read_to_string(ts_path).unwrap_or_else(|e| panic!("read {ts_path}: {e}"));
+        let ts_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../sdks/typescript/src/index.ts");
+        let ts_src = std::fs::read_to_string(ts_path).unwrap_or_else(|e| panic!("read {ts_path}: {e}"));
 
-        let start = ts_src
-            .find("const RESERVED_ACTION_KEYS")
-            .expect("RESERVED_ACTION_KEYS not found in the TypeScript SDK");
-        let block_end = ts_src[start..]
-            .find("]);")
-            .expect("unterminated RESERVED_ACTION_KEYS")
-            + start;
+        let start =
+            ts_src.find("const RESERVED_ACTION_KEYS").expect("RESERVED_ACTION_KEYS not found in the TypeScript SDK");
+        let block_end = ts_src[start..].find("]);").expect("unterminated RESERVED_ACTION_KEYS") + start;
 
         let ts_keys: std::collections::BTreeSet<String> = ts_src[start..block_end]
             .lines()
@@ -171,15 +153,10 @@ mod tests {
                 Some(inner.to_string())
             })
             .collect();
-        assert!(
-            !ts_keys.is_empty(),
-            "parsed zero keys from the TypeScript RESERVED_ACTION_KEYS set"
-        );
+        assert!(!ts_keys.is_empty(), "parsed zero keys from the TypeScript RESERVED_ACTION_KEYS set");
 
-        let rust_keys: std::collections::BTreeSet<String> = reserved_account_keys_all_activated()
-            .iter()
-            .map(|k| k.to_string())
-            .collect();
+        let rust_keys: std::collections::BTreeSet<String> =
+            reserved_account_keys_all_activated().iter().map(|k| k.to_string()).collect();
 
         let missing_in_rust: Vec<_> = ts_keys.difference(&rust_keys).collect();
         let missing_in_ts: Vec<_> = rust_keys.difference(&ts_keys).collect();

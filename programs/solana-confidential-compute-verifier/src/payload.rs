@@ -71,14 +71,14 @@ pub const VERIFY_NVIDIA_PROOF_PACKET_LEN: usize =
 
 /// BN254 base-field modulus `p`, big-endian.
 const BN254_BASE_MODULUS_BE: [u8; 32] = [
-    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
-    0x97, 0x81, 0x6a, 0x91, 0x68, 0x71, 0xca, 0x8d, 0x3c, 0x20, 0x8c, 0x16, 0xd8, 0x7c, 0xfd, 0x47,
+    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d, 0x97, 0x81, 0x6a,
+    0x91, 0x68, 0x71, 0xca, 0x8d, 0x3c, 0x20, 0x8c, 0x16, 0xd8, 0x7c, 0xfd, 0x47,
 ];
 
 /// BN254 scalar-field modulus `r`, big-endian.
 const BN254_SCALAR_MODULUS_BE: [u8; 32] = [
-    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
-    0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
+    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d, 0x28, 0x33, 0xe8,
+    0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
 ];
 
 /// Zero-copy view of a proof-backed `verify_nvidia_attestation` payload.
@@ -117,21 +117,12 @@ pub struct NvidiaVerifierMessage {
     pub signature_rs: [u8; 96],
 }
 
-fn read_array<'a, const N: usize>(
-    data: &'a [u8],
-    offset: &mut usize,
-) -> Result<&'a [u8; N], ProgramError> {
+fn read_array<'a, const N: usize>(data: &'a [u8], offset: &mut usize) -> Result<&'a [u8; N], ProgramError> {
     let start = *offset;
-    let end = start
-        .checked_add(N)
-        .ok_or(VerifierError::InvalidInstruction)?;
-    let bytes = data
-        .get(start..end)
-        .ok_or(VerifierError::InvalidInstruction)?;
+    let end = start.checked_add(N).ok_or(VerifierError::InvalidInstruction)?;
+    let bytes = data.get(start..end).ok_or(VerifierError::InvalidInstruction)?;
     *offset = end;
-    bytes
-        .try_into()
-        .map_err(|_| VerifierError::InvalidInstruction.into())
+    bytes.try_into().map_err(|_| VerifierError::InvalidInstruction.into())
 }
 
 /// Parse a proof packet. The length must be exact. A short or long buffer is rejected.
@@ -238,25 +229,15 @@ fn affine_point_well_formed(point: &[u8]) -> bool {
 
 /// Accept uncompressed `A`, `B`, and `C` when each coordinate is below `p` and no point is the identity.
 /// @spec SCC-NVIDIA-001
-pub fn nvidia_proof_points_well_formed(
-    proof_a: &[u8; 64],
-    proof_b: &[u8; 128],
-    proof_c: &[u8; 64],
-) -> bool {
-    affine_point_well_formed(proof_a)
-        && affine_point_well_formed(proof_b)
-        && affine_point_well_formed(proof_c)
+pub fn nvidia_proof_points_well_formed(proof_a: &[u8; 64], proof_b: &[u8; 128], proof_c: &[u8; 64]) -> bool {
+    affine_point_well_formed(proof_a) && affine_point_well_formed(proof_b) && affine_point_well_formed(proof_c)
 }
 
 /// Nonce seed `SHA-256(subject || measurement || slot_hash)`.
 ///
 /// Mode A uses the workload signer as `subject`. Mode B uses the action commitment.
 /// @spec SCC-NVIDIA-002 SCC-NVIDIA-004
-pub fn nvidia_nonce_seed(
-    subject: &[u8; 32],
-    measurement: &[u8; 32],
-    slot_hash: &[u8; 32],
-) -> [u8; 32] {
+pub fn nvidia_nonce_seed(subject: &[u8; 32], measurement: &[u8; 32], slot_hash: &[u8; 32]) -> [u8; 32] {
     hashv(&[subject, measurement, slot_hash]).to_bytes()
 }
 
@@ -278,11 +259,7 @@ pub fn nvidia_verifier_message(
     let mut signature_rs = [0u8; 96];
     signature_rs[..32].copy_from_slice(&binding);
     signature_rs[32..64].copy_from_slice(statement);
-    NvidiaVerifierMessage {
-        public_key_xy,
-        message_digest,
-        signature_rs,
-    }
+    NvidiaVerifierMessage { public_key_xy, message_digest, signature_rs }
 }
 
 /// Maximum DER length accepted for ASK or VCEK certificates.
@@ -481,9 +458,7 @@ pub struct IssueTdxChallengeArgs<'a> {
 
 /// Parse `issue_tdx_challenge`.
 /// @spec SCC-TDX-005
-pub fn parse_issue_tdx_challenge_args(
-    rest: &[u8],
-) -> Result<IssueTdxChallengeArgs<'_>, ProgramError> {
+pub fn parse_issue_tdx_challenge_args(rest: &[u8]) -> Result<IssueTdxChallengeArgs<'_>, ProgramError> {
     let mut offset = 0usize;
     let nonce = read_array::<32>(rest, &mut offset)?;
     let nonce_slot = u64::from_le_bytes(*read_array::<8>(rest, &mut offset)?);
@@ -509,12 +484,8 @@ pub fn parse_tdx_qe_report_args(rest: &[u8]) -> Result<VerifyTdxQeReportArgs<'_>
     if auth_len > MAX_QE_AUTH_DATA_LEN {
         return Err(VerifierError::InvalidInstruction.into());
     }
-    let end = offset
-        .checked_add(auth_len)
-        .ok_or(VerifierError::InvalidInstruction)?;
-    let qe_auth_data = rest
-        .get(offset..end)
-        .ok_or(VerifierError::InvalidInstruction)?;
+    let end = offset.checked_add(auth_len).ok_or(VerifierError::InvalidInstruction)?;
+    let qe_auth_data = rest.get(offset..end).ok_or(VerifierError::InvalidInstruction)?;
     if end != rest.len() {
         return Err(VerifierError::InvalidInstruction.into());
     }
@@ -523,13 +494,7 @@ pub fn parse_tdx_qe_report_args(rest: &[u8]) -> Result<VerifyTdxQeReportArgs<'_>
     if pck_pubkey[0] != 0x02 && pck_pubkey[0] != 0x03 {
         return Err(VerifierError::InvalidInstruction.into());
     }
-    Ok(VerifyTdxQeReportArgs {
-        attestation_pubkey_xy,
-        pck_pubkey,
-        gpu_rim_digest,
-        model_digest,
-        qe_auth_data,
-    })
+    Ok(VerifyTdxQeReportArgs { attestation_pubkey_xy, pck_pubkey, gpu_rim_digest, model_digest, qe_auth_data })
 }
 
 /// `mode (1) || nonce_slot (8)`.

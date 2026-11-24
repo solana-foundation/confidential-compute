@@ -15,10 +15,7 @@ use solana_confidential_compute_core::{
     error::ConfidentialComputeError,
     nitro::MAX_NITRO_DOCUMENT_LEN,
     report::SnpReportView,
-    types::{
-        compute_action_commitment, AttestedSigner, EnclaveType, MeasurementDigest,
-        VerifyAtomicHeader,
-    },
+    types::{compute_action_commitment, AttestedSigner, EnclaveType, MeasurementDigest, VerifyAtomicHeader},
     NitroAttestationView, SignatureVerifier, SNP_REPORT_SIZE,
 };
 use solana_program::{
@@ -46,27 +43,24 @@ use solana_confidential_compute_core::MockVerifier;
 
 use crate::error::VerifierError;
 use crate::payload::{
-    nvidia_attestation_statement, nvidia_nonce_seed, nvidia_proof_points_well_formed,
-    nvidia_public_inputs_canonical, nvidia_public_inputs_from_statement, nvidia_verifier_message,
-    parse_nvidia_proof_packet, NvidiaStatement, NVIDIA_ATTESTATION_SOURCE,
+    nvidia_attestation_statement, nvidia_nonce_seed, nvidia_proof_points_well_formed, nvidia_public_inputs_canonical,
+    nvidia_public_inputs_from_statement, nvidia_verifier_message, parse_nvidia_proof_packet, NvidiaStatement,
+    NVIDIA_ATTESTATION_SOURCE,
 };
 use crate::payload::{
-    InitPolicyRegistryArgs, RegisterJwksKeyArgs, RegisterVcekArgs, RevokeJwksKeyArgs,
-    RotateRootCertArgs, UpdatePolicyArgs, INIT_POLICY_REGISTRY_DISCRIMINATOR, MAX_VCEK_CERT_LEN,
-    REGISTER_JWKS_KEY_DISCRIMINATOR, REGISTER_VCEK_DISCRIMINATOR, REGISTER_VCEK_HEADER_SIZE,
-    REVOKE_JWKS_KEY_DISCRIMINATOR, ROTATE_ROOT_CERT_DISCRIMINATOR, UPDATE_POLICY_DISCRIMINATOR,
-    VERIFY_AND_REGISTER_DISCRIMINATOR, VERIFY_ATOMIC_DISCRIMINATOR,
-    VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR, VERIFY_GOOGLE_JWT_DISCRIMINATOR,
-    VERIFY_GOOGLE_JWT_MODE_A, VERIFY_GOOGLE_JWT_MODE_B, VERIFY_NITRO_ATTESTATION_DISCRIMINATOR,
-    VERIFY_NITRO_MODE_A, VERIFY_NITRO_MODE_B, VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR,
-    VERIFY_NVIDIA_LEGACY_LEN, VERIFY_NVIDIA_MODE_A, VERIFY_NVIDIA_MODE_B,
-    VERIFY_NVIDIA_PROOF_PACKET_LEN,
+    InitPolicyRegistryArgs, RegisterJwksKeyArgs, RegisterVcekArgs, RevokeJwksKeyArgs, RotateRootCertArgs,
+    UpdatePolicyArgs, INIT_POLICY_REGISTRY_DISCRIMINATOR, MAX_VCEK_CERT_LEN, REGISTER_JWKS_KEY_DISCRIMINATOR,
+    REGISTER_VCEK_DISCRIMINATOR, REGISTER_VCEK_HEADER_SIZE, REVOKE_JWKS_KEY_DISCRIMINATOR,
+    ROTATE_ROOT_CERT_DISCRIMINATOR, UPDATE_POLICY_DISCRIMINATOR, VERIFY_AND_REGISTER_DISCRIMINATOR,
+    VERIFY_ATOMIC_DISCRIMINATOR, VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR, VERIFY_GOOGLE_JWT_DISCRIMINATOR,
+    VERIFY_GOOGLE_JWT_MODE_A, VERIFY_GOOGLE_JWT_MODE_B, VERIFY_NITRO_ATTESTATION_DISCRIMINATOR, VERIFY_NITRO_MODE_A,
+    VERIFY_NITRO_MODE_B, VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR, VERIFY_NVIDIA_LEGACY_LEN, VERIFY_NVIDIA_MODE_A,
+    VERIFY_NVIDIA_MODE_B, VERIFY_NVIDIA_PROOF_PACKET_LEN,
 };
 use crate::state::{
-    AmdIdentityRevocation, AttestedSignerAccount, JwksAccount, PolicyRegistry, PolicyRegistryView,
-    UsedNonceAccount, VcekAccount, VcekAccountView, ATTESTED_SIGNER_DISCRIMINATOR,
-    JWKS_ACCOUNT_DISCRIMINATOR, POLICY_REGISTRY_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR,
-    VCEK_ACCOUNT_DISCRIMINATOR,
+    AmdIdentityRevocation, AttestedSignerAccount, JwksAccount, PolicyRegistry, PolicyRegistryView, UsedNonceAccount,
+    VcekAccount, VcekAccountView, ATTESTED_SIGNER_DISCRIMINATOR, JWKS_ACCOUNT_DISCRIMINATOR,
+    POLICY_REGISTRY_DISCRIMINATOR, USED_NONCE_DISCRIMINATOR, VCEK_ACCOUNT_DISCRIMINATOR,
 };
 
 /// Independent slot cap; elapsed wall time is bounded separately.
@@ -97,11 +91,8 @@ impl SignatureVerifier for DirectCryptoVerifier {
         }
         #[cfg(not(target_os = "solana"))]
         {
-            match solana_confidential_compute_crypto::verify_p384_signature(
-                public_key_xy,
-                message_digest,
-                signature_rs,
-            ) {
+            match solana_confidential_compute_crypto::verify_p384_signature(public_key_xy, message_digest, signature_rs)
+            {
                 Ok(true) => Ok(()),
                 Ok(false) | Err(_) => Err(VerifierError::InvalidSignature.into()),
             }
@@ -124,18 +115,14 @@ pub struct SolanaDefaultVerifier {
 /// @spec SCC-VERIFY-016 SCC-PERF-001
 #[cfg(all(not(feature = "mock-crypto"), target_os = "solana"))]
 pub const EXPECTED_SIGVERIFY_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
-    0x53, 0x45, 0x43, 0x50, 0x33, 0x38, 0x34, 0x52, 0x31, 0x53, 0x49, 0x47, 0x56, 0x45, 0x52, 0x49,
-    0x46, 0x59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0x53, 0x45, 0x43, 0x50, 0x33, 0x38, 0x34, 0x52, 0x31, 0x53, 0x49, 0x47, 0x56, 0x45, 0x52, 0x49, 0x46, 0x59, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ]);
 
 #[cfg(all(not(feature = "mock-crypto"), target_os = "solana"))]
 impl Default for SolanaDefaultVerifier {
     fn default() -> Self {
-        Self {
-            inner: crate::introspection::InstructionIntrospectionVerifier::new(
-                EXPECTED_SIGVERIFY_PROGRAM_ID,
-            ),
-        }
+        Self { inner: crate::introspection::InstructionIntrospectionVerifier::new(EXPECTED_SIGVERIFY_PROGRAM_ID) }
     }
 }
 
@@ -148,12 +135,7 @@ impl SignatureVerifier for SolanaDefaultVerifier {
         signature_rs: &[u8; 96],
         instructions_sysvar: Option<&AccountInfo>,
     ) -> Result<(), ProgramError> {
-        self.inner.verify_p384(
-            public_key_xy,
-            message_digest,
-            signature_rs,
-            instructions_sysvar,
-        )
+        self.inner.verify_p384(public_key_xy, message_digest, signature_rs, instructions_sysvar)
     }
 }
 
@@ -175,17 +157,8 @@ pub const ROTATE_AUTHORITY_DISCRIMINATOR: [u8; 8] = [248, 225, 151, 35, 28, 15, 
 pub struct Processor;
 
 impl Processor {
-    pub fn process(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        instruction_data: &[u8],
-    ) -> ProgramResult {
-        Self::process_with(
-            &DefaultVerifier::default(),
-            program_id,
-            accounts,
-            instruction_data,
-        )
+    pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
+        Self::process_with(&DefaultVerifier::default(), program_id, accounts, instruction_data)
     }
 
     /// Dispatch with an explicit `SignatureVerifier` backend.
@@ -210,20 +183,14 @@ impl Processor {
             d if d == SET_GCP_TENANT_POLICY_DISCRIMINATOR => {
                 Self::process_set_gcp_tenant_policy(program_id, accounts, rest)
             }
-            d if d == SET_BACKEND_POLICY_DISCRIMINATOR => {
-                Self::process_set_backend_policy(program_id, accounts, rest)
-            }
-            d if d == REVOKE_VCEK_DISCRIMINATOR => {
-                Self::process_revoke_vcek(program_id, accounts, rest)
-            }
+            d if d == SET_BACKEND_POLICY_DISCRIMINATOR => Self::process_set_backend_policy(program_id, accounts, rest),
+            d if d == REVOKE_VCEK_DISCRIMINATOR => Self::process_revoke_vcek(program_id, accounts, rest),
 
             d if d == REVOKE_ATTESTED_SIGNER_DISCRIMINATOR => {
                 Self::process_revoke_attested_signer(program_id, accounts, rest)
             }
 
-            d if d == CLOSE_STALE_NONCE_DISCRIMINATOR => {
-                Self::process_close_stale_nonce(program_id, accounts, rest)
-            }
+            d if d == CLOSE_STALE_NONCE_DISCRIMINATOR => Self::process_close_stale_nonce(program_id, accounts, rest),
             d if d == CLOSE_ATTESTED_SIGNER_DISCRIMINATOR => {
                 Self::process_close_attested_signer(program_id, accounts, rest)
             }
@@ -231,36 +198,20 @@ impl Processor {
             d if d == INIT_POLICY_REGISTRY_DISCRIMINATOR => {
                 Self::process_init_policy_registry(program_id, accounts, rest)
             }
-            d if d == UPDATE_POLICY_DISCRIMINATOR => {
-                Self::process_update_policy(program_id, accounts, rest)
-            }
-            d if d == ROTATE_AUTHORITY_DISCRIMINATOR => {
-                Self::process_rotate_authority(program_id, accounts, rest)
-            }
-            d if d == ROTATE_ROOT_CERT_DISCRIMINATOR => {
-                Self::process_rotate_root_cert(program_id, accounts, rest)
-            }
-            d if d == REGISTER_VCEK_DISCRIMINATOR => {
-                Self::process_register_vcek(program_id, accounts, rest)
-            }
+            d if d == UPDATE_POLICY_DISCRIMINATOR => Self::process_update_policy(program_id, accounts, rest),
+            d if d == ROTATE_AUTHORITY_DISCRIMINATOR => Self::process_rotate_authority(program_id, accounts, rest),
+            d if d == ROTATE_ROOT_CERT_DISCRIMINATOR => Self::process_rotate_root_cert(program_id, accounts, rest),
+            d if d == REGISTER_VCEK_DISCRIMINATOR => Self::process_register_vcek(program_id, accounts, rest),
             d if d == VERIFY_AND_REGISTER_DISCRIMINATOR => {
                 Self::process_verify_and_register(verifier, program_id, accounts, rest)
             }
-            d if d == VERIFY_ATOMIC_DISCRIMINATOR => {
-                Self::process_verify_atomic(verifier, program_id, accounts, rest)
-            }
+            d if d == VERIFY_ATOMIC_DISCRIMINATOR => Self::process_verify_atomic(verifier, program_id, accounts, rest),
             d if d == VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR => {
                 Self::process_verify_atomic_with_nonce(verifier, program_id, accounts, rest)
             }
-            d if d == REGISTER_JWKS_KEY_DISCRIMINATOR => {
-                Self::process_register_jwks_key(program_id, accounts, rest)
-            }
-            d if d == REVOKE_JWKS_KEY_DISCRIMINATOR => {
-                Self::process_revoke_jwks_key(program_id, accounts, rest)
-            }
-            d if d == VERIFY_GOOGLE_JWT_DISCRIMINATOR => {
-                Self::process_verify_google_jwt(program_id, accounts, rest)
-            }
+            d if d == REGISTER_JWKS_KEY_DISCRIMINATOR => Self::process_register_jwks_key(program_id, accounts, rest),
+            d if d == REVOKE_JWKS_KEY_DISCRIMINATOR => Self::process_revoke_jwks_key(program_id, accounts, rest),
+            d if d == VERIFY_GOOGLE_JWT_DISCRIMINATOR => Self::process_verify_google_jwt(program_id, accounts, rest),
             d if d == VERIFY_NITRO_ATTESTATION_DISCRIMINATOR => {
                 Self::process_verify_nitro_attestation(verifier, program_id, accounts, rest)
             }
@@ -317,9 +268,7 @@ impl Processor {
             return Err(ProgramError::IncorrectProgramId);
         }
 
-        let lamports = Rent::get()
-            .map_err(|_| VerifierError::InvalidAccountAddress)?
-            .minimum_balance(space);
+        let lamports = Rent::get().map_err(|_| VerifierError::InvalidAccountAddress)?.minimum_balance(space);
         // @spec SCC-ARCH-001
         if pda.lamports() > 0 {
             let deficit = lamports.saturating_sub(pda.lamports());
@@ -342,22 +291,13 @@ impl Processor {
             return Ok(());
         }
         invoke_signed(
-            &system_instruction::create_account(
-                payer.key,
-                pda.key,
-                lamports,
-                space as u64,
-                program_id,
-            ),
+            &system_instruction::create_account(payer.key, pda.key, lamports, space as u64, program_id),
             &[payer.clone(), pda.clone(), system_program_acc.clone()],
             &[signer_seeds],
         )
     }
 
-    fn account_has_discriminator(
-        account: &AccountInfo,
-        discriminator: &[u8; 8],
-    ) -> Result<bool, ProgramError> {
+    fn account_has_discriminator(account: &AccountInfo, discriminator: &[u8; 8]) -> Result<bool, ProgramError> {
         let data = account.try_borrow_data()?;
         Ok(data.len() >= 8 && data[0..8] == discriminator[..])
     }
@@ -372,12 +312,9 @@ impl Processor {
     /// Validates the canonical address and its client-provided or stored bump.
     /// @spec SCC-ARCH-001
     fn assert_pda(account: &AccountInfo, seeds: &[&[u8]], program_id: &Pubkey) -> ProgramResult {
-        let (stored_bump, address_seeds) = seeds
-            .split_last()
-            .ok_or(VerifierError::InvalidAccountAddress)?;
+        let (stored_bump, address_seeds) = seeds.split_last().ok_or(VerifierError::InvalidAccountAddress)?;
         let (expected, canonical_bump) =
-            Pubkey::try_find_program_address(address_seeds, program_id)
-                .ok_or(VerifierError::InvalidAccountAddress)?;
+            Pubkey::try_find_program_address(address_seeds, program_id).ok_or(VerifierError::InvalidAccountAddress)?;
         if *stored_bump != [canonical_bump] {
             return Err(VerifierError::InvalidAccountAddress.into());
         }
@@ -387,10 +324,7 @@ impl Processor {
     /// Mode A registers or renews a key only with that workload's consent.
     /// Clients may append the readonly signer without moving existing accounts;
     /// a workload that is also the signed payer needs no duplicate account.
-    fn assert_workload_consent(
-        accounts: &[AccountInfo],
-        signer_pubkey: &[u8; 32],
-    ) -> ProgramResult {
+    fn assert_workload_consent(accounts: &[AccountInfo], signer_pubkey: &[u8; 32]) -> ProgramResult {
         let workload = accounts
             .iter()
             .find(|account| account.key.as_ref() == signer_pubkey)
@@ -430,25 +364,20 @@ impl Processor {
 
     fn map_confidential_compute_error(err: ConfidentialComputeError) -> VerifierError {
         match err {
-            ConfidentialComputeError::DebugModeProhibited
-            | ConfidentialComputeError::UnauthorizedPolicy => VerifierError::UnauthorizedPolicy,
+            ConfidentialComputeError::DebugModeProhibited | ConfidentialComputeError::UnauthorizedPolicy => {
+                VerifierError::UnauthorizedPolicy
+            }
             ConfidentialComputeError::InvalidMeasurement => VerifierError::DisallowedMeasurement,
             ConfidentialComputeError::InvalidSignature
             | ConfidentialComputeError::InvalidSignaturePadding
-            | ConfidentialComputeError::InvalidSignatureAlgorithm => {
-                VerifierError::InvalidSignature
-            }
+            | ConfidentialComputeError::InvalidSignatureAlgorithm => VerifierError::InvalidSignature,
             ConfidentialComputeError::ReportSizeInvalid => VerifierError::InvalidInstruction,
             _ => VerifierError::VerificationFailed,
         }
     }
 
-    fn optional_instructions_sysvar<'a, 'b>(
-        accounts: &'a [AccountInfo<'b>],
-    ) -> Option<&'a AccountInfo<'b>> {
-        accounts
-            .iter()
-            .find(|account| account.key == &instructions::ID)
+    fn optional_instructions_sysvar<'a, 'b>(accounts: &'a [AccountInfo<'b>]) -> Option<&'a AccountInfo<'b>> {
+        accounts.iter().find(|account| account.key == &instructions::ID)
     }
 
     fn verify_snp_signature<V: SignatureVerifier>(
@@ -457,12 +386,8 @@ impl Processor {
         public_key_xy: &[u8; 96],
         instructions_sysvar: Option<&AccountInfo>,
     ) -> ProgramResult {
-        let r_be = view
-            .signature_r_be()
-            .map_err(|_| VerifierError::InvalidSignature)?;
-        let s_be = view
-            .signature_s_be()
-            .map_err(|_| VerifierError::InvalidSignature)?;
+        let r_be = view.signature_r_be().map_err(|_| VerifierError::InvalidSignature)?;
+        let s_be = view.signature_s_be().map_err(|_| VerifierError::InvalidSignature)?;
         let mut sig_rs = [0u8; 96];
         sig_rs[..48].copy_from_slice(&r_be);
         sig_rs[48..].copy_from_slice(&s_be);
@@ -487,10 +412,8 @@ impl Processor {
         instructions_sysvar: Option<&AccountInfo>,
         clock: &Clock,
     ) -> Result<(SnpReportView<'a>, [u8; 32]), ProgramError> {
-        let view = SnpReportView::try_from_slice(report_bytes)
-            .map_err(Self::map_confidential_compute_error)?;
-        view.validate_security_invariants()
-            .map_err(Self::map_confidential_compute_error)?;
+        let view = SnpReportView::try_from_slice(report_bytes).map_err(Self::map_confidential_compute_error)?;
+        view.validate_security_invariants().map_err(Self::map_confidential_compute_error)?;
 
         let (public_key_xy, chip_id_hash) = {
             if vcek_acc.owner != program_id {
@@ -505,17 +428,10 @@ impl Processor {
             let vcek_bump_seed = [vcek.bump()];
             // Zero chip id or SIGNING_KEY == 1 derives the VLEK seed from the
             // endorsement public key. @spec SCC-VERIFY-009
-            let chip_id_hash: [u8; 32] = if view.is_vlek() {
-                hashv(&[&public_key_xy]).to_bytes()
-            } else {
-                hashv(&[view.chip_id()]).to_bytes()
-            };
+            let chip_id_hash: [u8; 32] =
+                if view.is_vlek() { hashv(&[&public_key_xy]).to_bytes() } else { hashv(&[view.chip_id()]).to_bytes() };
             let tcb_bytes = view.reported_tcb().to_le_bytes();
-            Self::assert_pda(
-                vcek_acc,
-                &[b"vcek_v2", &chip_id_hash, &tcb_bytes, &vcek_bump_seed],
-                program_id,
-            )?;
+            Self::assert_pda(vcek_acc, &[b"vcek_v2", &chip_id_hash, &tcb_bytes, &vcek_bump_seed], program_id)?;
             (public_key_xy, chip_id_hash)
         };
 
@@ -525,11 +441,7 @@ impl Processor {
         let registry_data = registry_acc.try_borrow_data()?;
         let registry = PolicyRegistryView::try_from_slice(&registry_data)?;
         let registry_bump_seed = [registry.bump()];
-        Self::assert_pda(
-            registry_acc,
-            &[b"policy_registry", &registry_bump_seed],
-            program_id,
-        )?;
+        Self::assert_pda(registry_acc, &[b"policy_registry", &registry_bump_seed], program_id)?;
         let measurement = view.measurement();
         Self::assert_backend_measurement(program_id, accounts, 1, &measurement)?;
         let tcb_reported = view.reported_tcb_components();
@@ -545,13 +457,8 @@ impl Processor {
     }
 
     /// Initializes the singleton PolicyRegistry PDA (@spec SCC-VERIFY-005).
-    fn process_init_policy_registry(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
-        let args = InitPolicyRegistryArgs::try_from_slice(rest)
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+    fn process_init_policy_registry(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
+        let args = InitPolicyRegistryArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
 
         // Legacy global measurements are retained for ABI compatibility and ignored
         // by AMD/Nitro/GCP admission. Clear each relevant BackendPolicy to stop new
@@ -579,8 +486,7 @@ impl Processor {
         // @spec SCC-VERIFY-005 SCC-SEC-004
         let program_data_acc = rest_accs.get(1).ok_or(ProgramError::NotEnoughAccountKeys)?;
         let loader = bpf_loader_upgradeable::id();
-        let (expected_program_data, _) =
-            Pubkey::find_program_address(&[program_id.as_ref()], &loader);
+        let (expected_program_data, _) = Pubkey::find_program_address(&[program_id.as_ref()], &loader);
         if program_data_acc.key != &expected_program_data || program_data_acc.owner != &loader {
             return Err(VerifierError::InvalidAccountAddress.into());
         }
@@ -628,24 +534,14 @@ impl Processor {
             bump,
         };
 
-        Self::write_governance_data(
-            b"init_policy_registry",
-            authority_acc,
-            registry_acc,
-            &registry,
-        )
+        Self::write_governance_data(b"init_policy_registry", authority_acc, registry_acc, &registry)
     }
 
     /// Updates minimum TCB floors and ABI-compatible legacy global measurements.
     /// AMD/Nitro/GCP admission uses BackendPolicy; clear each relevant backend policy
     /// to stop new admission (@spec SCC-VERIFY-005).
-    fn process_update_policy(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
-        let args = UpdatePolicyArgs::try_from_slice(rest)
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+    fn process_update_policy(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
+        let args = UpdatePolicyArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
 
         // Legacy global measurements are retained for ABI compatibility and ignored
         // by AMD/Nitro/GCP admission. Clear each relevant BackendPolicy to stop new
@@ -654,12 +550,8 @@ impl Processor {
             return Err(VerifierError::InvalidInstruction.into());
         }
 
-        let authority_acc = accounts
-            .first()
-            .ok_or(VerifierError::InvalidAccountAddress)?;
-        let registry_acc = accounts
-            .get(1)
-            .ok_or(VerifierError::InvalidAccountAddress)?;
+        let authority_acc = accounts.first().ok_or(VerifierError::InvalidAccountAddress)?;
+        let registry_acc = accounts.get(1).ok_or(VerifierError::InvalidAccountAddress)?;
 
         if !authority_acc.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -706,24 +598,18 @@ impl Processor {
 
     /// Transfers governance with consent from both the current and new authority.
     /// No pending-state layout or one-sided transfer can strand governance on a typo.
-    fn process_rotate_authority(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_rotate_authority(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         if !rest.is_empty() {
             return Err(VerifierError::InvalidInstruction.into());
         }
         let [authority_acc, registry_acc, new_authority_acc, ..] = accounts else {
             return Err(ProgramError::NotEnoughAccountKeys);
         };
-        let mut registry =
-            Self::assert_registry_authority(program_id, authority_acc, registry_acc)?;
+        let mut registry = Self::assert_registry_authority(program_id, authority_acc, registry_acc)?;
         if !new_authority_acc.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
-        if new_authority_acc.key == &Pubkey::default() || new_authority_acc.key == authority_acc.key
-        {
+        if new_authority_acc.key == &Pubkey::default() || new_authority_acc.key == authority_acc.key {
             return Err(VerifierError::InvalidAuthority.into());
         }
         if !registry_acc.is_writable {
@@ -734,20 +620,11 @@ impl Processor {
     }
 
     /// Multisig rotation of trusted AMD Root Key (ARK) (@spec SCC-VERIFY-005).
-    fn process_rotate_root_cert(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
-        let args = RotateRootCertArgs::try_from_slice(rest)
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+    fn process_rotate_root_cert(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
+        let args = RotateRootCertArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
 
-        let authority_acc = accounts
-            .first()
-            .ok_or(VerifierError::InvalidAccountAddress)?;
-        let registry_acc = accounts
-            .get(1)
-            .ok_or(VerifierError::InvalidAccountAddress)?;
+        let authority_acc = accounts.first().ok_or(VerifierError::InvalidAccountAddress)?;
+        let registry_acc = accounts.get(1).ok_or(VerifierError::InvalidAccountAddress)?;
 
         if !authority_acc.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -781,11 +658,7 @@ impl Processor {
 
     /// Registers and caches a physical AMD chip VCEK public key.
     /// @spec SCC-VERIFY-003, SCC-VERIFY-009
-    fn process_register_vcek(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_register_vcek(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         let [payer_acc, registry_acc, vcek_acc, system_program_acc, ..] = accounts else {
             return Err(VerifierError::InvalidAccountAddress.into());
         };
@@ -814,8 +687,7 @@ impl Processor {
         let ask_der = &rest[REGISTER_VCEK_HEADER_SIZE..REGISTER_VCEK_HEADER_SIZE + ask_len];
         let vcek_der = &rest[REGISTER_VCEK_HEADER_SIZE + ask_len..trailing_end];
 
-        let (expected_registry, _) =
-            Pubkey::find_program_address(&[b"policy_registry"], program_id);
+        let (expected_registry, _) = Pubkey::find_program_address(&[b"policy_registry"], program_id);
         Self::assert_expected_pda(registry_acc, &expected_registry)?;
         // A matching address owned by another program is not this registry.
         // @spec SCC-SEC-004
@@ -835,8 +707,7 @@ impl Processor {
         }
 
         let clock = Clock::get().map_err(|_| VerifierError::InvalidAccountAddress)?;
-        let now_unix =
-            u64::try_from(clock.unix_timestamp).map_err(|_| VerifierError::InvalidInstruction)?;
+        let now_unix = u64::try_from(clock.unix_timestamp).map_err(|_| VerifierError::InvalidInstruction)?;
         let valid_until_unix = solana_confidential_compute_crypto::validate_vcek_chain_at(
             &registry.ark_pubkey_xy,
             ask_der,
@@ -866,8 +737,7 @@ impl Processor {
 
         Self::assert_amd_identity_allowed(program_id, accounts, &chip_id_hash)?;
         let tcb_bytes = args.tcb_version.to_le_bytes();
-        let (expected_pda, bump) =
-            Pubkey::find_program_address(&[b"vcek_v2", &chip_id_hash, &tcb_bytes], program_id);
+        let (expected_pda, bump) = Pubkey::find_program_address(&[b"vcek_v2", &chip_id_hash, &tcb_bytes], program_id);
         Self::assert_expected_pda(vcek_acc, &expected_pda)?;
 
         if Self::account_has_discriminator(vcek_acc, &VCEK_ACCOUNT_DISCRIMINATOR)? {
@@ -907,12 +777,7 @@ impl Processor {
         };
 
         Self::write_account_data(vcek_acc, &vcek)?;
-        Self::log_registration(
-            b"register_vcek",
-            b"amd_sev_snp",
-            &args.public_key_xy,
-            vcek_acc,
-        )
+        Self::log_registration(b"register_vcek", b"amd_sev_snp", &args.public_key_xy, vcek_acc)
     }
 
     /// Stage 2: Verifies AMD report, enforces policies, and registers AttestedSignerAccount.
@@ -942,11 +807,7 @@ impl Processor {
         if rest.len() != REST_LEN {
             return Err(VerifierError::InvalidInstruction.into());
         }
-        let nonce_slot = u64::from_le_bytes(
-            rest[0..8]
-                .try_into()
-                .map_err(|_| VerifierError::InvalidInstruction)?,
-        );
+        let nonce_slot = u64::from_le_bytes(rest[0..8].try_into().map_err(|_| VerifierError::InvalidInstruction)?);
         let report_bytes = &rest[8..8 + SNP_REPORT_SIZE];
         let nonce_bump = rest[8 + SNP_REPORT_SIZE];
         let signer_bump = rest[8 + SNP_REPORT_SIZE + 1];
@@ -976,12 +837,7 @@ impl Processor {
         let signer_pubkey = view.pubkey();
         Self::assert_workload_consent(accounts, &signer_pubkey)?;
         let nonce = view.nonce();
-        Self::assert_legacy_nonce_migration(
-            program_id,
-            accounts,
-            &[b"nonce", &signer_pubkey, &nonce],
-            clock.slot,
-        )?;
+        Self::assert_legacy_nonce_migration(program_id, accounts, &[b"nonce", &signer_pubkey, &nonce], clock.slot)?;
         let (expected_nonce_pda, expected_nonce_bump) =
             Pubkey::find_program_address(&[b"nonce", &[1], &signer_pubkey, &nonce], program_id);
         Self::assert_expected_pda(used_nonce_acc, &expected_nonce_pda)?;
@@ -1014,9 +870,8 @@ impl Processor {
         let signer_bump_seed = [expected_signer_bump];
 
         if Self::account_has_discriminator(attested_signer_acc, &ATTESTED_SIGNER_DISCRIMINATOR)? {
-            let existing =
-                AttestedSignerAccount::try_from_slice(&attested_signer_acc.try_borrow_data()?)
-                    .map_err(|_| VerifierError::InvalidAccountAddress)?;
+            let existing = AttestedSignerAccount::try_from_slice(&attested_signer_acc.try_borrow_data()?)
+                .map_err(|_| VerifierError::InvalidAccountAddress)?;
             if existing.is_revoked() {
                 return Err(VerifierError::UnauthorizedPolicy.into());
             }
@@ -1051,23 +906,14 @@ impl Processor {
             bump: expected_signer_bump,
             expires_unix_timestamp: Self::session_unix_deadline(
                 clock.unix_timestamp,
-                Some(
-                    VcekAccountView::try_from_slice(&vcek_acc.try_borrow_data()?)?
-                        .valid_until_unix(),
-                ),
+                Some(VcekAccountView::try_from_slice(&vcek_acc.try_borrow_data()?)?.valid_until_unix()),
             )?,
         };
         Self::write_account_data(attested_signer_acc, &signer_record)?;
 
-        let used_nonce = UsedNonceAccount::new(clock.slot, expected_nonce_bump)
-            .with_refund(payer_acc.key.to_bytes());
+        let used_nonce = UsedNonceAccount::new(clock.slot, expected_nonce_bump).with_refund(payer_acc.key.to_bytes());
         Self::write_account_data(used_nonce_acc, &used_nonce)?;
-        Self::log_registration(
-            b"register_signer",
-            b"amd_sev_snp",
-            &signer_pubkey,
-            attested_signer_acc,
-        )
+        Self::log_registration(b"register_signer", b"amd_sev_snp", &signer_pubkey, attested_signer_acc)
     }
 
     /// Loads the 32-byte slot hash from the pinned SlotHashes sysvar.
@@ -1091,22 +937,14 @@ impl Processor {
         if data.len() < 8 {
             return Err(VerifierError::StaleNonce.into());
         }
-        let num_entries = u64::from_le_bytes(
-            data[0..8]
-                .try_into()
-                .map_err(|_| VerifierError::StaleNonce)?,
-        ) as usize;
+        let num_entries = u64::from_le_bytes(data[0..8].try_into().map_err(|_| VerifierError::StaleNonce)?) as usize;
         for i in 0..num_entries.min(150) {
             let start = 8 + i * 40;
             let end = start + 40;
             if data.len() < end {
                 break;
             }
-            let slot = u64::from_le_bytes(
-                data[start..start + 8]
-                    .try_into()
-                    .map_err(|_| VerifierError::StaleNonce)?,
-            );
+            let slot = u64::from_le_bytes(data[start..start + 8].try_into().map_err(|_| VerifierError::StaleNonce)?);
             if slot == nonce_slot {
                 let mut hash = [0u8; 32];
                 hash.copy_from_slice(&data[start + 8..end]);
@@ -1141,8 +979,7 @@ impl Processor {
         }
         let header = VerifyAtomicHeader::try_from_slice(&rest[..VerifyAtomicHeader::SIZE])
             .map_err(|_| VerifierError::InvalidInstruction)?;
-        let report_bytes =
-            &rest[VerifyAtomicHeader::SIZE..VerifyAtomicHeader::SIZE + SNP_REPORT_SIZE];
+        let report_bytes = &rest[VerifyAtomicHeader::SIZE..VerifyAtomicHeader::SIZE + SNP_REPORT_SIZE];
 
         // The next instruction must be the attested consumer. A copied
         // verifier instruction cannot burn the nonce by itself.
@@ -1152,13 +989,10 @@ impl Processor {
             return Err(ProgramError::IncorrectProgramId);
         }
         let current_index = load_current_index_checked(instructions_sysvar)?;
-        let next_index = current_index
-            .checked_add(1)
-            .ok_or(ProgramError::InvalidInstructionData)?;
+        let next_index = current_index.checked_add(1).ok_or(ProgramError::InvalidInstructionData)?;
         let consumer_ix = load_instruction_at_checked(next_index as usize, instructions_sysvar)?;
         if consumer_ix.program_id.to_bytes() != header.consumer_program_id
-            || solana_confidential_compute_core::action::hash_instruction(&consumer_ix)
-                != header.action_hash
+            || solana_confidential_compute_core::action::hash_instruction(&consumer_ix) != header.action_hash
         {
             return Err(VerifierError::ActionHashMismatch.into());
         }
@@ -1234,10 +1068,8 @@ impl Processor {
             &[b"nonce", &signer_pubkey, &expected_commitment],
             clock.slot,
         )?;
-        let (expected_nonce_pda, expected_nonce_bump) = Pubkey::find_program_address(
-            &[b"nonce", &[1], &signer_pubkey, &expected_commitment],
-            program_id,
-        );
+        let (expected_nonce_pda, expected_nonce_bump) =
+            Pubkey::find_program_address(&[b"nonce", &[1], &signer_pubkey, &expected_commitment], program_id);
         Self::assert_expected_pda(used_nonce_acc, &expected_nonce_pda)?;
         if nonce_bump != expected_nonce_bump {
             return Err(VerifierError::InvalidAccountAddress.into());
@@ -1251,19 +1083,12 @@ impl Processor {
             used_nonce_acc,
             Some(system_program_acc),
             program_id,
-            &[
-                b"nonce",
-                &[1],
-                &signer_pubkey,
-                &expected_commitment,
-                &nonce_bump_seed,
-            ],
+            &[b"nonce", &[1], &signer_pubkey, &expected_commitment, &nonce_bump_seed],
             UsedNonceAccount::SIZE,
         )?;
         Self::write_account_data(
             used_nonce_acc,
-            &UsedNonceAccount::new(clock.slot, expected_nonce_bump)
-                .with_refund(payer_acc.key.to_bytes()),
+            &UsedNonceAccount::new(clock.slot, expected_nonce_bump).with_refund(payer_acc.key.to_bytes()),
         )?;
         Ok(())
     }
@@ -1276,15 +1101,12 @@ impl Processor {
         nonce_slot: u64,
         expected_hash: &[u8; 32],
     ) -> Result<(), VerifierError> {
-        let hash =
-            Self::load_slot_hash(slot_hashes_account, nonce_slot, current_slot).map_err(|err| {
-                match err {
-                    ProgramError::Custom(c) if c == VerifierError::InvalidAccountAddress as u32 => {
-                        VerifierError::InvalidAccountAddress
-                    }
-                    _ => VerifierError::StaleNonce,
-                }
-            })?;
+        let hash = Self::load_slot_hash(slot_hashes_account, nonce_slot, current_slot).map_err(|err| match err {
+            ProgramError::Custom(c) if c == VerifierError::InvalidAccountAddress as u32 => {
+                VerifierError::InvalidAccountAddress
+            }
+            _ => VerifierError::StaleNonce,
+        })?;
         if &hash != expected_hash {
             return Err(VerifierError::StaleNonce);
         }
@@ -1298,12 +1120,8 @@ impl Processor {
         measurement: &[u8; 48],
     ) -> ProgramResult {
         use crate::state::BackendPolicy;
-        let (key, bump) =
-            Pubkey::find_program_address(&[BackendPolicy::SEED, &[source]], program_id);
-        let account = accounts
-            .iter()
-            .find(|a| a.key == &key)
-            .ok_or(VerifierError::UnauthorizedPolicy)?;
+        let (key, bump) = Pubkey::find_program_address(&[BackendPolicy::SEED, &[source]], program_id);
+        let account = accounts.iter().find(|a| a.key == &key).ok_or(VerifierError::UnauthorizedPolicy)?;
         if account.owner != program_id {
             return Err(ProgramError::IllegalOwner);
         }
@@ -1315,14 +1133,9 @@ impl Processor {
         Ok(())
     }
 
-    fn process_set_backend_policy(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_set_backend_policy(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         use crate::state::BackendPolicy;
-        let args = SetBackendPolicyArgs::try_from_slice(rest)
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+        let args = SetBackendPolicyArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
         let [authority, registry, policy, payer, system, ..] = accounts else {
             return Err(VerifierError::InvalidAccountAddress.into());
         };
@@ -1330,8 +1143,7 @@ impl Processor {
         if !(1..=5).contains(&args.source) || args.measurement_count > 8 {
             return Err(VerifierError::InvalidInstruction.into());
         }
-        let (key, bump) =
-            Pubkey::find_program_address(&[BackendPolicy::SEED, &[args.source]], program_id);
+        let (key, bump) = Pubkey::find_program_address(&[BackendPolicy::SEED, &[args.source]], program_id);
         Self::assert_expected_pda(policy, &key)?;
         let value = BackendPolicy {
             discriminator: BackendPolicy::DISCRIMINATOR,
@@ -1349,9 +1161,7 @@ impl Processor {
             BackendPolicy::SIZE,
         )?;
         // Re-setting the current policy is a no-op: no write and no event.
-        if BackendPolicy::try_from_slice(&policy.try_borrow_data()?)
-            .is_ok_and(|current| current == value)
-        {
+        if BackendPolicy::try_from_slice(&policy.try_borrow_data()?).is_ok_and(|current| current == value) {
             return Ok(());
         }
         Self::write_governance_data(b"set_backend_policy", authority, policy, &value)
@@ -1363,9 +1173,7 @@ impl Processor {
         if now < 0 {
             return Err(VerifierError::InvalidInstruction.into());
         }
-        let deadline = now
-            .checked_add(ATTESTATION_TTL_SECONDS)
-            .ok_or(VerifierError::InvalidInstruction)?;
+        let deadline = now.checked_add(ATTESTATION_TTL_SECONDS).ok_or(VerifierError::InvalidInstruction)?;
         let deadline = match credential_exp {
             Some(exp) => deadline.min(i64::try_from(exp).unwrap_or(i64::MAX)),
             None => deadline,
@@ -1383,10 +1191,7 @@ impl Processor {
         now: u64,
     ) -> ProgramResult {
         let (key, _) = Pubkey::find_program_address(seeds, program_id);
-        let account = accounts
-            .iter()
-            .find(|a| a.key == &key)
-            .ok_or(VerifierError::InvalidAccountAddress)?;
+        let account = accounts.iter().find(|a| a.key == &key).ok_or(VerifierError::InvalidAccountAddress)?;
         if account.data_is_empty() {
             if account.owner == &system_program::ID || account.owner == program_id {
                 return Ok(());
@@ -1400,35 +1205,21 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
         let data = account.try_borrow_data()?;
-        let consumed = u64::from_le_bytes(
-            data.get(8..16)
-                .ok_or(ProgramError::InvalidAccountData)?
-                .try_into()
-                .unwrap(),
-        );
+        let consumed = u64::from_le_bytes(data.get(8..16).ok_or(ProgramError::InvalidAccountData)?.try_into().unwrap());
         if now.checked_sub(consumed).is_none_or(|age| age <= 150) {
             return Err(VerifierError::NonceAlreadyUsed.into());
         }
         Ok(())
     }
 
-    fn process_revoke_vcek(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
-        let args =
-            RevokeVcekArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
+    fn process_revoke_vcek(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
+        let args = RevokeVcekArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
         let [authority, registry, cache, revocation, payer, system, ..] = accounts else {
             return Err(VerifierError::InvalidAccountAddress.into());
         };
         Self::assert_registry_authority(program_id, authority, registry)?;
         let (key, bump) = Pubkey::find_program_address(
-            &[
-                VcekAccount::SEED,
-                &args.chip_id_hash,
-                &args.tcb_version.to_le_bytes(),
-            ],
+            &[VcekAccount::SEED, &args.chip_id_hash, &args.tcb_version.to_le_bytes()],
             program_id,
         );
         Self::assert_expected_pda(cache, &key)?;
@@ -1441,10 +1232,8 @@ impl Processor {
         if system.key != &system_program::ID || !system.executable {
             return Err(ProgramError::IncorrectProgramId);
         }
-        let (identity_key, identity_bump) = Pubkey::find_program_address(
-            &[AmdIdentityRevocation::SEED, &args.chip_id_hash],
-            program_id,
-        );
+        let (identity_key, identity_bump) =
+            Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, &args.chip_id_hash], program_id);
         Self::assert_expected_pda(revocation, &identity_key)?;
         // Validate all inputs before allocating or writing either account.
         let cached = if cache.owner == program_id {
@@ -1475,10 +1264,7 @@ impl Processor {
             {
                 return Err(VerifierError::InvalidAccountAddress.into());
             }
-        } else if revocation.owner != &system_program::ID
-            || !revocation.data_is_empty()
-            || revocation.executable
-        {
+        } else if revocation.owner != &system_program::ID || !revocation.data_is_empty() || revocation.executable {
             return Err(ProgramError::IllegalOwner);
         }
         Self::create_pda_if_needed(
@@ -1486,11 +1272,7 @@ impl Processor {
             revocation,
             Some(system),
             program_id,
-            &[
-                AmdIdentityRevocation::SEED,
-                &args.chip_id_hash,
-                &[identity_bump],
-            ],
+            &[AmdIdentityRevocation::SEED, &args.chip_id_hash, &[identity_bump]],
             AmdIdentityRevocation::SIZE,
         )?;
         Self::write_governance_data(b"revoke_amd_identity", authority, revocation, &tombstone)?;
@@ -1498,10 +1280,7 @@ impl Processor {
             value.is_revoked = true;
             Self::write_governance_data(b"revoke_vcek", authority, cache, &value)?;
         }
-        solana_program::msg!(
-            "solana-confidential-compute:revoke_amd_identity:v1 {}",
-            revocation.key
-        );
+        solana_program::msg!("solana-confidential-compute:revoke_amd_identity:v1 {}", revocation.key);
         Ok(())
     }
 
@@ -1512,12 +1291,8 @@ impl Processor {
         accounts: &[AccountInfo],
         identity: &[u8; 32],
     ) -> ProgramResult {
-        let (key, _) =
-            Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, identity], program_id);
-        let account = accounts
-            .iter()
-            .find(|a| a.key == &key)
-            .ok_or(ProgramError::NotEnoughAccountKeys)?;
+        let (key, _) = Pubkey::find_program_address(&[AmdIdentityRevocation::SEED, identity], program_id);
+        let account = accounts.iter().find(|a| a.key == &key).ok_or(ProgramError::NotEnoughAccountKeys)?;
         if account.owner == program_id {
             // Fail closed even for malformed program-owned denylist state.
             return Err(VerifierError::UnauthorizedPolicy.into());
@@ -1529,23 +1304,15 @@ impl Processor {
     }
 
     fn nonce_already_used(account: &AccountInfo) -> Result<bool, ProgramError> {
-        Ok(
-            Self::account_has_discriminator(account, &USED_NONCE_DISCRIMINATOR)?
-                || Self::account_has_discriminator(
-                    account,
-                    &crate::state::LEGACY_USED_NONCE_DISCRIMINATOR,
-                )?,
-        )
+        Ok(Self::account_has_discriminator(account, &USED_NONCE_DISCRIMINATOR)?
+            || Self::account_has_discriminator(account, &crate::state::LEGACY_USED_NONCE_DISCRIMINATOR)?)
     }
 
     fn close_owned_account(account: &AccountInfo, refund: &AccountInfo) -> ProgramResult {
         if !account.is_writable || !refund.is_writable || account.key == refund.key {
             return Err(VerifierError::InvalidAccountAddress.into());
         }
-        let total = refund
-            .lamports()
-            .checked_add(account.lamports())
-            .ok_or(ProgramError::ArithmeticOverflow)?;
+        let total = refund.lamports().checked_add(account.lamports()).ok_or(ProgramError::ArithmeticOverflow)?;
         account.resize(0)?;
         **refund.try_borrow_mut_lamports()? = total;
         **account.try_borrow_mut_lamports()? = 0;
@@ -1560,11 +1327,7 @@ impl Processor {
         Clock::from_account_info(account)
     }
 
-    fn process_close_stale_nonce(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_close_stale_nonce(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         if !rest.is_empty() {
             return Err(VerifierError::InvalidInstruction.into());
         }
@@ -1590,11 +1353,7 @@ impl Processor {
         Self::close_governance_account(b"close_stale_nonce", refund, nonce, refund)
     }
 
-    fn process_close_attested_signer(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_close_attested_signer(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         if !rest.is_empty() {
             return Err(VerifierError::InvalidInstruction.into());
         }
@@ -1609,8 +1368,7 @@ impl Processor {
         }
         let value = AttestedSignerAccount::try_from_slice(&record.try_borrow_data()?)
             .map_err(|_| VerifierError::InvalidAccountAddress)?;
-        let (expected, bump) =
-            Pubkey::find_program_address(&[b"attested_signer_v2", signer.key.as_ref()], program_id);
+        let (expected, bump) = Pubkey::find_program_address(&[b"attested_signer_v2", signer.key.as_ref()], program_id);
         if record.key != &expected
             || value.bump != bump
             || value.discriminator != ATTESTED_SIGNER_DISCRIMINATOR
@@ -1634,9 +1392,7 @@ impl Processor {
     fn write_account_data<T: BorshSerialize>(account: &AccountInfo, value: &T) -> ProgramResult {
         let mut data = account.try_borrow_mut_data()?;
         let mut writer = &mut data[..];
-        value
-            .serialize(&mut writer)
-            .map_err(|_| ProgramError::AccountDataTooSmall)?;
+        value.serialize(&mut writer).map_err(|_| ProgramError::AccountDataTooSmall)?;
         Ok(())
     }
 
@@ -1644,12 +1400,7 @@ impl Processor {
     /// affected account, SHA-256(final account bytes). The VCEK subject is its
     /// 96-byte P-384 key; signer subjects are 32-byte workload keys. Require
     /// transaction success when indexing these logs, as for governance events.
-    fn log_registration(
-        operation: &[u8],
-        source: &[u8],
-        subject: &[u8],
-        account: &AccountInfo,
-    ) -> ProgramResult {
+    fn log_registration(operation: &[u8], source: &[u8], subject: &[u8], account: &AccountInfo) -> ProgramResult {
         let state_hash = hashv(&[&account.try_borrow_data()?]);
         solana_program::log::sol_log_data(&[
             b"solana-confidential-compute:registration:v1",
@@ -1716,8 +1467,7 @@ impl Processor {
         if !authority_acc.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
-        let (expected_registry, _) =
-            Pubkey::find_program_address(&[b"policy_registry"], program_id);
+        let (expected_registry, _) = Pubkey::find_program_address(&[b"policy_registry"], program_id);
         Self::assert_expected_pda(registry_acc, &expected_registry)?;
         // A matching address owned by another program is not this registry.
         // @spec SCC-SEC-004
@@ -1737,19 +1487,13 @@ impl Processor {
 
     /// Permanent targeted containment for this workload public key, across sources.
     /// Retain the record as a tombstone; expiry zero is never issued by admission.
-    fn process_revoke_attested_signer(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
-        let args = RevokeAttestedSignerArgs::try_from_slice(rest)
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+    fn process_revoke_attested_signer(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
+        let args = RevokeAttestedSignerArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
         let [authority, registry, signer, ..] = accounts else {
             return Err(VerifierError::InvalidAccountAddress.into());
         };
         Self::assert_registry_authority(program_id, authority, registry)?;
-        let (expected, bump) =
-            Pubkey::find_program_address(&[b"attested_signer_v2", &args.signer_pubkey], program_id);
+        let (expected, bump) = Pubkey::find_program_address(&[b"attested_signer_v2", &args.signer_pubkey], program_id);
         Self::assert_expected_pda(signer, &expected)?;
         if signer.owner != program_id || !signer.is_writable {
             return Err(VerifierError::InvalidAccountAddress.into());
@@ -1765,38 +1509,26 @@ impl Processor {
         value.record.expires_slot = 0;
         value.expires_unix_timestamp = 0;
         Self::write_governance_data(b"revoke_attested_signer", authority, signer, &value)?;
-        solana_program::msg!(
-            "solana-confidential-compute:revoke_attested_signer:v1 {}",
-            signer.key
-        );
+        solana_program::msg!("solana-confidential-compute:revoke_attested_signer:v1 {}", signer.key);
         Ok(())
     }
 
     /// Accounts: authority signer, global registry, tenant policy writable,
     /// payer signer writable, system program. Existing global policy ABI is unchanged.
-    fn process_set_gcp_tenant_policy(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_set_gcp_tenant_policy(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         use crate::state::GcpTenantPolicy;
         // Bound dynamic Borsh payload before deserializing untrusted strings.
         if rest.len() > 8 + 128 + 160 {
             return Err(VerifierError::InvalidInstruction.into());
         }
-        let args = SetGcpTenantPolicyArgs::try_from_slice(rest)
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+        let args = SetGcpTenantPolicyArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
         let [authority, registry, policy, payer, system, ..] = accounts else {
             return Err(VerifierError::InvalidAccountAddress.into());
         };
         Self::assert_registry_authority(program_id, authority, registry)?;
         let (expected, bump) = Pubkey::find_program_address(&[GcpTenantPolicy::SEED], program_id);
         Self::assert_expected_pda(policy, &expected)?;
-        let value = GcpTenantPolicy::new(
-            args.expected_audience.as_bytes(),
-            args.expected_subject.as_bytes(),
-            bump,
-        )?;
+        let value = GcpTenantPolicy::new(args.expected_audience.as_bytes(), args.expected_subject.as_bytes(), bump)?;
         Self::create_pda_if_needed(
             payer,
             policy,
@@ -1806,9 +1538,7 @@ impl Processor {
             GcpTenantPolicy::SIZE,
         )?;
         // Re-setting the current policy is a no-op: no write and no event.
-        if GcpTenantPolicy::try_from_slice(&policy.try_borrow_data()?)
-            .is_ok_and(|current| current == value)
-        {
+        if GcpTenantPolicy::try_from_slice(&policy.try_borrow_data()?).is_ok_and(|current| current == value) {
             return Ok(());
         }
         Self::write_governance_data(b"set_gcp_tenant_policy", authority, policy, &value)
@@ -1817,15 +1547,9 @@ impl Processor {
     /// Registers an immutable Google JWKS RSA-2048 key with precomputed Montgomery constants.
     /// Accounts: `[authority, registry, jwks_account, payer, system_program]`
     /// @spec SCC-JWT-003 SCC-JWT-006
-    fn process_register_jwks_key(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
-        let args = RegisterJwksKeyArgs::try_from_slice(rest)
-            .map_err(|_| VerifierError::InvalidInstruction)?;
-        let [authority_acc, registry_acc, jwks_acc, payer_acc, system_program_acc, ..] = accounts
-        else {
+    fn process_register_jwks_key(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
+        let args = RegisterJwksKeyArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
+        let [authority_acc, registry_acc, jwks_acc, payer_acc, system_program_acc, ..] = accounts else {
             return Err(VerifierError::InvalidAccountAddress.into());
         };
 
@@ -1842,18 +1566,11 @@ impl Processor {
         }
 
         let kid_hash = solana_confidential_compute_crypto::jwt::kid_hash(&args.kid);
-        let (expected_pda, bump) = Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_crypto::jwt::JWKS_SEED,
-                &kid_hash,
-            ],
-            program_id,
-        );
+        let (expected_pda, bump) =
+            Pubkey::find_program_address(&[solana_confidential_compute_crypto::jwt::JWKS_SEED, &kid_hash], program_id);
         Self::assert_expected_pda(jwks_acc, &expected_pda)?;
 
-        let current_slot = Clock::get()
-            .map_err(|_| VerifierError::InvalidAccountAddress)?
-            .slot;
+        let current_slot = Clock::get().map_err(|_| VerifierError::InvalidAccountAddress)?.slot;
         if Self::account_has_discriminator(jwks_acc, &JWKS_ACCOUNT_DISCRIMINATOR)? {
             if jwks_acc.owner != program_id {
                 return Err(ProgramError::IllegalOwner);
@@ -1885,36 +1602,19 @@ impl Processor {
             jwks_acc,
             Some(system_program_acc),
             program_id,
-            &[
-                solana_confidential_compute_crypto::jwt::JWKS_SEED,
-                &kid_hash,
-                &bump_seed,
-            ],
+            &[solana_confidential_compute_crypto::jwt::JWKS_SEED, &kid_hash, &bump_seed],
             JwksAccount::SIZE,
         )?;
 
-        let jwks = JwksAccount::new(
-            kid_hash,
-            args.modulus,
-            args.exponent,
-            n0,
-            r2,
-            current_slot,
-            bump,
-        );
+        let jwks = JwksAccount::new(kid_hash, args.modulus, args.exponent, n0, r2, current_slot, bump);
         Self::write_governance_data(b"register_jwks_key", authority_acc, jwks_acc, &jwks)
     }
 
     /// Marks a registered JWKS key as revoked. The modulus is never mutated.
     /// Accounts: `[authority, registry, jwks_account]`
     /// @spec SCC-JWT-006
-    fn process_revoke_jwks_key(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
-        let args = RevokeJwksKeyArgs::try_from_slice(rest)
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+    fn process_revoke_jwks_key(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
+        let args = RevokeJwksKeyArgs::try_from_slice(rest).map_err(|_| VerifierError::InvalidInstruction)?;
         let [authority_acc, registry_acc, jwks_acc, ..] = accounts else {
             return Err(VerifierError::InvalidAccountAddress.into());
         };
@@ -1922,10 +1622,7 @@ impl Processor {
         let _registry = Self::assert_registry_authority(program_id, authority_acc, registry_acc)?;
 
         let (expected_pda, bump) = Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_crypto::jwt::JWKS_SEED,
-                &args.kid_hash,
-            ],
+            &[solana_confidential_compute_crypto::jwt::JWKS_SEED, &args.kid_hash],
             program_id,
         );
         Self::assert_expected_pda(jwks_acc, &expected_pda)?;
@@ -1947,11 +1644,7 @@ impl Processor {
     /// Accounts: `[attested_signer, policy_registry, jwks_account, used_nonce, payer,
     /// system_program, clock, slot_hashes, workload_signer / instructions_sysvar?]`
     /// @spec SCC-JWT-001 SCC-JWT-002 SCC-JWT-003 SCC-JWT-005 SCC-JWT-006
-    fn process_verify_google_jwt(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_verify_google_jwt(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         // Zero-copy header unpacking (zero-heap, bounds-safe against OOM)
         const HEADER_LEN: usize = 1 + 8 + 32 + 4;
         if rest.len() < HEADER_LEN {
@@ -1963,28 +1656,18 @@ impl Processor {
             return Err(VerifierError::InvalidInstruction.into());
         }
 
-        let nonce_slot = u64::from_le_bytes(
-            rest[1..9]
-                .try_into()
-                .map_err(|_| VerifierError::InvalidInstruction)?,
-        );
+        let nonce_slot = u64::from_le_bytes(rest[1..9].try_into().map_err(|_| VerifierError::InvalidInstruction)?);
         let mut expected_action_hash = [0u8; 32];
         expected_action_hash.copy_from_slice(&rest[9..41]);
-        let jwt_len = u32::from_le_bytes(
-            rest[41..45]
-                .try_into()
-                .map_err(|_| VerifierError::InvalidInstruction)?,
-        ) as usize;
+        let jwt_len =
+            u32::from_le_bytes(rest[41..45].try_into().map_err(|_| VerifierError::InvalidInstruction)?) as usize;
 
-        if jwt_len > solana_confidential_compute_crypto::jwt::MAX_JWT_LEN
-            || rest.len() < HEADER_LEN + jwt_len
-        {
+        if jwt_len > solana_confidential_compute_crypto::jwt::MAX_JWT_LEN || rest.len() < HEADER_LEN + jwt_len {
             return Err(VerifierError::InvalidInstruction.into());
         }
 
         let jwt_bytes = &rest[HEADER_LEN..HEADER_LEN + jwt_len];
-        let jwt_str =
-            core::str::from_utf8(jwt_bytes).map_err(|_| VerifierError::InvalidInstruction)?;
+        let jwt_str = core::str::from_utf8(jwt_bytes).map_err(|_| VerifierError::InvalidInstruction)?;
 
         let [attested_signer_acc, registry_acc, jwks_acc, used_nonce_acc, payer_acc, system_program_acc, clock_acc, slot_hashes_acc, rest_accs @ ..] =
             accounts
@@ -2000,8 +1683,7 @@ impl Processor {
             return Err(VerifierError::InvalidAccountAddress.into());
         }
         let clock = Clock::from_account_info(clock_acc)?;
-        let now_unix =
-            u64::try_from(clock.unix_timestamp).map_err(|_| VerifierError::InvalidInstruction)?;
+        let now_unix = u64::try_from(clock.unix_timestamp).map_err(|_| VerifierError::InvalidInstruction)?;
 
         let jwks = JwksAccount::try_from_slice(&jwks_acc.try_borrow_data()?)
             .map_err(|_| VerifierError::InvalidAccountAddress)?;
@@ -2014,29 +1696,19 @@ impl Processor {
         let jwks_bump_seed = [jwks.bump];
         Self::assert_pda(
             jwks_acc,
-            &[
-                solana_confidential_compute_crypto::jwt::JWKS_SEED,
-                &jwks.kid_hash,
-                &jwks_bump_seed,
-            ],
+            &[solana_confidential_compute_crypto::jwt::JWKS_SEED, &jwks.kid_hash, &jwks_bump_seed],
             program_id,
         )?;
 
-        let view = solana_confidential_compute_crypto::jwt::JwtView::parse(jwt_str)
+        let view = solana_confidential_compute_crypto::jwt::JwtView::parse(jwt_str).map_err(Self::map_crypto_error)?;
+        let kid_padded = solana_confidential_compute_crypto::jwt::parse_header_kid_b64(view.header_b64)
             .map_err(Self::map_crypto_error)?;
-        let kid_padded =
-            solana_confidential_compute_crypto::jwt::parse_header_kid_b64(view.header_b64)
-                .map_err(Self::map_crypto_error)?;
-        let kid_len = kid_padded
-            .iter()
-            .position(|&b| b == 0)
-            .unwrap_or(solana_confidential_compute_crypto::jwt::MAX_KID);
+        let kid_len =
+            kid_padded.iter().position(|&b| b == 0).unwrap_or(solana_confidential_compute_crypto::jwt::MAX_KID);
         if kid_len == 0 {
             return Err(VerifierError::InvalidInstruction.into());
         }
-        if solana_confidential_compute_crypto::jwt::kid_hash(&kid_padded[..kid_len])
-            != jwks.kid_hash
-        {
+        if solana_confidential_compute_crypto::jwt::kid_hash(&kid_padded[..kid_len]) != jwks.kid_hash {
             return Err(VerifierError::InvalidAccountAddress.into());
         }
 
@@ -2053,10 +1725,7 @@ impl Processor {
         // No unsigned request field or token claim chooses its own trust scope.
         let (tenant_key, tenant_bump) =
             Pubkey::find_program_address(&[crate::state::GcpTenantPolicy::SEED], program_id);
-        let tenant_acc = rest_accs
-            .iter()
-            .find(|a| a.key == &tenant_key)
-            .ok_or(VerifierError::UnauthorizedPolicy)?;
+        let tenant_acc = rest_accs.iter().find(|a| a.key == &tenant_key).ok_or(VerifierError::UnauthorizedPolicy)?;
         if tenant_acc.owner != program_id {
             return Err(ProgramError::IllegalOwner);
         }
@@ -2066,16 +1735,10 @@ impl Processor {
             return Err(VerifierError::UnauthorizedPolicy.into());
         }
         let (expected_aud, expected_sub) = tenant.expected()?;
-        solana_confidential_compute_crypto::jwt::enforce_google_tenant(
-            &claims,
-            expected_aud,
-            expected_sub,
-        )
-        .map_err(Self::map_crypto_error)?;
+        solana_confidential_compute_crypto::jwt::enforce_google_tenant(&claims, expected_aud, expected_sub)
+            .map_err(Self::map_crypto_error)?;
 
-        if !claims.secboot
-            || claims.dbgstat() != solana_confidential_compute_crypto::jwt::REQUIRED_DBGSTAT
-        {
+        if !claims.secboot || claims.dbgstat() != solana_confidential_compute_crypto::jwt::REQUIRED_DBGSTAT {
             return Err(VerifierError::UnauthorizedPolicy.into());
         }
 
@@ -2085,11 +1748,7 @@ impl Processor {
         let registry_data = registry_acc.try_borrow_data()?;
         let registry = PolicyRegistryView::try_from_slice(&registry_data)?;
         let registry_bump_seed = [registry.bump()];
-        Self::assert_pda(
-            registry_acc,
-            &[b"policy_registry", &registry_bump_seed],
-            program_id,
-        )?;
+        Self::assert_pda(registry_acc, &[b"policy_registry", &registry_bump_seed], program_id)?;
         Self::assert_backend_measurement(program_id, accounts, 3, &measurement)?;
 
         if claims.eat_nonce().is_empty() {
@@ -2099,59 +1758,41 @@ impl Processor {
         let slot_hash = Self::load_slot_hash(slot_hashes_acc, nonce_slot, clock.slot)?;
 
         let nonce_seed = if mode == VERIFY_GOOGLE_JWT_MODE_A {
-            let workload_signer = rest_accs
-                .first()
-                .ok_or(VerifierError::InvalidAccountAddress)?;
+            let workload_signer = rest_accs.first().ok_or(VerifierError::InvalidAccountAddress)?;
             if !workload_signer.is_signer {
                 return Err(ProgramError::MissingRequiredSignature);
             }
             // Nonce 0 and nonce 1 are unpadded base64url. Compare the raw bytes.
             // Tombstone seed is SHA-256(pubkey || slot_hash). @spec SCC-JWT-005
-            let raw = claims
-                .decode_mode_a_binding()
-                .map_err(|_| VerifierError::SignerMismatch)?;
+            let raw = claims.decode_mode_a_binding().map_err(|_| VerifierError::SignerMismatch)?;
             if raw[..32] != workload_signer.key.to_bytes() || raw[32..] != slot_hash {
                 return Err(VerifierError::SignerMismatch.into());
             }
             solana_confidential_compute_crypto::jwt::eat_nonce_tombstone_seed(&raw)
         } else {
-            let instructions_sysvar = Self::optional_instructions_sysvar(accounts)
-                .ok_or(ProgramError::NotEnoughAccountKeys)?;
+            let instructions_sysvar =
+                Self::optional_instructions_sysvar(accounts).ok_or(ProgramError::NotEnoughAccountKeys)?;
             if instructions_sysvar.key != &instructions::ID {
                 return Err(ProgramError::IncorrectProgramId);
             }
             let current_index = load_current_index_checked(instructions_sysvar)?;
-            let next_index = current_index
-                .checked_add(1)
-                .ok_or(ProgramError::InvalidInstructionData)?;
-            let consumer_ix =
-                load_instruction_at_checked(next_index as usize, instructions_sysvar)?;
-            if solana_confidential_compute_core::action::hash_instruction(&consumer_ix)
-                != expected_action_hash
-            {
+            let next_index = current_index.checked_add(1).ok_or(ProgramError::InvalidInstructionData)?;
+            let consumer_ix = load_instruction_at_checked(next_index as usize, instructions_sysvar)?;
+            if solana_confidential_compute_core::action::hash_instruction(&consumer_ix) != expected_action_hash {
                 return Err(VerifierError::ActionHashMismatch.into());
             }
             let consumer_program_id = consumer_ix.program_id.to_bytes();
-            let commitment =
-                compute_action_commitment(&slot_hash, &expected_action_hash, &consumer_program_id);
+            let commitment = compute_action_commitment(&slot_hash, &expected_action_hash, &consumer_program_id);
             // Unpadded base64url of the 32-byte commitment. Decode before compare.
             // Tombstone seed is SHA-256 of those raw bytes. @spec SCC-JWT-005
-            let raw = claims
-                .decode_mode_b_commitment()
-                .map_err(Self::map_crypto_error)?;
+            let raw = claims.decode_mode_b_commitment().map_err(Self::map_crypto_error)?;
             if raw != commitment {
                 return Err(VerifierError::ActionHashMismatch.into());
             }
             solana_confidential_compute_crypto::jwt::eat_nonce_tombstone_seed(&raw)
         };
-        Self::assert_legacy_nonce_migration(
-            program_id,
-            accounts,
-            &[b"nonce", &nonce_seed],
-            clock.slot,
-        )?;
-        let (expected_nonce_pda, nonce_bump) =
-            Pubkey::find_program_address(&[b"nonce", &[3], &nonce_seed], program_id);
+        Self::assert_legacy_nonce_migration(program_id, accounts, &[b"nonce", &nonce_seed], clock.slot)?;
+        let (expected_nonce_pda, nonce_bump) = Pubkey::find_program_address(&[b"nonce", &[3], &nonce_seed], program_id);
         Self::assert_expected_pda(used_nonce_acc, &expected_nonce_pda)?;
         if Self::nonce_already_used(used_nonce_acc)? {
             return Err(VerifierError::NonceAlreadyUsed.into());
@@ -2171,26 +1812,21 @@ impl Processor {
         )?;
 
         if mode == VERIFY_GOOGLE_JWT_MODE_A {
-            let workload_signer = rest_accs
-                .first()
-                .ok_or(VerifierError::InvalidAccountAddress)?;
+            let workload_signer = rest_accs.first().ok_or(VerifierError::InvalidAccountAddress)?;
             let signer_pubkey = workload_signer.key.to_bytes();
             let (expected_signer_pda, signer_bump) =
                 Pubkey::find_program_address(&[b"attested_signer_v2", &signer_pubkey], program_id);
             Self::assert_expected_pda(attested_signer_acc, &expected_signer_pda)?;
 
-            if Self::account_has_discriminator(attested_signer_acc, &ATTESTED_SIGNER_DISCRIMINATOR)?
-            {
-                let existing =
-                    AttestedSignerAccount::try_from_slice(&attested_signer_acc.try_borrow_data()?)
-                        .map_err(|_| VerifierError::InvalidAccountAddress)?;
+            if Self::account_has_discriminator(attested_signer_acc, &ATTESTED_SIGNER_DISCRIMINATOR)? {
+                let existing = AttestedSignerAccount::try_from_slice(&attested_signer_acc.try_borrow_data()?)
+                    .map_err(|_| VerifierError::InvalidAccountAddress)?;
                 if existing.is_revoked() {
                     return Err(VerifierError::UnauthorizedPolicy.into());
                 }
                 let expired = clock.slot > existing.record.expires_slot;
                 let matching_pubkey = existing.record.signer_pubkey == signer_pubkey;
-                let matching_enclave =
-                    existing.record.enclave_type == EnclaveType::GcpConfidentialSpace;
+                let matching_enclave = existing.record.enclave_type == EnclaveType::GcpConfidentialSpace;
                 if !expired && (!matching_pubkey || !matching_enclave) {
                     return Err(ProgramError::AccountAlreadyInitialized);
                 }
@@ -2218,18 +1854,10 @@ impl Processor {
                     expires_slot: clock.slot.saturating_add(ATTESTATION_TTL_SLOTS),
                 },
                 bump: signer_bump,
-                expires_unix_timestamp: Self::session_unix_deadline(
-                    clock.unix_timestamp,
-                    Some(claims.exp),
-                )?,
+                expires_unix_timestamp: Self::session_unix_deadline(clock.unix_timestamp, Some(claims.exp))?,
             };
             Self::write_account_data(attested_signer_acc, &signer_record)?;
-            Self::log_registration(
-                b"register_signer",
-                b"gcp_confidential_space",
-                &signer_pubkey,
-                attested_signer_acc,
-            )?;
+            Self::log_registration(b"register_signer", b"gcp_confidential_space", &signer_pubkey, attested_signer_acc)?;
         }
 
         Ok(())
@@ -2255,10 +1883,7 @@ impl Processor {
         rest: &[u8],
     ) -> ProgramResult {
         if rest.len() == VERIFY_NVIDIA_LEGACY_LEN {
-            let mode = rest
-                .first()
-                .copied()
-                .ok_or(VerifierError::InvalidInstruction)?;
+            let mode = rest.first().copied().ok_or(VerifierError::InvalidInstruction)?;
             if mode != VERIFY_NVIDIA_MODE_A && mode != VERIFY_NVIDIA_MODE_B {
                 return Err(VerifierError::InvalidInstruction.into());
             }
@@ -2282,12 +1907,7 @@ impl Processor {
         Self::require_pinned_sysvar(clock_acc, &clock::ID)?;
         let clock = Clock::from_account_info(clock_acc)?;
         let slot_hash = Self::load_slot_hash(slot_hashes_acc, packet.nonce_slot, clock.slot)?;
-        let subject = Self::nvidia_subject(
-            packet.mode,
-            packet.expected_action_hash,
-            &slot_hash,
-            mode_acc,
-        )?;
+        let subject = Self::nvidia_subject(packet.mode, packet.expected_action_hash, &slot_hash, mode_acc)?;
         let statement = nvidia_attestation_statement(&NvidiaStatement {
             program_id: program_id.as_ref(),
             mode: packet.mode,
@@ -2298,13 +1918,10 @@ impl Processor {
             subject: &subject,
         });
         let expected_inputs = nvidia_public_inputs_from_statement(&statement);
-        if packet.public_inputs != expected_inputs
-            || !nvidia_public_inputs_canonical(&expected_inputs)
-        {
+        if packet.public_inputs != expected_inputs || !nvidia_public_inputs_canonical(&expected_inputs) {
             return Err(VerifierError::InvalidProof.into());
         }
-        let message =
-            nvidia_verifier_message(&statement, packet.proof_a, packet.proof_b, packet.proof_c);
+        let message = nvidia_verifier_message(&statement, packet.proof_a, packet.proof_b, packet.proof_c);
         verifier.verify_p384(
             &message.public_key_xy,
             &message.message_digest,
@@ -2319,11 +1936,7 @@ impl Processor {
             let registry_data = registry_acc.try_borrow_data()?;
             PolicyRegistryView::try_from_slice(&registry_data)?.bump()
         };
-        Self::assert_pda(
-            registry_acc,
-            &[b"policy_registry", &[registry_bump]],
-            program_id,
-        )?;
+        Self::assert_pda(registry_acc, &[b"policy_registry", &[registry_bump]], program_id)?;
         let mut measurement = [0u8; 48];
         measurement[..32].copy_from_slice(packet.measurement);
         Self::assert_nvidia_backend_policy(program_id, backend_policy_acc, &measurement)?;
@@ -2341,18 +1954,9 @@ impl Processor {
             return Err(ProgramError::IncorrectProgramId);
         }
 
-        let signer_pubkey = if packet.mode == VERIFY_NVIDIA_MODE_A {
-            Some(subject)
-        } else {
-            None
-        };
+        let signer_pubkey = if packet.mode == VERIFY_NVIDIA_MODE_A { Some(subject) } else { None };
         if let Some(signer_pubkey) = signer_pubkey {
-            Self::reject_nvidia_tombstone(
-                program_id,
-                attested_signer_acc,
-                &signer_pubkey,
-                clock.slot,
-            )?;
+            Self::reject_nvidia_tombstone(program_id, attested_signer_acc, &signer_pubkey, clock.slot)?;
         }
         Self::consume_nvidia_nonce(
             program_id,
@@ -2407,15 +2011,9 @@ impl Processor {
                     return Err(VerifierError::InvalidInstruction.into());
                 }
                 let current_index = load_current_index_checked(mode_account)?;
-                let next_index = current_index
-                    .checked_add(1)
-                    .ok_or(ProgramError::InvalidInstructionData)?;
+                let next_index = current_index.checked_add(1).ok_or(ProgramError::InvalidInstructionData)?;
                 let consumer = load_instruction_at_checked(next_index as usize, mode_account)?;
-                Ok(compute_action_commitment(
-                    slot_hash,
-                    action_hash,
-                    &consumer.program_id.to_bytes(),
-                ))
+                Ok(compute_action_commitment(slot_hash, action_hash, &consumer.program_id.to_bytes()))
             }
             _ => Err(VerifierError::InvalidInstruction.into()),
         }
@@ -2427,10 +2025,8 @@ impl Processor {
         measurement: &[u8; 48],
     ) -> ProgramResult {
         use crate::state::BackendPolicy;
-        let (policy_pda, _) = Pubkey::find_program_address(
-            &[BackendPolicy::SEED, &[NVIDIA_ATTESTATION_SOURCE]],
-            program_id,
-        );
+        let (policy_pda, _) =
+            Pubkey::find_program_address(&[BackendPolicy::SEED, &[NVIDIA_ATTESTATION_SOURCE]], program_id);
         if backend_policy.key != &policy_pda {
             return Err(VerifierError::UnauthorizedPolicy.into());
         }
@@ -2490,10 +2086,8 @@ impl Processor {
         clock_slot: u64,
     ) -> ProgramResult {
         let seed = nvidia_nonce_seed(subject, measurement, slot_hash);
-        let (expected_nonce, nonce_bump) = Pubkey::find_program_address(
-            &[b"nonce", &[NVIDIA_ATTESTATION_SOURCE], &seed],
-            program_id,
-        );
+        let (expected_nonce, nonce_bump) =
+            Pubkey::find_program_address(&[b"nonce", &[NVIDIA_ATTESTATION_SOURCE], &seed], program_id);
         Self::assert_expected_pda(used_nonce, &expected_nonce)?;
         if Self::nonce_already_used(used_nonce)? {
             return Err(VerifierError::NonceAlreadyUsed.into());
@@ -2504,12 +2098,7 @@ impl Processor {
             used_nonce,
             Some(system_program_acc),
             program_id,
-            &[
-                b"nonce",
-                &[NVIDIA_ATTESTATION_SOURCE],
-                &seed,
-                &nonce_bump_seed,
-            ],
+            &[b"nonce", &[NVIDIA_ATTESTATION_SOURCE], &seed, &nonce_bump_seed],
             UsedNonceAccount::SIZE,
         )?;
         Self::write_account_data(
@@ -2558,12 +2147,7 @@ impl Processor {
             expires_unix_timestamp: Self::session_unix_deadline(clock.unix_timestamp, None)?,
         };
         Self::write_account_data(attested_signer, &signer_record)?;
-        Self::log_registration(
-            b"register_signer",
-            b"nvidia_h100",
-            signer_pubkey,
-            attested_signer,
-        )
+        Self::log_registration(b"register_signer", b"nvidia_h100", signer_pubkey, attested_signer)
     }
 
     /// Verifies an AWS Nitro COSE Sign1 attestation (Mode A register / Mode B atomic).
@@ -2585,18 +2169,11 @@ impl Processor {
         if mode != VERIFY_NITRO_MODE_A && mode != VERIFY_NITRO_MODE_B {
             return Err(VerifierError::InvalidInstruction.into());
         }
-        let nonce_slot = u64::from_le_bytes(
-            rest[1..9]
-                .try_into()
-                .map_err(|_| VerifierError::InvalidInstruction)?,
-        );
+        let nonce_slot = u64::from_le_bytes(rest[1..9].try_into().map_err(|_| VerifierError::InvalidInstruction)?);
         let mut expected_action_hash = [0u8; 32];
         expected_action_hash.copy_from_slice(&rest[9..41]);
-        let doc_len = u32::from_le_bytes(
-            rest[41..45]
-                .try_into()
-                .map_err(|_| VerifierError::InvalidInstruction)?,
-        ) as usize;
+        let doc_len =
+            u32::from_le_bytes(rest[41..45].try_into().map_err(|_| VerifierError::InvalidInstruction)?) as usize;
         if doc_len == 0 || doc_len > MAX_NITRO_DOCUMENT_LEN || rest.len() != HEADER_LEN + doc_len {
             return Err(VerifierError::InvalidInstruction.into());
         }
@@ -2612,11 +2189,10 @@ impl Processor {
             return Err(VerifierError::InvalidAccountAddress.into());
         }
         let clock = Clock::from_account_info(clock_acc)?;
-        let now_unix =
-            u64::try_from(clock.unix_timestamp).map_err(|_| VerifierError::InvalidInstruction)?;
+        let now_unix = u64::try_from(clock.unix_timestamp).map_err(|_| VerifierError::InvalidInstruction)?;
 
-        let (cose, view) = solana_confidential_compute_crypto::parse_nitro_attestation(document)
-            .map_err(Self::map_crypto_error)?;
+        let (cose, view) =
+            solana_confidential_compute_crypto::parse_nitro_attestation(document).map_err(Self::map_crypto_error)?;
 
         let registry_bump = {
             let registry_data = registry_acc.try_borrow_data()?;
@@ -2626,11 +2202,7 @@ impl Processor {
             registry.bump()
         };
         let registry_bump_seed = [registry_bump];
-        Self::assert_pda(
-            registry_acc,
-            &[b"policy_registry", &registry_bump_seed],
-            program_id,
-        )?;
+        Self::assert_pda(registry_acc, &[b"policy_registry", &registry_bump_seed], program_id)?;
 
         Self::assert_backend_measurement(program_id, accounts, 2, &view.pcrs.pcr0)?;
         let pcr0_allowed = true;
@@ -2643,11 +2215,8 @@ impl Processor {
             instructions_sysvar,
         )?;
 
-        let digest = solana_confidential_compute_crypto::hash_cose_sig_structure(
-            cose.protected,
-            cose.payload,
-        )
-        .map_err(Self::map_crypto_error)?;
+        let digest = solana_confidential_compute_crypto::hash_cose_sig_structure(cose.protected, cose.payload)
+            .map_err(Self::map_crypto_error)?;
         verifier.verify_p384(&leaf_xy, &digest, &cose.signature_rs, instructions_sysvar)?;
 
         // @spec SCC-NITRO-006
@@ -2666,25 +2235,18 @@ impl Processor {
             Self::assert_workload_consent(accounts, &signer_pubkey)?;
             view.nonce
         } else {
-            let instructions_sysvar =
-                instructions_sysvar.ok_or(ProgramError::NotEnoughAccountKeys)?;
+            let instructions_sysvar = instructions_sysvar.ok_or(ProgramError::NotEnoughAccountKeys)?;
             if instructions_sysvar.key != &instructions::ID {
                 return Err(ProgramError::IncorrectProgramId);
             }
             let current_index = load_current_index_checked(instructions_sysvar)?;
-            let next_index = current_index
-                .checked_add(1)
-                .ok_or(ProgramError::InvalidInstructionData)?;
-            let consumer_ix =
-                load_instruction_at_checked(next_index as usize, instructions_sysvar)?;
-            if solana_confidential_compute_core::action::hash_instruction(&consumer_ix)
-                != expected_action_hash
-            {
+            let next_index = current_index.checked_add(1).ok_or(ProgramError::InvalidInstructionData)?;
+            let consumer_ix = load_instruction_at_checked(next_index as usize, instructions_sysvar)?;
+            if solana_confidential_compute_core::action::hash_instruction(&consumer_ix) != expected_action_hash {
                 return Err(VerifierError::ActionHashMismatch.into());
             }
             let consumer_program_id = consumer_ix.program_id.to_bytes();
-            let commitment =
-                compute_action_commitment(&slot_hash, &expected_action_hash, &consumer_program_id);
+            let commitment = compute_action_commitment(&slot_hash, &expected_action_hash, &consumer_program_id);
             if view.nonce != commitment {
                 return Err(VerifierError::ActionHashMismatch.into());
             }
@@ -2697,10 +2259,8 @@ impl Processor {
             &[b"nonce", &signer_pubkey, &nonce_bytes],
             clock.slot,
         )?;
-        let (expected_nonce_pda, nonce_bump) = Pubkey::find_program_address(
-            &[b"nonce", &[2], &signer_pubkey, &nonce_bytes],
-            program_id,
-        );
+        let (expected_nonce_pda, nonce_bump) =
+            Pubkey::find_program_address(&[b"nonce", &[2], &signer_pubkey, &nonce_bytes], program_id);
         Self::assert_expected_pda(used_nonce_acc, &expected_nonce_pda)?;
         if Self::nonce_already_used(used_nonce_acc)? {
             return Err(VerifierError::NonceAlreadyUsed.into());
@@ -2711,13 +2271,7 @@ impl Processor {
             used_nonce_acc,
             Some(system_program_acc),
             program_id,
-            &[
-                b"nonce",
-                &[2],
-                &signer_pubkey,
-                &nonce_bytes,
-                &nonce_bump_seed,
-            ],
+            &[b"nonce", &[2], &signer_pubkey, &nonce_bytes, &nonce_bump_seed],
             UsedNonceAccount::SIZE,
         )?;
         Self::write_account_data(
@@ -2730,11 +2284,9 @@ impl Processor {
                 Pubkey::find_program_address(&[b"attested_signer_v2", &signer_pubkey], program_id);
             Self::assert_expected_pda(attested_signer_acc, &expected_signer_pda)?;
 
-            if Self::account_has_discriminator(attested_signer_acc, &ATTESTED_SIGNER_DISCRIMINATOR)?
-            {
-                let existing =
-                    AttestedSignerAccount::try_from_slice(&attested_signer_acc.try_borrow_data()?)
-                        .map_err(|_| VerifierError::InvalidAccountAddress)?;
+            if Self::account_has_discriminator(attested_signer_acc, &ATTESTED_SIGNER_DISCRIMINATOR)? {
+                let existing = AttestedSignerAccount::try_from_slice(&attested_signer_acc.try_borrow_data()?)
+                    .map_err(|_| VerifierError::InvalidAccountAddress)?;
                 if existing.is_revoked() {
                     return Err(VerifierError::UnauthorizedPolicy.into());
                 }
@@ -2769,18 +2321,10 @@ impl Processor {
                     expires_slot: clock.slot.saturating_add(ATTESTATION_TTL_SLOTS),
                 },
                 bump: signer_bump,
-                expires_unix_timestamp: Self::session_unix_deadline(
-                    clock.unix_timestamp,
-                    Some(credential_exp),
-                )?,
+                expires_unix_timestamp: Self::session_unix_deadline(clock.unix_timestamp, Some(credential_exp))?,
             };
             Self::write_account_data(attested_signer_acc, &signer_record)?;
-            Self::log_registration(
-                b"register_signer",
-                b"aws_nitro",
-                &signer_pubkey,
-                attested_signer_acc,
-            )?;
+            Self::log_registration(b"register_signer", b"aws_nitro", &signer_pubkey, attested_signer_acc)?;
         }
 
         Ok(())
@@ -2804,16 +2348,12 @@ impl Processor {
         if view.cabundle_len == 0 {
             return Err(VerifierError::VerificationFailed.into());
         }
-        solana_confidential_compute_crypto::validate_nitro_path_constraints(
-            view.cabundle_certs(),
-            view.certificate,
-        )
-        .map_err(Self::map_crypto_error)?;
+        solana_confidential_compute_crypto::validate_nitro_path_constraints(view.cabundle_certs(), view.certificate)
+            .map_err(Self::map_crypto_error)?;
         let mut issuer_xy = *root_xy;
         let mut credential_exp = u64::MAX;
         for (i, der) in view.cabundle_certs().iter().enumerate() {
-            let cert = solana_confidential_compute_crypto::parse_nitro_cert(der)
-                .map_err(Self::map_crypto_error)?;
+            let cert = solana_confidential_compute_crypto::parse_nitro_cert(der).map_err(Self::map_crypto_error)?;
             if now_unix < cert.not_before || now_unix > cert.not_after {
                 return Err(VerifierError::VerificationFailed.into());
             }
@@ -2825,18 +2365,13 @@ impl Processor {
                 let mut hasher = Sha384::new();
                 hasher.update(cert.tbs_der);
                 let digest: [u8; 48] = hasher.finalize().into();
-                verifier.verify_p384(
-                    &issuer_xy,
-                    &digest,
-                    &cert.signature_rs,
-                    instructions_sysvar,
-                )?;
+                verifier.verify_p384(&issuer_xy, &digest, &cert.signature_rs, instructions_sysvar)?;
             }
             credential_exp = credential_exp.min(cert.not_after);
             issuer_xy = cert.pubkey_xy;
         }
-        let leaf = solana_confidential_compute_crypto::parse_nitro_cert(view.certificate)
-            .map_err(Self::map_crypto_error)?;
+        let leaf =
+            solana_confidential_compute_crypto::parse_nitro_cert(view.certificate).map_err(Self::map_crypto_error)?;
         if now_unix < leaf.not_before || now_unix > leaf.not_after {
             return Err(VerifierError::VerificationFailed.into());
         }
@@ -2857,11 +2392,7 @@ impl Processor {
     /// (signer, writable), system program, clock, instructions sysvar.
     ///
     /// @spec SCC-TDX-001
-    fn process_verify_tdx_qe_report(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_verify_tdx_qe_report(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         use crate::state::TdxSessionAccount;
         use crate::tdx;
 
@@ -2948,12 +2479,10 @@ impl Processor {
         // expired session can be replaced outright because nothing is
         // relying on it any more.
         if session_acc.data_len() == TdxSessionAccount::SIZE && session_acc.owner == program_id {
-            if let Ok(existing) = TdxSessionAccount::try_from_slice(&session_acc.try_borrow_data()?)
-            {
+            if let Ok(existing) = TdxSessionAccount::try_from_slice(&session_acc.try_borrow_data()?) {
                 if existing.discriminator == TdxSessionAccount::DISCRIMINATOR
                     && existing.is_live_at(clock.slot)
-                    && (existing.gpu_rim_digest != *args.gpu_rim_digest
-                        || existing.model_digest != *args.model_digest)
+                    && (existing.gpu_rim_digest != *args.gpu_rim_digest || existing.model_digest != *args.model_digest)
                 {
                     return Err(VerifierError::InvalidInstruction.into());
                 }
@@ -2981,12 +2510,7 @@ impl Processor {
                 bump: session_bump,
             },
         )?;
-        Self::log_registration(
-            b"tdx_qe_report",
-            b"intel_tdx",
-            &attestation_pubkey[1..],
-            session_acc,
-        )
+        Self::log_registration(b"tdx_qe_report", b"intel_tdx", &attestation_pubkey[1..], session_acc)
     }
 
     /// Second half of Intel TDX verification: admit the workload signer.
@@ -3001,11 +2525,7 @@ impl Processor {
     /// clock, challenge PDA, workload signer (signer), instructions sysvar.
     ///
     /// @spec SCC-TDX-002
-    fn process_verify_tdx_quote(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        rest: &[u8],
-    ) -> ProgramResult {
+    fn process_verify_tdx_quote(program_id: &Pubkey, accounts: &[AccountInfo], rest: &[u8]) -> ProgramResult {
         use crate::tdx;
 
         let args = crate::payload::parse_tdx_quote_args(rest)?;
@@ -3032,20 +2552,14 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let challenge =
-            Self::load_tdx_challenge(program_id, challenge_acc, clock.slot, args.nonce_slot)?;
+        let challenge = Self::load_tdx_challenge(program_id, challenge_acc, clock.slot, args.nonce_slot)?;
         // The quote body, as verified by the precompile.
         let verified = tdx::extract_secp256r1_verified(instructions_acc, tdx::ISV_SIGNED_LEN)?;
 
         // The key that signed it must be the one an allowlisted platform
         // certified. Without this check the body is signed by nobody in
         // particular: the precompile is happy to verify an attacker's own key.
-        let session = Self::load_tdx_session(
-            program_id,
-            session_acc,
-            &verified.compressed_pubkey,
-            clock.slot,
-        )?;
+        let session = Self::load_tdx_session(program_id, session_acc, &verified.compressed_pubkey, clock.slot)?;
         // Redundant by construction -- `load_tdx_session` derives the PDA
         // from `verified.compressed_pubkey`, and the QE step wrote the record
         // under the same derivation, so a session found at that address
@@ -3058,16 +2572,10 @@ impl Processor {
 
         // Only now is the body trustworthy enough to read fields out of.
         let body = &verified.message[tdx::QUOTE_HEADER_LEN..];
-        let mr_td: [u8; 48] = body[136..184]
-            .try_into()
-            .map_err(|_| VerifierError::InvalidInstruction)?;
-        let mr_config_id: [u8; 48] = body[184..232]
-            .try_into()
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+        let mr_td: [u8; 48] = body[136..184].try_into().map_err(|_| VerifierError::InvalidInstruction)?;
+        let mr_config_id: [u8; 48] = body[184..232].try_into().map_err(|_| VerifierError::InvalidInstruction)?;
         let rtmrs_hash = hashv(&[&body[328..520]]).to_bytes();
-        let report_data: [u8; 64] = body[520..584]
-            .try_into()
-            .map_err(|_| VerifierError::InvalidInstruction)?;
+        let report_data: [u8; 64] = body[520..584].try_into().map_err(|_| VerifierError::InvalidInstruction)?;
 
         // A debug TD has the approved measurement and no protection: the host
         // can read the workload's keys straight out of its memory.
@@ -3095,11 +2603,7 @@ impl Processor {
         // Recorded on the signer so a consumer can tell two admitted TDs
         // apart by their measurements alone.
         let journal_hash = solana_confidential_compute_core::types::compute_journal_hash(
-            &solana_confidential_compute_core::types::JournalV3 {
-                mr_td,
-                mr_config_id,
-                rtmrs_hash,
-            },
+            &solana_confidential_compute_core::types::JournalV3 { mr_td, mr_config_id, rtmrs_hash },
         );
         let mut journal_measurement = [0u8; 48];
         journal_measurement[..32].copy_from_slice(&journal_hash);
@@ -3146,20 +2650,9 @@ impl Processor {
         }
 
         let quote_body_digest = hashv(&[verified.message.as_slice()]).to_bytes();
-        let seed = crate::payload::tdx_nonce_seed(
-            &signer_pubkey,
-            &quote_body_digest,
-            &challenge.slot_hash,
-            &challenge.nonce,
-        );
-        Self::consume_tdx_nonce(
-            program_id,
-            payer_acc,
-            system_program_acc,
-            used_nonce_acc,
-            &seed,
-            clock.slot,
-        )?;
+        let seed =
+            crate::payload::tdx_nonce_seed(&signer_pubkey, &quote_body_digest, &challenge.slot_hash, &challenge.nonce);
+        Self::consume_tdx_nonce(program_id, payer_acc, system_program_acc, used_nonce_acc, &seed, clock.slot)?;
 
         // Retire the challenge permanently.
         //
@@ -3186,17 +2679,11 @@ impl Processor {
 
     /// Write the `expires_slot == 0` tombstone onto an accepted challenge.
     /// @spec SCC-TDX-005
-    fn consume_tdx_challenge(
-        challenge_acc: &AccountInfo,
-        challenge: &crate::state::ChallengeAccount,
-    ) -> ProgramResult {
+    fn consume_tdx_challenge(challenge_acc: &AccountInfo, challenge: &crate::state::ChallengeAccount) -> ProgramResult {
         if !challenge_acc.is_writable {
             return Err(ProgramError::InvalidAccountData);
         }
-        let retired = crate::state::ChallengeAccount {
-            expires_slot: 0,
-            ..*challenge
-        };
+        let retired = crate::state::ChallengeAccount { expires_slot: 0, ..*challenge };
         let encoded = borsh::to_vec(&retired).map_err(|_| VerifierError::InvalidInstruction)?;
         challenge_acc.try_borrow_mut_data()?[..encoded.len()].copy_from_slice(&encoded);
         Ok(())
@@ -3223,17 +2710,11 @@ impl Processor {
         }
         let challenge = ChallengeAccount::try_from_slice(&challenge_acc.try_borrow_data()?)
             .map_err(|_| VerifierError::InvalidAccountAddress)?;
-        if challenge.discriminator != ChallengeAccount::DISCRIMINATOR
-            || challenge.source != TDX_ATTESTATION_SOURCE
-        {
+        if challenge.discriminator != ChallengeAccount::DISCRIMINATOR || challenge.source != TDX_ATTESTATION_SOURCE {
             return Err(VerifierError::InvalidAccountAddress.into());
         }
         let (expected, _) = Pubkey::find_program_address(
-            &[
-                ChallengeAccount::SEED,
-                &[TDX_ATTESTATION_SOURCE],
-                &challenge.nonce,
-            ],
+            &[ChallengeAccount::SEED, &[TDX_ATTESTATION_SOURCE], &challenge.nonce],
             program_id,
         );
         Self::assert_expected_pda(challenge_acc, &expected)?;
@@ -3273,9 +2754,7 @@ impl Processor {
 
         let args = crate::payload::parse_issue_tdx_challenge_args(rest)?;
 
-        let [challenge_acc, payer_acc, system_program_acc, clock_acc, slot_hashes_acc, ..] =
-            accounts
-        else {
+        let [challenge_acc, payer_acc, system_program_acc, clock_acc, slot_hashes_acc, ..] = accounts else {
             return Err(VerifierError::InvalidAccountAddress.into());
         };
         Self::require_pinned_sysvar(clock_acc, &clock::ID)?;
@@ -3290,21 +2769,13 @@ impl Processor {
         // Authenticated, not asserted: the hash comes from the sysvar.
         let slot_hash = Self::load_slot_hash(slot_hashes_acc, args.nonce_slot, clock.slot)?;
 
-        let (expected, bump) = Pubkey::find_program_address(
-            &[
-                ChallengeAccount::SEED,
-                &[TDX_ATTESTATION_SOURCE],
-                args.nonce,
-            ],
-            program_id,
-        );
+        let (expected, bump) =
+            Pubkey::find_program_address(&[ChallengeAccount::SEED, &[TDX_ATTESTATION_SOURCE], args.nonce], program_id);
         Self::assert_expected_pda(challenge_acc, &expected)?;
 
         // Checked before allocation so an existing record is never clobbered.
         if challenge_acc.data_len() == ChallengeAccount::SIZE && challenge_acc.owner == program_id {
-            if let Ok(existing) =
-                ChallengeAccount::try_from_slice(&challenge_acc.try_borrow_data()?)
-            {
+            if let Ok(existing) = ChallengeAccount::try_from_slice(&challenge_acc.try_borrow_data()?) {
                 if existing.discriminator == ChallengeAccount::DISCRIMINATOR
                     && (existing.is_consumed() || existing.is_live_at(clock.slot))
                 {
@@ -3318,12 +2789,7 @@ impl Processor {
             challenge_acc,
             Some(system_program_acc),
             program_id,
-            &[
-                ChallengeAccount::SEED,
-                &[TDX_ATTESTATION_SOURCE],
-                args.nonce,
-                &[bump],
-            ],
+            &[ChallengeAccount::SEED, &[TDX_ATTESTATION_SOURCE], args.nonce, &[bump]],
             ChallengeAccount::SIZE,
         )?;
 
@@ -3391,9 +2857,8 @@ impl Processor {
         Self::assert_expected_pda(attested_signer, &expected_signer)?;
 
         if Self::account_has_discriminator(attested_signer, &ATTESTED_SIGNER_DISCRIMINATOR)? {
-            let existing =
-                AttestedSignerAccount::try_from_slice(&attested_signer.try_borrow_data()?)
-                    .map_err(|_| VerifierError::InvalidAccountAddress)?;
+            let existing = AttestedSignerAccount::try_from_slice(&attested_signer.try_borrow_data()?)
+                .map_err(|_| VerifierError::InvalidAccountAddress)?;
             // A governance tombstone outranks a fresh quote.
             if existing.is_revoked() {
                 return Err(VerifierError::UnauthorizedPolicy.into());
@@ -3436,12 +2901,7 @@ impl Processor {
             expires_unix_timestamp: Self::session_unix_deadline(clock.unix_timestamp, None)?,
         };
         Self::write_account_data(attested_signer, &record)?;
-        Self::log_registration(
-            b"register_signer",
-            b"intel_tdx",
-            signer_pubkey,
-            attested_signer,
-        )
+        Self::log_registration(b"register_signer", b"intel_tdx", signer_pubkey, attested_signer)
     }
 
     /// Load and bounds-check a live TDX session written by the QE step.
@@ -3454,8 +2914,7 @@ impl Processor {
     ) -> Result<crate::state::TdxSessionAccount, ProgramError> {
         use crate::state::TdxSessionAccount;
         let session_seed = TdxSessionAccount::seed_for(attestation_pubkey);
-        let (expected, _) =
-            Pubkey::find_program_address(&[TdxSessionAccount::SEED, &session_seed], program_id);
+        let (expected, _) = Pubkey::find_program_address(&[TdxSessionAccount::SEED, &session_seed], program_id);
         Self::assert_expected_pda(session_acc, &expected)?;
         if session_acc.owner != program_id {
             return Err(ProgramError::IllegalOwner);
@@ -3483,10 +2942,8 @@ impl Processor {
     ) -> ProgramResult {
         use crate::payload::TDX_ATTESTATION_SOURCE;
         use crate::state::BackendPolicy;
-        let (policy_pda, _) = Pubkey::find_program_address(
-            &[BackendPolicy::SEED, &[TDX_ATTESTATION_SOURCE]],
-            program_id,
-        );
+        let (policy_pda, _) =
+            Pubkey::find_program_address(&[BackendPolicy::SEED, &[TDX_ATTESTATION_SOURCE]], program_id);
         if backend_policy.key != &policy_pda {
             return Err(VerifierError::UnauthorizedPolicy.into());
         }
@@ -3514,31 +2971,19 @@ mod tests {
         let (other, other_bump) = (0..bump)
             .rev()
             .find_map(|b| {
-                Pubkey::create_program_address(&[b"policy_registry", &[b]], &program)
-                    .ok()
-                    .map(|key| (key, b))
+                Pubkey::create_program_address(&[b"policy_registry", &[b]], &program).ok().map(|key| (key, b))
             })
             .expect("another valid off-curve address");
         let check = |key: &Pubkey, stored: u8| {
             let mut lamports = 1;
             let mut data = [];
-            let account =
-                AccountInfo::new(key, false, false, &mut lamports, &mut data, &program, false);
+            let account = AccountInfo::new(key, false, false, &mut lamports, &mut data, &program, false);
             Processor::assert_pda(&account, &[b"policy_registry", &[stored]], &program)
         };
         assert_eq!(check(&canonical, bump), Ok(()));
-        assert_eq!(
-            check(&other, other_bump),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
-        assert_eq!(
-            check(&canonical, other_bump),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
-        assert_eq!(
-            check(&other, bump),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        assert_eq!(check(&other, other_bump), Err(VerifierError::InvalidAccountAddress.into()));
+        assert_eq!(check(&canonical, other_bump), Err(VerifierError::InvalidAccountAddress.into()));
+        assert_eq!(check(&other, bump), Err(VerifierError::InvalidAccountAddress.into()));
     }
 
     fn smt_policy() -> u64 {
@@ -3584,10 +3029,7 @@ mod tests {
     impl SyscallGuard {
         fn install_clock(slot: u64) -> Self {
             let lock = SYSCALL_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-            Self {
-                _lock: lock,
-                previous: Some(set_syscall_stubs(Box::new(ClockSyscallStub(slot)))),
-            }
+            Self { _lock: lock, previous: Some(set_syscall_stubs(Box::new(ClockSyscallStub(slot)))) }
         }
     }
 
@@ -3599,11 +3041,7 @@ mod tests {
         }
     }
 
-    fn system_program_account<'a>(
-        key: &'a Pubkey,
-        lamports: &'a mut u64,
-        data: &'a mut [u8],
-    ) -> AccountInfo<'a> {
+    fn system_program_account<'a>(key: &'a Pubkey, lamports: &'a mut u64, data: &'a mut [u8]) -> AccountInfo<'a> {
         AccountInfo::new(key, false, false, lamports, data, key, false)
     }
 
@@ -3633,15 +3071,7 @@ mod tests {
         data[16..48].copy_from_slice(&[0xAA; 32]);
 
         let owner = solana_program::sysvar::ID;
-        let acc = AccountInfo::new(
-            &slot_hashes_key,
-            false,
-            false,
-            &mut lamports,
-            &mut data,
-            &owner,
-            false,
-        );
+        let acc = AccountInfo::new(&slot_hashes_key, false, false, &mut lamports, &mut data, &owner, false);
 
         let res = Processor::verify_recent_slot_hash(&acc, 120, 100, &[0xAA; 32]);
         assert!(res.is_ok());
@@ -3657,15 +3087,7 @@ mod tests {
         data[16..48].copy_from_slice(&[0xAA; 32]);
 
         let owner = solana_program::sysvar::ID;
-        let acc = AccountInfo::new(
-            &slot_hashes_key,
-            false,
-            false,
-            &mut lamports,
-            &mut data,
-            &owner,
-            false,
-        );
+        let acc = AccountInfo::new(&slot_hashes_key, false, false, &mut lamports, &mut data, &owner, false);
 
         let res = Processor::verify_recent_slot_hash(&acc, 251, 100, &[0xAA; 32]);
         assert_eq!(res, Err(VerifierError::StaleNonce));
@@ -3681,15 +3103,7 @@ mod tests {
         data[16..48].copy_from_slice(&[0xAA; 32]);
 
         let owner = Pubkey::new_unique();
-        let acc = AccountInfo::new(
-            &slot_hashes_key,
-            false,
-            false,
-            &mut lamports,
-            &mut data,
-            &owner,
-            false,
-        );
+        let acc = AccountInfo::new(&slot_hashes_key, false, false, &mut lamports, &mut data, &owner, false);
 
         let res = Processor::verify_recent_slot_hash(&acc, 120, 100, &[0xAA; 32]);
         assert_eq!(res, Err(VerifierError::InvalidAccountAddress));
@@ -3701,15 +3115,7 @@ mod tests {
         let mut lamports = 0u64;
         let mut data = vec![0u8; 48];
         let owner = Pubkey::default();
-        let acc = AccountInfo::new(
-            &fake_key,
-            false,
-            false,
-            &mut lamports,
-            &mut data,
-            &owner,
-            false,
-        );
+        let acc = AccountInfo::new(&fake_key, false, false, &mut lamports, &mut data, &owner, false);
 
         let res = Processor::verify_recent_slot_hash(&acc, 120, 100, &[0xAA; 32]);
         assert_eq!(res, Err(VerifierError::InvalidAccountAddress));
@@ -3723,27 +3129,11 @@ mod tests {
 
         let mut auth_lamports = 1000;
         let mut auth_data = vec![];
-        let auth_acc = AccountInfo::new(
-            &authority_key,
-            true,
-            true,
-            &mut auth_lamports,
-            &mut auth_data,
-            &pid,
-            false,
-        );
+        let auth_acc = AccountInfo::new(&authority_key, true, true, &mut auth_lamports, &mut auth_data, &pid, false);
 
         let mut reg_lamports = 1000;
         let mut reg_data = vec![0u8; PolicyRegistry::SIZE];
-        let reg_acc = AccountInfo::new(
-            &registry_pda,
-            false,
-            true,
-            &mut reg_lamports,
-            &mut reg_data,
-            &pid,
-            false,
-        );
+        let reg_acc = AccountInfo::new(&registry_pda, false, true, &mut reg_lamports, &mut reg_data, &pid, false);
 
         let mut ix_data = Vec::new();
         ix_data.extend_from_slice(&INIT_POLICY_REGISTRY_DISCRIMINATOR);
@@ -3763,15 +3153,8 @@ mod tests {
         let (program_data_key, _) = Pubkey::find_program_address(&[pid.as_ref()], &loader);
         let mut pd_lamports = 1;
         let mut pd_data = program_data_bytes(authority_key.as_ref());
-        let program_data = AccountInfo::new(
-            &program_data_key,
-            false,
-            false,
-            &mut pd_lamports,
-            &mut pd_data,
-            &loader,
-            false,
-        );
+        let program_data =
+            AccountInfo::new(&program_data_key, false, false, &mut pd_lamports, &mut pd_data, &loader, false);
         let system_key = system_program::id();
         let mut system_lamports = 1;
         let mut system_data = vec![];
@@ -3780,8 +3163,7 @@ mod tests {
         let res = Processor::process(&pid, &accounts, &ix_data);
         assert!(res.is_ok());
 
-        let saved =
-            PolicyRegistry::try_from_slice(&accounts[1].try_borrow_data().unwrap()).unwrap();
+        let saved = PolicyRegistry::try_from_slice(&accounts[1].try_borrow_data().unwrap()).unwrap();
         assert_eq!(saved.discriminator, POLICY_REGISTRY_DISCRIMINATOR);
         assert_eq!(saved.authority, *authority_key.as_ref());
         assert_eq!(saved.bump, bump);
@@ -3807,15 +3189,7 @@ mod tests {
 
         let mut auth_lamports = 1000;
         let mut auth_data = vec![];
-        let auth_acc = AccountInfo::new(
-            &authority_key,
-            true,
-            true,
-            &mut auth_lamports,
-            &mut auth_data,
-            &pid,
-            false,
-        );
+        let auth_acc = AccountInfo::new(&authority_key, true, true, &mut auth_lamports, &mut auth_data, &pid, false);
 
         let mut registry = PolicyRegistry {
             discriminator: [0u8; 8],
@@ -3832,15 +3206,7 @@ mod tests {
         let mut reg_lamports = 1000;
         let mut reg_data = vec![0u8; PolicyRegistry::SIZE];
         registry.serialize(&mut &mut reg_data[..]).unwrap();
-        let reg_acc = AccountInfo::new(
-            &registry_pda,
-            false,
-            true,
-            &mut reg_lamports,
-            &mut reg_data,
-            &pid,
-            false,
-        );
+        let reg_acc = AccountInfo::new(&registry_pda, false, true, &mut reg_lamports, &mut reg_data, &pid, false);
 
         let mut update_ix = Vec::from(UPDATE_POLICY_DISCRIMINATOR);
         UpdatePolicyArgs {
@@ -3854,29 +3220,16 @@ mod tests {
         .serialize(&mut update_ix)
         .unwrap();
         let accounts = [auth_acc, reg_acc];
-        assert_eq!(
-            Processor::process(&pid, &accounts, &update_ix),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &update_ix), Err(VerifierError::InvalidAccountAddress.into()));
 
         let mut rotate_ix = Vec::from(ROTATE_ROOT_CERT_DISCRIMINATOR);
-        RotateRootCertArgs {
-            new_ark_pubkey_xy: [9u8; 96],
-        }
-        .serialize(&mut rotate_ix)
-        .unwrap();
-        assert_eq!(
-            Processor::process(&pid, &accounts, &rotate_ix),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        RotateRootCertArgs { new_ark_pubkey_xy: [9u8; 96] }.serialize(&mut rotate_ix).unwrap();
+        assert_eq!(Processor::process(&pid, &accounts, &rotate_ix), Err(VerifierError::InvalidAccountAddress.into()));
 
         registry.discriminator = POLICY_REGISTRY_DISCRIMINATOR;
-        registry
-            .serialize(&mut &mut accounts[1].try_borrow_mut_data().unwrap()[..])
-            .unwrap();
+        registry.serialize(&mut &mut accounts[1].try_borrow_mut_data().unwrap()[..]).unwrap();
         assert!(Processor::process(&pid, &accounts, &update_ix).is_ok());
-        let saved =
-            PolicyRegistry::try_from_slice(&accounts[1].try_borrow_data().unwrap()).unwrap();
+        let saved = PolicyRegistry::try_from_slice(&accounts[1].try_borrow_data().unwrap()).unwrap();
         assert_eq!(saved.discriminator, POLICY_REGISTRY_DISCRIMINATOR);
         assert_eq!(saved.min_tcb_boot_loader, 9);
     }
@@ -3890,15 +3243,7 @@ mod tests {
 
         let mut auth_lamports = 1000;
         let mut auth_data = vec![];
-        let auth_acc = AccountInfo::new(
-            &authority_key,
-            true,
-            true,
-            &mut auth_lamports,
-            &mut auth_data,
-            &pid,
-            false,
-        );
+        let auth_acc = AccountInfo::new(&authority_key, true, true, &mut auth_lamports, &mut auth_data, &pid, false);
 
         let registry = PolicyRegistry {
             discriminator: POLICY_REGISTRY_DISCRIMINATOR,
@@ -3915,15 +3260,7 @@ mod tests {
         let mut reg_lamports = 1000;
         let mut reg_data = vec![0u8; PolicyRegistry::SIZE];
         registry.serialize(&mut &mut reg_data[..]).unwrap();
-        let reg_acc = AccountInfo::new(
-            &registry_pda,
-            false,
-            true,
-            &mut reg_lamports,
-            &mut reg_data,
-            &foreign,
-            false,
-        );
+        let reg_acc = AccountInfo::new(&registry_pda, false, true, &mut reg_lamports, &mut reg_data, &foreign, false);
 
         let mut update_ix = Vec::from(UPDATE_POLICY_DISCRIMINATOR);
         UpdatePolicyArgs {
@@ -3937,21 +3274,11 @@ mod tests {
         .serialize(&mut update_ix)
         .unwrap();
         let accounts = [auth_acc, reg_acc];
-        assert_eq!(
-            Processor::process(&pid, &accounts, &update_ix),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &update_ix), Err(VerifierError::InvalidAccountAddress.into()));
 
         let mut rotate_ix = Vec::from(ROTATE_ROOT_CERT_DISCRIMINATOR);
-        RotateRootCertArgs {
-            new_ark_pubkey_xy: [9u8; 96],
-        }
-        .serialize(&mut rotate_ix)
-        .unwrap();
-        assert_eq!(
-            Processor::process(&pid, &accounts, &rotate_ix),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        RotateRootCertArgs { new_ark_pubkey_xy: [9u8; 96] }.serialize(&mut rotate_ix).unwrap();
+        assert_eq!(Processor::process(&pid, &accounts, &rotate_ix), Err(VerifierError::InvalidAccountAddress.into()));
     }
 
     #[test]
@@ -3964,26 +3291,11 @@ mod tests {
         // Case 1: authority is not a signer -> MissingRequiredSignature
         let mut auth_lamports = 1000;
         let mut auth_data = vec![];
-        let auth_acc_unsigned = AccountInfo::new(
-            &authority_key,
-            false,
-            true,
-            &mut auth_lamports,
-            &mut auth_data,
-            &pid,
-            false,
-        );
+        let auth_acc_unsigned =
+            AccountInfo::new(&authority_key, false, true, &mut auth_lamports, &mut auth_data, &pid, false);
         let mut reg_lamports = 1000;
         let mut reg_data = vec![0u8; PolicyRegistry::SIZE];
-        let reg_acc = AccountInfo::new(
-            &registry_pda,
-            false,
-            true,
-            &mut reg_lamports,
-            &mut reg_data,
-            &pid,
-            false,
-        );
+        let reg_acc = AccountInfo::new(&registry_pda, false, true, &mut reg_lamports, &mut reg_data, &pid, false);
         let mut ix_data = Vec::new();
         ix_data.extend_from_slice(&INIT_POLICY_REGISTRY_DISCRIMINATOR);
         let args = InitPolicyRegistryArgs {
@@ -4003,26 +3315,11 @@ mod tests {
         // Case 2: attacker signs but sets args.authority to someone else -> InvalidAuthority
         let mut attacker_lamports = 1000;
         let mut attacker_data = vec![];
-        let attacker_acc = AccountInfo::new(
-            &attacker_key,
-            true,
-            true,
-            &mut attacker_lamports,
-            &mut attacker_data,
-            &pid,
-            false,
-        );
+        let attacker_acc =
+            AccountInfo::new(&attacker_key, true, true, &mut attacker_lamports, &mut attacker_data, &pid, false);
         let mut reg_lamports2 = 1000;
         let mut reg_data2 = vec![0u8; PolicyRegistry::SIZE];
-        let reg_acc2 = AccountInfo::new(
-            &registry_pda,
-            false,
-            true,
-            &mut reg_lamports2,
-            &mut reg_data2,
-            &pid,
-            false,
-        );
+        let reg_acc2 = AccountInfo::new(&registry_pda, false, true, &mut reg_lamports2, &mut reg_data2, &pid, false);
         let res_mismatch = Processor::process(&pid, &[attacker_acc, reg_acc2], &ix_data);
         assert_eq!(res_mismatch, Err(VerifierError::InvalidAuthority.into()));
 
@@ -4041,15 +3338,7 @@ mod tests {
         );
         let mut reg_lamports3 = 1000;
         let mut reg_data3 = vec![0u8; PolicyRegistry::SIZE];
-        let reg_acc3 = AccountInfo::new(
-            &registry_pda,
-            false,
-            true,
-            &mut reg_lamports3,
-            &mut reg_data3,
-            &pid,
-            false,
-        );
+        let reg_acc3 = AccountInfo::new(&registry_pda, false, true, &mut reg_lamports3, &mut reg_data3, &pid, false);
         let mut ix_data_default = Vec::new();
         ix_data_default.extend_from_slice(&INIT_POLICY_REGISTRY_DISCRIMINATOR);
         let mut args_default = args;
@@ -4103,13 +3392,10 @@ mod tests {
         let tcb_version = u64::from_le_bytes(report[0x180..0x188].try_into().unwrap());
 
         let chip_id_hash = hashv(&[&vcek_pubkey_xy]).to_bytes();
-        let (vcek_pda, vcek_bump) = Pubkey::find_program_address(
-            &[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()],
-            &pid,
-        );
+        let (vcek_pda, vcek_bump) =
+            Pubkey::find_program_address(&[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()], &pid);
 
-        let (registry_pda, registry_bump) =
-            Pubkey::find_program_address(&[b"policy_registry"], &pid);
+        let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
         let mut registry_data = vec![0u8; PolicyRegistry::SIZE];
         let registry = PolicyRegistry {
             discriminator: POLICY_REGISTRY_DISCRIMINATOR,
@@ -4150,8 +3436,7 @@ mod tests {
         slot_hashes_data[8..16].copy_from_slice(&nonce_slot.to_le_bytes());
         slot_hashes_data[16..48].copy_from_slice(&slot_hash);
 
-        let (signer_pda, signer_bump) =
-            Pubkey::find_program_address(&[b"attested_signer_v2", &workload_pubkey], &pid);
+        let (signer_pda, signer_bump) = Pubkey::find_program_address(&[b"attested_signer_v2", &workload_pubkey], &pid);
         let (nonce_pda, nonce_bump) =
             Pubkey::find_program_address(&[b"nonce", &[1], &workload_pubkey, &slot_hash], &pid);
 
@@ -4174,15 +3459,7 @@ mod tests {
 
         let mut payer_lamports = 1000;
         let mut payer_data = vec![];
-        let payer_acc = AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut payer_lamports,
-            &mut payer_data,
-            &pid,
-            false,
-        );
+        let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
 
         let mut signer_lamports = 1000;
         let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
@@ -4202,49 +3479,18 @@ mod tests {
         }
         .serialize(&mut &mut signer_data[..])
         .unwrap();
-        let signer_acc = AccountInfo::new(
-            &signer_pda,
-            false,
-            true,
-            &mut signer_lamports,
-            &mut signer_data,
-            &pid,
-            false,
-        );
+        let signer_acc =
+            AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false);
 
         let mut vcek_lamports = 1000;
-        let vcek_acc = AccountInfo::new(
-            &vcek_pda,
-            false,
-            false,
-            &mut vcek_lamports,
-            &mut vcek_data,
-            &pid,
-            false,
-        );
+        let vcek_acc = AccountInfo::new(&vcek_pda, false, false, &mut vcek_lamports, &mut vcek_data, &pid, false);
 
         let mut reg_lamports = 1000;
-        let reg_acc = AccountInfo::new(
-            &registry_pda,
-            false,
-            false,
-            &mut reg_lamports,
-            &mut registry_data,
-            &pid,
-            false,
-        );
+        let reg_acc = AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false);
 
         let mut nonce_lamports = 1000;
         let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
-        let nonce_acc = AccountInfo::new(
-            &nonce_pda,
-            false,
-            true,
-            &mut nonce_lamports,
-            &mut nonce_data,
-            &pid,
-            false,
-        );
+        let nonce_acc = AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false);
 
         let mut sh_lamports = 1000;
         let sh_acc = AccountInfo::new(
@@ -4287,15 +3533,8 @@ mod tests {
         let workload_key = Pubkey::new_from_array(workload_pubkey);
         let mut workload_lamports = 1;
         let mut workload_data = [];
-        let workload_acc = AccountInfo::new(
-            &workload_key,
-            true,
-            false,
-            &mut workload_lamports,
-            &mut workload_data,
-            &pid,
-            false,
-        );
+        let workload_acc =
+            AccountInfo::new(&workload_key, true, false, &mut workload_lamports, &mut workload_data, &pid, false);
         let mut accounts = vec![
             payer_acc,
             reg_acc,
@@ -4314,48 +3553,31 @@ mod tests {
         if renewal {
             let mut existing = AttestedSignerAccount::try_from_slice(&foreign_before).unwrap();
             existing.record.enclave_type = EnclaveType::AmdSevSnp;
-            existing
-                .serialize(&mut &mut signer_acc.try_borrow_mut_data().unwrap()[..])
-                .unwrap();
+            existing.serialize(&mut &mut signer_acc.try_borrow_mut_data().unwrap()[..]).unwrap();
         }
         let signer_before = signer_acc.try_borrow_data().unwrap().to_vec();
         let nonce_before = nonce_acc.try_borrow_data().unwrap().to_vec();
         accounts[8].is_signer = false;
-        assert_eq!(
-            Processor::process(&pid, &accounts, &ix_data),
-            Err(ProgramError::MissingRequiredSignature)
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &ix_data), Err(ProgramError::MissingRequiredSignature));
         let workload = accounts.pop().unwrap();
-        assert_eq!(
-            Processor::process(&pid, &accounts, &ix_data),
-            Err(VerifierError::SignerMismatch.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &ix_data), Err(VerifierError::SignerMismatch.into()));
         assert_eq!(*signer_acc.try_borrow_data().unwrap(), signer_before);
         assert_eq!(*nonce_acc.try_borrow_data().unwrap(), nonce_before);
         accounts.push(workload);
         accounts[8].is_signer = true;
-        signer_acc
-            .try_borrow_mut_data()
-            .unwrap()
-            .copy_from_slice(&foreign_before);
+        signer_acc.try_borrow_mut_data().unwrap().copy_from_slice(&foreign_before);
 
         let mut wrong_bump = ix_data.clone();
         let bump_at = wrong_bump.len() - 1;
         wrong_bump[bump_at] ^= 0xff;
-        assert_eq!(
-            Processor::process(&pid, &accounts, &wrong_bump),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &wrong_bump), Err(VerifierError::InvalidAccountAddress.into()));
 
         let foreign = Processor::process(&pid, &accounts, &ix_data);
         assert_eq!(foreign, Err(ProgramError::AccountAlreadyInitialized));
         signer_acc.try_borrow_mut_data().unwrap().fill(0);
 
         if renewal {
-            signer_acc
-                .try_borrow_mut_data()
-                .unwrap()
-                .copy_from_slice(&signer_before);
+            signer_acc.try_borrow_mut_data().unwrap().copy_from_slice(&signer_before);
         }
         // A legacy governance revocation must survive fresh, correctly signed
         // evidence, workload consent and an otherwise unused nonce.
@@ -4365,50 +3587,30 @@ mod tests {
         revoked.record.expires_slot = 0;
         // Old revocations retained their Unix deadline: recognize them too.
         revoked.expires_unix_timestamp = 86_400;
-        revoked
-            .serialize(&mut &mut signer_acc.try_borrow_mut_data().unwrap()[..])
-            .unwrap();
+        revoked.serialize(&mut &mut signer_acc.try_borrow_mut_data().unwrap()[..]).unwrap();
         let tombstone = signer_acc.try_borrow_data().unwrap().to_vec();
         let nonce_before = nonce_acc.try_borrow_data().unwrap().to_vec();
-        assert_eq!(
-            Processor::process(&pid, &accounts, &ix_data),
-            Err(VerifierError::UnauthorizedPolicy.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &ix_data), Err(VerifierError::UnauthorizedPolicy.into()));
         assert_eq!(*signer_acc.try_borrow_data().unwrap(), tombstone);
         assert_eq!(*nonce_acc.try_borrow_data().unwrap(), nonce_before);
-        signer_acc
-            .try_borrow_mut_data()
-            .unwrap()
-            .copy_from_slice(&before);
+        signer_acc.try_borrow_mut_data().unwrap().copy_from_slice(&before);
         registration_events::assert_empty();
         let res = Processor::process(&pid, &accounts, &ix_data);
         assert_eq!(res, Ok(()));
-        registration_events::assert_event(
-            b"register_signer",
-            b"amd_sev_snp",
-            &workload_pubkey,
-            &signer_acc,
-        );
+        registration_events::assert_event(b"register_signer", b"amd_sev_snp", &workload_pubkey, &signer_acc);
 
-        let saved_signer =
-            AttestedSignerAccount::try_from_slice(&signer_acc.try_borrow_data().unwrap()).unwrap();
+        let saved_signer = AttestedSignerAccount::try_from_slice(&signer_acc.try_borrow_data().unwrap()).unwrap();
         assert_eq!(saved_signer.discriminator, ATTESTED_SIGNER_DISCRIMINATOR);
         assert_eq!(saved_signer.bump, signer_bump);
         assert_eq!(saved_signer.record.signer_pubkey, workload_pubkey);
         assert_eq!(saved_signer.record.enclave_type, EnclaveType::AmdSevSnp);
         assert_eq!(saved_signer.record.registered_slot, current_slot);
-        assert_eq!(
-            saved_signer.record.expires_slot,
-            current_slot + ATTESTATION_TTL_SLOTS
-        );
+        assert_eq!(saved_signer.record.expires_slot, current_slot + ATTESTATION_TTL_SLOTS);
         assert_eq!(saved_signer.expires_unix_timestamp, 1_800_000_001);
         assert!(!saved_signer.record.is_expired(current_slot + 100));
-        assert!(saved_signer
-            .record
-            .is_expired(current_slot + ATTESTATION_TTL_SLOTS + 1));
+        assert!(saved_signer.record.is_expired(current_slot + ATTESTATION_TTL_SLOTS + 1));
 
-        let saved_nonce =
-            UsedNonceAccount::try_from_slice(&nonce_acc.try_borrow_data().unwrap()).unwrap();
+        let saved_nonce = UsedNonceAccount::try_from_slice(&nonce_acc.try_borrow_data().unwrap()).unwrap();
         assert_eq!(saved_nonce.discriminator, USED_NONCE_DISCRIMINATOR);
         assert_eq!(saved_nonce.slot, current_slot);
 
@@ -4424,19 +3626,11 @@ mod tests {
                     cache[VcekAccount::REVOKED_OFFSET] = 1;
                 }
                 if kind == 2 {
-                    cache
-                        [VcekAccount::TRUST_PROFILE_OFFSET..VcekAccount::TRUST_PROFILE_OFFSET + 32]
-                        .fill(0);
+                    cache[VcekAccount::TRUST_PROFILE_OFFSET..VcekAccount::TRUST_PROFILE_OFFSET + 32].fill(0);
                 }
             }
-            assert_eq!(
-                Processor::process(&pid, &accounts, &ix_data),
-                Err(VerifierError::UnauthorizedPolicy.into())
-            );
-            accounts[2]
-                .try_borrow_mut_data()
-                .unwrap()
-                .copy_from_slice(&original_cache);
+            assert_eq!(Processor::process(&pid, &accounts, &ix_data), Err(VerifierError::UnauthorizedPolicy.into()));
+            accounts[2].try_borrow_mut_data().unwrap().copy_from_slice(&original_cache);
         }
 
         let res_replay = Processor::process(&pid, &accounts, &ix_data);
@@ -4444,21 +3638,9 @@ mod tests {
         registration_events::assert_empty();
     }
 
-    fn dummy_clock_account<'a>(
-        key: &'a Pubkey,
-        lamports: &'a mut u64,
-        data: &'a mut [u8],
-    ) -> AccountInfo<'a> {
+    fn dummy_clock_account<'a>(key: &'a Pubkey, lamports: &'a mut u64, data: &'a mut [u8]) -> AccountInfo<'a> {
         data[0..8].copy_from_slice(&100u64.to_le_bytes());
-        AccountInfo::new(
-            key,
-            false,
-            false,
-            lamports,
-            data,
-            &solana_program::sysvar::ID,
-            false,
-        )
+        AccountInfo::new(key, false, false, lamports, data, &solana_program::sysvar::ID, false)
     }
 
     #[test]
@@ -4474,28 +3656,12 @@ mod tests {
 
         let mut payer_lamports = 1000;
         let mut payer_data = vec![];
-        let payer_acc = AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut payer_lamports,
-            &mut payer_data,
-            &pid,
-            false,
-        );
+        let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
 
         let dummy_key = Pubkey::new_unique();
         let mut d_lamports = 1000;
         let mut d_data = vec![0u8; 200];
-        let dummy_acc = AccountInfo::new(
-            &dummy_key,
-            false,
-            true,
-            &mut d_lamports,
-            &mut d_data,
-            &pid,
-            false,
-        );
+        let dummy_acc = AccountInfo::new(&dummy_key, false, true, &mut d_lamports, &mut d_data, &pid, false);
 
         let clock_key = clock::ID;
         let mut clock_lamports = 1000;
@@ -4504,10 +3670,7 @@ mod tests {
 
         let mut ix_data = Vec::new();
         ix_data.extend_from_slice(&VERIFY_AND_REGISTER_DISCRIMINATOR);
-        let args = VerifyAndRegisterArgs {
-            nonce_slot: 100,
-            report,
-        };
+        let args = VerifyAndRegisterArgs { nonce_slot: 100, report };
         args.serialize(&mut ix_data).unwrap();
         ix_data.extend_from_slice(&[0, 0]);
 
@@ -4536,28 +3699,12 @@ mod tests {
 
         let mut payer_lamports = 1000;
         let mut payer_data = vec![];
-        let payer_acc = AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut payer_lamports,
-            &mut payer_data,
-            &pid,
-            false,
-        );
+        let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
 
         let dummy_key = Pubkey::new_unique();
         let mut d_lamports = 1000;
         let mut d_data = vec![0u8; 200];
-        let dummy_acc = AccountInfo::new(
-            &dummy_key,
-            false,
-            true,
-            &mut d_lamports,
-            &mut d_data,
-            &pid,
-            false,
-        );
+        let dummy_acc = AccountInfo::new(&dummy_key, false, true, &mut d_lamports, &mut d_data, &pid, false);
 
         let clock_key = clock::ID;
         let mut clock_lamports = 1000;
@@ -4566,10 +3713,7 @@ mod tests {
 
         let mut ix_data = Vec::new();
         ix_data.extend_from_slice(&VERIFY_AND_REGISTER_DISCRIMINATOR);
-        let args = VerifyAndRegisterArgs {
-            nonce_slot: 100,
-            report,
-        };
+        let args = VerifyAndRegisterArgs { nonce_slot: 100, report };
         args.serialize(&mut ix_data).unwrap();
         ix_data.extend_from_slice(&[0, 0]);
 
@@ -4602,12 +3746,7 @@ mod tests {
         (signing_key, xy)
     }
 
-    fn acc<'a>(
-        key: &'a Pubkey,
-        lamports: &'a mut u64,
-        data: &'a mut [u8],
-        owner: &'a Pubkey,
-    ) -> AccountInfo<'a> {
+    fn acc<'a>(key: &'a Pubkey, lamports: &'a mut u64, data: &'a mut [u8], owner: &'a Pubkey) -> AccountInfo<'a> {
         AccountInfo::new(key, false, false, lamports, data, owner, false)
     }
 
@@ -4650,10 +3789,7 @@ mod tests {
         let pid = Pubkey::new_unique();
         let mut ix = Vec::from(VERIFY_ATOMIC_DISCRIMINATOR);
         ix.extend_from_slice(&[0u8; 16]);
-        assert_eq!(
-            Processor::process(&pid, &[], &ix),
-            Err(VerifierError::NonceRequired.into())
-        );
+        assert_eq!(Processor::process(&pid, &[], &ix), Err(VerifierError::NonceRequired.into()));
     }
 
     #[test]
@@ -4663,12 +3799,8 @@ mod tests {
         let consumer = Pubkey::new_unique();
         let workload_pubkey = [0x99u8; 32];
         let slot_hash = [0x55u8; 32];
-        let action_hash = solana_confidential_compute_core::action::hash_action_parts(
-            &[],
-            0,
-            core::iter::empty(),
-            &[0u8; 4],
-        );
+        let action_hash =
+            solana_confidential_compute_core::action::hash_action_parts(&[], 0, core::iter::empty(), &[0u8; 4]);
         let nonce_slot = 500u64;
         let current_slot = 520u64;
         let measurement = [42u8; 48];
@@ -4687,12 +3819,9 @@ mod tests {
         let tcb_version = u64::from_le_bytes(report[0x180..0x188].try_into().unwrap());
         let vcek_xy = sign_snp_report(&mut report, 0x07);
         let chip_id_hash = hashv(&[&vcek_xy]).to_bytes();
-        let (vcek_pda, vcek_bump) = Pubkey::find_program_address(
-            &[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()],
-            &pid,
-        );
-        let (registry_pda, registry_bump) =
-            Pubkey::find_program_address(&[b"policy_registry"], &pid);
+        let (vcek_pda, vcek_bump) =
+            Pubkey::find_program_address(&[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()], &pid);
+        let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
         let (nonce_pda, nonce_bump) =
             Pubkey::find_program_address(&[b"nonce", &[1], &workload_pubkey, &commitment], &pid);
 
@@ -4742,29 +3871,20 @@ mod tests {
         let mut payer_data = vec![];
 
         let mut ix_ok = Vec::from(VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
-        VerifyAtomicHeader {
-            nonce_slot,
-            action_hash,
-            consumer_program_id: consumer.to_bytes(),
-        }
-        .serialize(&mut ix_ok)
-        .unwrap();
+        VerifyAtomicHeader { nonce_slot, action_hash, consumer_program_id: consumer.to_bytes() }
+            .serialize(&mut ix_ok)
+            .unwrap();
         ix_ok.extend_from_slice(&report);
         ix_ok.push(nonce_bump);
         let mut ix_bad = Vec::from(VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
-        VerifyAtomicHeader {
-            nonce_slot,
-            action_hash: [0x22u8; 32],
-            consumer_program_id: consumer.to_bytes(),
-        }
-        .serialize(&mut ix_bad)
-        .unwrap();
+        VerifyAtomicHeader { nonce_slot, action_hash: [0x22u8; 32], consumer_program_id: consumer.to_bytes() }
+            .serialize(&mut ix_bad)
+            .unwrap();
         ix_bad.extend_from_slice(&report);
         ix_bad.push(nonce_bump);
 
         let ix_key = instructions::ID;
-        let mut ix_sysvar =
-            serialize_instructions(&[(pid, ix_ok.as_slice()), (consumer, &[0u8; 4])], 0);
+        let mut ix_sysvar = serialize_instructions(&[(pid, ix_ok.as_slice()), (consumer, &[0u8; 4])], 0);
         let mut ix_lp = 1u64;
         let mut p_lp = 1_000u64;
         let mut r_lp = 1u64;
@@ -4774,38 +3894,12 @@ mod tests {
         let mut c_lp = 1u64;
         let mut sys_lp = 1u64;
         let accounts = [
-            AccountInfo::new(
-                &payer_key,
-                true,
-                true,
-                &mut p_lp,
-                &mut payer_data,
-                &pid,
-                false,
-            ),
+            AccountInfo::new(&payer_key, true, true, &mut p_lp, &mut payer_data, &pid, false),
             acc(&registry_pda, &mut r_lp, &mut registry_data, &pid),
             acc(&vcek_pda, &mut v_lp, &mut vcek_data, &pid),
-            AccountInfo::new(
-                &nonce_pda,
-                false,
-                true,
-                &mut n_lp,
-                &mut nonce_data,
-                &pid,
-                false,
-            ),
-            acc(
-                &slot_hashes_key,
-                &mut s_lp,
-                &mut slot_hashes_data,
-                &solana_program::sysvar::ID,
-            ),
-            acc(
-                &clock_key,
-                &mut c_lp,
-                &mut clock_data,
-                &solana_program::sysvar::ID,
-            ),
+            AccountInfo::new(&nonce_pda, false, true, &mut n_lp, &mut nonce_data, &pid, false),
+            acc(&slot_hashes_key, &mut s_lp, &mut slot_hashes_data, &solana_program::sysvar::ID),
+            acc(&clock_key, &mut c_lp, &mut clock_data, &solana_program::sysvar::ID),
             system_program_account(&sys_key, &mut sys_lp, &mut sys_data),
             acc(&ix_key, &mut ix_lp, &mut ix_sysvar, &ix_key),
         ];
@@ -4813,28 +3907,16 @@ mod tests {
             Processor::process(&pid, &accounts[..accounts.len() - 1], &ix_bad),
             Err(ProgramError::NotEnoughAccountKeys)
         );
-        assert_eq!(
-            Processor::process(&pid, &accounts, &ix_bad),
-            Err(VerifierError::ActionHashMismatch.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &ix_bad), Err(VerifierError::ActionHashMismatch.into()));
         let mut trailing = ix_ok.clone();
         trailing.push(0);
-        assert_eq!(
-            Processor::process(&pid, &accounts, &trailing),
-            Err(VerifierError::InvalidInstruction.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &trailing), Err(VerifierError::InvalidInstruction.into()));
         let mut wrong_bump = ix_ok.clone();
         let bump_at = wrong_bump.len() - 1;
         wrong_bump[bump_at] ^= 0xff;
-        assert_eq!(
-            Processor::process(&pid, &accounts, &wrong_bump),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &wrong_bump), Err(VerifierError::InvalidAccountAddress.into()));
         assert!(Processor::process(&pid, &accounts, &ix_ok).is_ok());
-        assert_eq!(
-            Processor::process(&pid, &accounts, &ix_ok),
-            Err(VerifierError::NonceAlreadyUsed.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &ix_ok), Err(VerifierError::NonceAlreadyUsed.into()));
     }
     #[test]
     fn test_vlek_report_with_nonzero_chip_id_resolves_pubkey_seed() {
@@ -4880,13 +3962,10 @@ mod tests {
         // key_sel == 1 is a VLEK even when chip_id is non-zero.
         // @spec SCC-VERIFY-009
         let chip_id_hash = hashv(&[&vcek_pubkey_xy]).to_bytes();
-        let (vcek_pda, vcek_bump) = Pubkey::find_program_address(
-            &[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()],
-            &pid,
-        );
+        let (vcek_pda, vcek_bump) =
+            Pubkey::find_program_address(&[b"vcek_v2", &chip_id_hash, &tcb_version.to_le_bytes()], &pid);
 
-        let (registry_pda, registry_bump) =
-            Pubkey::find_program_address(&[b"policy_registry"], &pid);
+        let (registry_pda, registry_bump) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
         let mut registry_data = vec![0u8; PolicyRegistry::SIZE];
         let registry = PolicyRegistry {
             discriminator: POLICY_REGISTRY_DISCRIMINATOR,
@@ -4927,8 +4006,7 @@ mod tests {
         slot_hashes_data[8..16].copy_from_slice(&nonce_slot.to_le_bytes());
         slot_hashes_data[16..48].copy_from_slice(&slot_hash);
 
-        let (signer_pda, signer_bump) =
-            Pubkey::find_program_address(&[b"attested_signer_v2", &workload_pubkey], &pid);
+        let (signer_pda, signer_bump) = Pubkey::find_program_address(&[b"attested_signer_v2", &workload_pubkey], &pid);
         let (nonce_pda, nonce_bump) =
             Pubkey::find_program_address(&[b"nonce", &[1], &workload_pubkey, &slot_hash], &pid);
 
@@ -4951,61 +4029,22 @@ mod tests {
 
         let mut payer_lamports = 1000;
         let mut payer_data = vec![];
-        let payer_acc = AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut payer_lamports,
-            &mut payer_data,
-            &pid,
-            false,
-        );
+        let payer_acc = AccountInfo::new(&payer_key, true, true, &mut payer_lamports, &mut payer_data, &pid, false);
 
         let mut reg_lamports = 1000;
-        let reg_acc = AccountInfo::new(
-            &registry_pda,
-            false,
-            false,
-            &mut reg_lamports,
-            &mut registry_data,
-            &pid,
-            false,
-        );
+        let reg_acc = AccountInfo::new(&registry_pda, false, false, &mut reg_lamports, &mut registry_data, &pid, false);
 
         let mut v_lamports = 1000;
-        let vcek_account = AccountInfo::new(
-            &vcek_pda,
-            false,
-            false,
-            &mut v_lamports,
-            &mut vcek_data,
-            &pid,
-            false,
-        );
+        let vcek_account = AccountInfo::new(&vcek_pda, false, false, &mut v_lamports, &mut vcek_data, &pid, false);
 
         let mut signer_lamports = 1000;
         let mut signer_data = vec![0u8; AttestedSignerAccount::SIZE];
-        let signer_acc = AccountInfo::new(
-            &signer_pda,
-            false,
-            true,
-            &mut signer_lamports,
-            &mut signer_data,
-            &pid,
-            false,
-        );
+        let signer_acc =
+            AccountInfo::new(&signer_pda, false, true, &mut signer_lamports, &mut signer_data, &pid, false);
 
         let mut nonce_lamports = 1000;
         let mut nonce_data = vec![0u8; UsedNonceAccount::SIZE];
-        let nonce_acc = AccountInfo::new(
-            &nonce_pda,
-            false,
-            true,
-            &mut nonce_lamports,
-            &mut nonce_data,
-            &pid,
-            false,
-        );
+        let nonce_acc = AccountInfo::new(&nonce_pda, false, true, &mut nonce_lamports, &mut nonce_data, &pid, false);
 
         let mut sh_lamports = 1000;
         let sh_acc = AccountInfo::new(
@@ -5044,23 +4083,10 @@ mod tests {
         ix_data.push(nonce_bump);
         ix_data.push(signer_bump);
 
-        let accounts = vec![
-            payer_acc,
-            reg_acc,
-            vcek_account,
-            signer_acc,
-            nonce_acc,
-            sh_acc,
-            clock_acc,
-            sys_acc,
-        ];
+        let accounts = vec![payer_acc, reg_acc, vcek_account, signer_acc, nonce_acc, sh_acc, clock_acc, sys_acc];
 
         let res = Processor::process(&pid, &accounts, &ix_data);
-        assert_eq!(
-            res,
-            Ok(()),
-            "VLEK report with non-zero chip_id should resolve from the public key"
-        );
+        assert_eq!(res, Ok(()), "VLEK report with non-zero chip_id should resolve from the public key");
     }
 
     fn placeholder<'a>(
@@ -5122,11 +4148,7 @@ mod tests {
             dummy.clone(),
         ];
         assert_eq!(
-            Processor::process(
-                &pid,
-                &atomic_accounts,
-                &VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-            ),
+            Processor::process(&pid, &atomic_accounts, &VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR),
             Err(VerifierError::InvalidAccountAddress.into())
         );
 
@@ -5143,24 +4165,14 @@ mod tests {
             clock_acc.clone(),
             dummy.clone(),
         ];
-        assert_eq!(
-            Processor::process(&pid, &jwt_accounts, &jwt_ix),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        assert_eq!(Processor::process(&pid, &jwt_accounts, &jwt_ix), Err(VerifierError::InvalidAccountAddress.into()));
 
         let mut nitro_ix = Vec::from(VERIFY_NITRO_ATTESTATION_DISCRIMINATOR);
         nitro_ix.extend(vec![0u8; 46]);
         nitro_ix[8] = VERIFY_NITRO_MODE_A;
         nitro_ix[49..53].copy_from_slice(&1u32.to_le_bytes());
-        let nitro_accounts = vec![
-            dummy.clone(),
-            dummy.clone(),
-            dummy.clone(),
-            dummy.clone(),
-            dummy.clone(),
-            clock_acc,
-            dummy.clone(),
-        ];
+        let nitro_accounts =
+            vec![dummy.clone(), dummy.clone(), dummy.clone(), dummy.clone(), dummy.clone(), clock_acc, dummy.clone()];
         assert_eq!(
             Processor::process(&pid, &nitro_accounts, &nitro_ix),
             Err(VerifierError::InvalidAccountAddress.into())
@@ -5178,8 +4190,7 @@ mod tests {
 
         let mut clock_lamports = 1u64;
         let mut clock_data = vec![0u8; 40];
-        let clock_acc =
-            clock_with_timestamp(&sysvar_owner, &mut clock_lamports, &mut clock_data, -1);
+        let clock_acc = clock_with_timestamp(&sysvar_owner, &mut clock_lamports, &mut clock_data, -1);
 
         let mut jwt_ix = Vec::from(VERIFY_GOOGLE_JWT_DISCRIMINATOR);
         jwt_ix.extend(vec![0u8; 45]);
@@ -5194,28 +4205,15 @@ mod tests {
             clock_acc.clone(),
             dummy.clone(),
         ];
-        assert_eq!(
-            Processor::process(&pid, &jwt_accounts, &jwt_ix),
-            Err(VerifierError::InvalidInstruction.into())
-        );
+        assert_eq!(Processor::process(&pid, &jwt_accounts, &jwt_ix), Err(VerifierError::InvalidInstruction.into()));
 
         let mut nitro_ix = Vec::from(VERIFY_NITRO_ATTESTATION_DISCRIMINATOR);
         nitro_ix.extend(vec![0u8; 46]);
         nitro_ix[8] = VERIFY_NITRO_MODE_A;
         nitro_ix[49..53].copy_from_slice(&1u32.to_le_bytes());
-        let nitro_accounts = vec![
-            dummy.clone(),
-            dummy.clone(),
-            dummy.clone(),
-            dummy.clone(),
-            dummy.clone(),
-            clock_acc,
-            dummy,
-        ];
-        assert_eq!(
-            Processor::process(&pid, &nitro_accounts, &nitro_ix),
-            Err(VerifierError::InvalidInstruction.into())
-        );
+        let nitro_accounts =
+            vec![dummy.clone(), dummy.clone(), dummy.clone(), dummy.clone(), dummy.clone(), clock_acc, dummy];
+        assert_eq!(Processor::process(&pid, &nitro_accounts, &nitro_ix), Err(VerifierError::InvalidInstruction.into()));
     }
 
     #[test]
@@ -5250,10 +4248,7 @@ mod tests {
         }
         .serialize(&mut ix)
         .unwrap();
-        assert_eq!(
-            Processor::process(&pid, &accounts, &ix),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        assert_eq!(Processor::process(&pid, &accounts, &ix), Err(VerifierError::InvalidAccountAddress.into()));
     }
 
     #[test]
@@ -5275,15 +4270,7 @@ mod tests {
         let mut jwks_data = vec![0u8; 8];
         let mut payer_data = vec![];
         let mut sys_data = vec![];
-        let authority = AccountInfo::new(
-            &authority_key,
-            true,
-            true,
-            &mut auth_lamports,
-            &mut auth_data,
-            &pid,
-            false,
-        );
+        let authority = AccountInfo::new(&authority_key, true, true, &mut auth_lamports, &mut auth_data, &pid, false);
         let accounts = [
             authority,
             placeholder(&registry_pda, &foreign, &mut reg_lamports, &mut reg_data),
@@ -5292,17 +4279,8 @@ mod tests {
             placeholder(&sys_key, &pid, &mut sys_lamports, &mut sys_data),
         ];
         let mut ix = Vec::from(REGISTER_JWKS_KEY_DISCRIMINATOR);
-        RegisterJwksKeyArgs {
-            kid: vec![1],
-            modulus: [2u8; 256],
-            exponent: 65537,
-        }
-        .serialize(&mut ix)
-        .unwrap();
-        assert_eq!(
-            Processor::process(&pid, &accounts, &ix),
-            Err(VerifierError::InvalidAccountAddress.into())
-        );
+        RegisterJwksKeyArgs { kid: vec![1], modulus: [2u8; 256], exponent: 65537 }.serialize(&mut ix).unwrap();
+        assert_eq!(Processor::process(&pid, &accounts, &ix), Err(VerifierError::InvalidAccountAddress.into()));
     }
 
     fn program_data_bytes(authority: &[u8]) -> Vec<u8> {
@@ -5318,8 +4296,7 @@ mod tests {
         let pid = Pubkey::new_unique();
         let authority_key = Pubkey::new_unique();
         let (registry_pda, _) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
-        let (program_data_key, _) =
-            Pubkey::find_program_address(&[pid.as_ref()], &bpf_loader_upgradeable::id());
+        let (program_data_key, _) = Pubkey::find_program_address(&[pid.as_ref()], &bpf_loader_upgradeable::id());
         let loader = bpf_loader_upgradeable::id();
 
         let mut ix = Vec::from(INIT_POLICY_REGISTRY_DISCRIMINATOR);
@@ -5338,58 +4315,26 @@ mod tests {
 
         let mut auth_lamports = 1000u64;
         let mut auth_data = vec![];
-        let auth_acc = AccountInfo::new(
-            &authority_key,
-            true,
-            true,
-            &mut auth_lamports,
-            &mut auth_data,
-            &pid,
-            false,
-        );
+        let auth_acc = AccountInfo::new(&authority_key, true, true, &mut auth_lamports, &mut auth_data, &pid, false);
         let mut reg_lamports = 1000u64;
         let mut reg_data = vec![0u8; PolicyRegistry::SIZE];
-        let reg_acc = AccountInfo::new(
-            &registry_pda,
-            false,
-            true,
-            &mut reg_lamports,
-            &mut reg_data,
-            &pid,
-            false,
-        );
+        let reg_acc = AccountInfo::new(&registry_pda, false, true, &mut reg_lamports, &mut reg_data, &pid, false);
         let filler_key = Pubkey::new_unique();
         let mut filler_lamports = 1u64;
         let mut filler_data = vec![];
         let filler = placeholder(&filler_key, &pid, &mut filler_lamports, &mut filler_data);
         let mut pd_lamports = 1u64;
         let mut pd_data = program_data_bytes(authority_key.as_ref());
-        let pd_acc = AccountInfo::new(
-            &program_data_key,
-            false,
-            false,
-            &mut pd_lamports,
-            &mut pd_data,
-            &loader,
-            false,
-        );
+        let pd_acc = AccountInfo::new(&program_data_key, false, false, &mut pd_lamports, &mut pd_data, &loader, false);
         let accounts = [auth_acc, reg_acc, filler, pd_acc];
         assert!(Processor::process(&pid, &accounts, &ix).is_ok());
-        let saved =
-            PolicyRegistry::try_from_slice(&accounts[1].try_borrow_data().unwrap()).unwrap();
+        let saved = PolicyRegistry::try_from_slice(&accounts[1].try_borrow_data().unwrap()).unwrap();
         assert_eq!(saved.authority, authority_key.to_bytes());
 
         let mut mismatch_lamports = 1000u64;
         let mut mismatch_auth_data = vec![];
-        let mismatch_auth = AccountInfo::new(
-            &authority_key,
-            true,
-            true,
-            &mut mismatch_lamports,
-            &mut mismatch_auth_data,
-            &pid,
-            false,
-        );
+        let mismatch_auth =
+            AccountInfo::new(&authority_key, true, true, &mut mismatch_lamports, &mut mismatch_auth_data, &pid, false);
         let mut mismatch_reg_lamports = 1000u64;
         let mut mismatch_reg_data = vec![0u8; PolicyRegistry::SIZE];
         let mismatch_reg = AccountInfo::new(
@@ -5403,29 +4348,13 @@ mod tests {
         );
         let mut mismatch_filler_lamports = 1u64;
         let mut mismatch_filler_data = vec![];
-        let mismatch_filler = placeholder(
-            &filler_key,
-            &pid,
-            &mut mismatch_filler_lamports,
-            &mut mismatch_filler_data,
-        );
+        let mismatch_filler = placeholder(&filler_key, &pid, &mut mismatch_filler_lamports, &mut mismatch_filler_data);
         let mut bad_pd_lamports = 1u64;
         let mut bad_pd_data = program_data_bytes(&[9u8; 32]);
-        let bad_pd = AccountInfo::new(
-            &program_data_key,
-            false,
-            false,
-            &mut bad_pd_lamports,
-            &mut bad_pd_data,
-            &loader,
-            false,
-        );
+        let bad_pd =
+            AccountInfo::new(&program_data_key, false, false, &mut bad_pd_lamports, &mut bad_pd_data, &loader, false);
         assert_eq!(
-            Processor::process(
-                &pid,
-                &[mismatch_auth, mismatch_reg, mismatch_filler, bad_pd],
-                &ix
-            ),
+            Processor::process(&pid, &[mismatch_auth, mismatch_reg, mismatch_filler, bad_pd], &ix),
             Err(VerifierError::InvalidAuthority.into())
         );
     }
@@ -5438,11 +4367,7 @@ mod issue_183_fixtures {
     use solana_confidential_compute_core::SignatureVerifier;
     use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
     pub struct TestProcessor;
-    fn with_policies<'a>(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo<'a>],
-        data: &[u8],
-    ) -> Vec<AccountInfo<'a>> {
+    fn with_policies<'a>(program_id: &Pubkey, accounts: &[AccountInfo<'a>], data: &[u8]) -> Vec<AccountInfo<'a>> {
         let mut output = accounts.to_vec();
         if ![
             crate::payload::VERIFY_AND_REGISTER_DISCRIMINATOR,
@@ -5457,8 +4382,7 @@ mod issue_183_fixtures {
         }
 
         if data.get(..8) == Some(crate::payload::VERIFY_AND_REGISTER_DISCRIMINATOR.as_slice())
-            || data.get(..8)
-                == Some(crate::payload::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.as_slice())
+            || data.get(..8) == Some(crate::payload::VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR.as_slice())
         {
             if let Some(cache) = accounts
                 .get(2)
@@ -5466,10 +4390,7 @@ mod issue_183_fixtures {
                 .and_then(|d| borsh::from_slice::<crate::state::VcekAccount>(&d).ok())
             {
                 let key = Pubkey::find_program_address(
-                    &[
-                        crate::state::AmdIdentityRevocation::SEED,
-                        &cache.chip_id_hash,
-                    ],
+                    &[crate::state::AmdIdentityRevocation::SEED, &cache.chip_id_hash],
                     program_id,
                 )
                 .0;
@@ -5487,17 +4408,13 @@ mod issue_183_fixtures {
             }
         }
         let (global, _) = Pubkey::find_program_address(&[b"policy_registry"], program_id);
-        let registry = accounts.iter().find(|a| a.key == &global).and_then(|a| {
-            a.try_borrow_data()
-                .ok()
-                .and_then(|d| borsh::from_slice::<PolicyRegistry>(&d).ok())
-        });
-        if let Some(registry) =
-            registry.filter(|r| r.discriminator == crate::state::POLICY_REGISTRY_DISCRIMINATOR)
-        {
+        let registry = accounts
+            .iter()
+            .find(|a| a.key == &global)
+            .and_then(|a| a.try_borrow_data().ok().and_then(|d| borsh::from_slice::<PolicyRegistry>(&d).ok()));
+        if let Some(registry) = registry.filter(|r| r.discriminator == crate::state::POLICY_REGISTRY_DISCRIMINATOR) {
             for source in 1..=4 {
-                let (key, bump) =
-                    Pubkey::find_program_address(&[BackendPolicy::SEED, &[source]], program_id);
+                let (key, bump) = Pubkey::find_program_address(&[BackendPolicy::SEED, &[source]], program_id);
                 if output.iter().any(|a| a.key == &key) {
                     continue;
                 }
@@ -5532,24 +4449,12 @@ mod issue_183_fixtures {
             crate::processor::Processor::verify_recent_slot_hash(account, current, nonce, hash)
         }
 
-        pub fn assert_pda(
-            account: &AccountInfo,
-            seeds: &[&[u8]],
-            program_id: &Pubkey,
-        ) -> ProgramResult {
+        pub fn assert_pda(account: &AccountInfo, seeds: &[&[u8]], program_id: &Pubkey) -> ProgramResult {
             crate::processor::Processor::assert_pda(account, seeds, program_id)
         }
 
-        pub fn process(
-            program_id: &Pubkey,
-            accounts: &[AccountInfo],
-            data: &[u8],
-        ) -> ProgramResult {
-            crate::processor::Processor::process(
-                program_id,
-                &with_policies(program_id, accounts, data),
-                data,
-            )
+        pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
+            crate::processor::Processor::process(program_id, &with_policies(program_id, accounts, data), data)
         }
         pub fn process_with<V: SignatureVerifier>(
             v: &V,
@@ -5557,12 +4462,7 @@ mod issue_183_fixtures {
             accounts: &[AccountInfo],
             data: &[u8],
         ) -> ProgramResult {
-            crate::processor::Processor::process_with(
-                v,
-                program_id,
-                &with_policies(program_id, accounts, data),
-                data,
-            )
+            crate::processor::Processor::process_with(v, program_id, &with_policies(program_id, accounts, data), data)
         }
     }
 }
@@ -5586,8 +4486,7 @@ mod issue_183 {
             };
             let mut bytes = borsh::to_vec(&value).unwrap();
             let mut lamports = 1;
-            let account =
-                AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, &pid, false);
+            let account = AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, &pid, false);
             let result = Processor::assert_backend_measurement(&pid, &[account], 3, &measurement);
             assert_eq!(result.is_ok(), stored_source == 3);
         }
@@ -5600,14 +4499,8 @@ mod issue_182 {
     use super::*;
     #[test]
     fn unix_deadline_clamps_to_credential_and_rejects_invalid_time() {
-        assert_eq!(
-            Processor::session_unix_deadline(100, Some(101)).unwrap(),
-            101
-        );
-        assert_eq!(
-            Processor::session_unix_deadline(100, Some(u64::MAX)).unwrap(),
-            86500
-        );
+        assert_eq!(Processor::session_unix_deadline(100, Some(101)).unwrap(), 101);
+        assert_eq!(Processor::session_unix_deadline(100, Some(u64::MAX)).unwrap(), 86500);
         assert_eq!(Processor::session_unix_deadline(100, None).unwrap(), 86500);
         assert!(Processor::session_unix_deadline(100, Some(100)).is_err());
         assert!(Processor::session_unix_deadline(-1, None).is_err());
@@ -5624,38 +4517,22 @@ mod issue_205_fixtures {
     pub struct TestProcessor;
     fn legacy_address(pid: &Pubkey, data: &[u8]) -> Option<Pubkey> {
         let disc = data.get(..8)?;
-        if disc == VERIFY_AND_REGISTER_DISCRIMINATOR
-            || disc == VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR
-        {
-            let offset = if disc == VERIFY_AND_REGISTER_DISCRIMINATOR {
-                16
-            } else {
-                80
-            };
-            let view = solana_confidential_compute_core::SnpReportView::try_from_slice(
-                data.get(offset..offset + 1184)?,
-            )
-            .ok()?;
-            return Some(
-                Pubkey::find_program_address(&[b"nonce", &view.pubkey(), &view.nonce()], pid).0,
-            );
+        if disc == VERIFY_AND_REGISTER_DISCRIMINATOR || disc == VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR {
+            let offset = if disc == VERIFY_AND_REGISTER_DISCRIMINATOR { 16 } else { 80 };
+            let view =
+                solana_confidential_compute_core::SnpReportView::try_from_slice(data.get(offset..offset + 1184)?)
+                    .ok()?;
+            return Some(Pubkey::find_program_address(&[b"nonce", &view.pubkey(), &view.nonce()], pid).0);
         }
         if disc == VERIFY_NITRO_ATTESTATION_DISCRIMINATOR {
-            let (_, view) =
-                solana_confidential_compute_crypto::parse_nitro_attestation(data.get(53..)?)
-                    .ok()?;
-            return Some(
-                Pubkey::find_program_address(&[b"nonce", &view.user_data, &view.nonce], pid).0,
-            );
+            let (_, view) = solana_confidential_compute_crypto::parse_nitro_attestation(data.get(53..)?).ok()?;
+            return Some(Pubkey::find_program_address(&[b"nonce", &view.user_data, &view.nonce], pid).0);
         }
         if disc == VERIFY_GOOGLE_JWT_DISCRIMINATOR {
-            let view = solana_confidential_compute_crypto::jwt::JwtView::parse(
-                core::str::from_utf8(data.get(53..)?).ok()?,
-            )
-            .ok()?;
-            let claims =
-                solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64)
+            let view =
+                solana_confidential_compute_crypto::jwt::JwtView::parse(core::str::from_utf8(data.get(53..)?).ok()?)
                     .ok()?;
+            let claims = solana_confidential_compute_crypto::jwt::parse_google_claims_b64(view.payload_b64).ok()?;
             let raw = if *data.get(8)? == 0 {
                 claims.decode_mode_a_binding().ok()?.to_vec()
             } else {
@@ -5666,11 +4543,7 @@ mod issue_205_fixtures {
         }
         None
     }
-    fn accounts<'a>(
-        pid: &Pubkey,
-        original: &[AccountInfo<'a>],
-        data: &[u8],
-    ) -> Vec<AccountInfo<'a>> {
+    fn accounts<'a>(pid: &Pubkey, original: &[AccountInfo<'a>], data: &[u8]) -> Vec<AccountInfo<'a>> {
         let mut accounts = original.to_vec();
         if let Some(key) = legacy_address(pid, data) {
             if !accounts.iter().any(|a| a.key == &key) {
@@ -5690,11 +4563,7 @@ mod issue_205_fixtures {
     #[allow(dead_code)]
     impl TestProcessor {
         pub fn process(pid: &Pubkey, original: &[AccountInfo], data: &[u8]) -> ProgramResult {
-            crate::processor::issue_183_fixtures::TestProcessor::process(
-                pid,
-                &accounts(pid, original, data),
-                data,
-            )
+            crate::processor::issue_183_fixtures::TestProcessor::process(pid, &accounts(pid, original, data), data)
         }
         pub fn process_with<V: SignatureVerifier>(
             v: &V,
@@ -5745,15 +4614,7 @@ mod issue_205 {
             bytes.extend_from_slice(&consumed.to_le_bytes());
             bytes.push(bump);
             let mut lamports = 1000;
-            let account = AccountInfo::new(
-                &legacy,
-                false,
-                false,
-                &mut lamports,
-                &mut bytes,
-                &pid,
-                false,
-            );
+            let account = AccountInfo::new(&legacy, false, false, &mut lamports, &mut bytes, &pid, false);
             for now in [499, 650, 651] {
                 let result = Processor::assert_legacy_nonce_migration(
                     &pid,
@@ -5764,13 +4625,7 @@ mod issue_205 {
                 assert_eq!(result.is_ok(), consumed == 500 && now == 651);
             }
         }
-        assert!(Processor::assert_legacy_nonce_migration(
-            &pid,
-            &[],
-            &[b"nonce", &signer, &nonce],
-            651
-        )
-        .is_err());
+        assert!(Processor::assert_legacy_nonce_migration(&pid, &[], &[b"nonce", &signer, &nonce], 651).is_err());
     }
 }
 
@@ -5792,18 +4647,11 @@ mod issue_289 {
             for bytes in [vec![], vec![0; AmdIdentityRevocation::SIZE]] {
                 let mut lamports = 1;
                 let mut bytes = bytes;
-                let mut account =
-                    AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, owner, false);
-                let result = Processor::assert_amd_identity_allowed(
-                    &pid,
-                    std::slice::from_ref(&account),
-                    &identity,
-                );
+                let mut account = AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, owner, false);
+                let result = Processor::assert_amd_identity_allowed(&pid, std::slice::from_ref(&account), &identity);
                 assert_eq!(result.is_ok(), owner == &system && account.data_is_empty());
                 account.executable = true;
-                assert!(
-                    Processor::assert_amd_identity_allowed(&pid, &[account], &identity).is_err()
-                );
+                assert!(Processor::assert_amd_identity_allowed(&pid, &[account], &identity).is_err());
             }
         }
         let mut lamports = 1;
@@ -5811,18 +4659,10 @@ mod issue_289 {
         let account = AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, &pid, false);
         for tcb in [0u64, 1, 99, u64::MAX] {
             // Changing TCB changes the cache, never this canonical identity key.
-            let cache = Pubkey::find_program_address(
-                &[VcekAccount::SEED, &identity, &tcb.to_le_bytes()],
-                &pid,
-            )
-            .0;
+            let cache = Pubkey::find_program_address(&[VcekAccount::SEED, &identity, &tcb.to_le_bytes()], &pid).0;
             assert_ne!(cache, key);
             assert_eq!(
-                Processor::assert_amd_identity_allowed(
-                    &pid,
-                    std::slice::from_ref(&account),
-                    &identity
-                ),
+                Processor::assert_amd_identity_allowed(&pid, std::slice::from_ref(&account), &identity),
                 Err(VerifierError::UnauthorizedPolicy.into())
             );
         }

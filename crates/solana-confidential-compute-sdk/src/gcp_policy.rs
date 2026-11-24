@@ -32,14 +32,8 @@ pub fn build_set_gcp_tenant_policy_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new_readonly(*authority, true),
-            AccountMeta::new_readonly(
-                Pubkey::find_program_address(&[b"policy_registry"], program_id).0,
-                false,
-            ),
-            AccountMeta::new(
-                Pubkey::find_program_address(&[b"gcp_tenant_policy"], program_id).0,
-                false,
-            ),
+            AccountMeta::new_readonly(Pubkey::find_program_address(&[b"policy_registry"], program_id).0, false),
+            AccountMeta::new(Pubkey::find_program_address(&[b"gcp_tenant_policy"], program_id).0, false),
             AccountMeta::new(*payer, true),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
         ],

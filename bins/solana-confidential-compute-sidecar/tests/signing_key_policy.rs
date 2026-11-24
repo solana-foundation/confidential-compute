@@ -23,23 +23,13 @@ fn workload_payer_rejected_before_any_signature_mutation() {
     let ix = instruction(payer);
     for message in [
         VersionedMessage::Legacy(Message::new(std::slice::from_ref(&ix), Some(&payer))),
-        VersionedMessage::V0(
-            v0::Message::try_compile(&payer, &[ix], &[], Hash::default()).unwrap(),
-        ),
+        VersionedMessage::V0(v0::Message::try_compile(&payer, &[ix], &[], Hash::default()).unwrap()),
     ] {
-        let mut tx = VersionedTransaction {
-            signatures: vec![],
-            message,
-        };
+        let mut tx = VersionedTransaction { signatures: vec![], message };
         let before = tx.clone();
-        let err = keys
-            .sign_transaction(&mut tx)
-            .expect_err("workload must never fund caller fees");
+        let err = keys.sign_transaction(&mut tx).expect_err("workload must never fund caller fees");
         assert!(err.to_string().contains("fee payer"), "{err}");
-        assert_eq!(
-            tx, before,
-            "rejection must precede signature vector resizing or release"
-        );
+        assert_eq!(tx, before, "rejection must precede signature vector resizing or release");
     }
 }
 
@@ -48,14 +38,10 @@ fn distinct_external_payer_preserved_and_workload_signature_verifies() {
     let keys = EphemeralKeyManager::new();
     let payer = Pubkey::new_unique();
     let message = VersionedMessage::V0(
-        v0::Message::try_compile(&payer, &[instruction(keys.pubkey())], &[], Hash::default())
-            .unwrap(),
+        v0::Message::try_compile(&payer, &[instruction(keys.pubkey())], &[], Hash::default()).unwrap(),
     );
     let payer_signature = Signature::from([0x55; 64]);
-    let mut tx = VersionedTransaction {
-        signatures: vec![payer_signature, Signature::default()],
-        message,
-    };
+    let mut tx = VersionedTransaction { signatures: vec![payer_signature, Signature::default()], message };
     let signature = keys.sign_transaction(&mut tx).unwrap();
     assert_eq!(tx.signatures[0], payer_signature);
     assert_eq!(tx.signatures[1], signature);

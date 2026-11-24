@@ -15,11 +15,7 @@ pub struct HeartbeatDaemon {
 }
 
 impl HeartbeatDaemon {
-    pub fn new(
-        state: Arc<SidecarAppState>,
-        poll_interval_secs: u64,
-        renewal_buffer_slots: u64,
-    ) -> Self {
+    pub fn new(state: Arc<SidecarAppState>, poll_interval_secs: u64, renewal_buffer_slots: u64) -> Self {
         Self {
             state,
             poll_interval: Duration::from_secs(poll_interval_secs),
@@ -70,8 +66,7 @@ impl HeartbeatDaemon {
             return Ok(true);
         };
         let renew = if self.state.onchain.is_dry_run() {
-            expiry.saturating_sub(self.state.onchain.get_current_slot().await?)
-                <= self.renewal_buffer_slots
+            expiry.saturating_sub(self.state.onchain.get_current_slot().await?) <= self.renewal_buffer_slots
         } else {
             let key = self.state.keys.read().await.pubkey();
             self.state
@@ -91,30 +86,21 @@ impl HeartbeatDaemon {
         let expires_slot = attest_current_key(&self.state).await?;
         let pubkey_after = self.state.keys.read().await.pubkey();
         if pubkey_before != pubkey_after {
-            return Err(crate::error::SidecarError::KeyError(
-                "heartbeat rotated the workload key".to_string(),
-            ));
+            return Err(crate::error::SidecarError::KeyError("heartbeat rotated the workload key".to_string()));
         }
-        tracing::info!(
-            new_expires_slot = expires_slot,
-            "Autonomous attestation renewed for the current ephemeral key"
-        );
+        tracing::info!(new_expires_slot = expires_slot, "Autonomous attestation renewed for the current ephemeral key");
         Ok(())
     }
 }
 
 /// Re-attest the current ephemeral key. The pubkey is unchanged.
 /// @spec SCC-SIDECAR-005
-pub async fn reattest_current_key(
-    state: &SidecarAppState,
-) -> Result<u64, crate::error::SidecarError> {
+pub async fn reattest_current_key(state: &SidecarAppState) -> Result<u64, crate::error::SidecarError> {
     let pubkey_before = state.keys.read().await.pubkey();
     let expires_slot = attest_current_key(state).await?;
     let pubkey_after = state.keys.read().await.pubkey();
     if pubkey_before != pubkey_after {
-        return Err(crate::error::SidecarError::KeyError(
-            "heartbeat rotated the workload key".to_string(),
-        ));
+        return Err(crate::error::SidecarError::KeyError("heartbeat rotated the workload key".to_string()));
     }
     Ok(expires_slot)
 }

@@ -9,8 +9,8 @@
 //! @spec SCC-TDX-001 SCC-TDX-002
 
 use solana_confidential_compute_verifier::tdx::{
-    compress_p256, normalize_low_s, TdxQuote, ISV_SIGNED_LEN, QE_REPORT_LEN, QUOTE_HEADER_LEN,
-    TD10_BODY_LEN, TDX_TEE_TYPE,
+    compress_p256, normalize_low_s, TdxQuote, ISV_SIGNED_LEN, QE_REPORT_LEN, QUOTE_HEADER_LEN, TD10_BODY_LEN,
+    TDX_TEE_TYPE,
 };
 
 const QUOTE: &[u8] = include_bytes!("fixtures/tdx_quote_v4.bin");
@@ -19,15 +19,8 @@ const QUOTE: &[u8] = include_bytes!("fixtures/tdx_quote_v4.bin");
 fn the_fixture_is_a_real_intel_tdx_v4_quote() {
     assert_eq!(QUOTE.len(), 4935);
     assert_eq!(u16::from_le_bytes([QUOTE[0], QUOTE[1]]), 4, "version");
-    assert_eq!(
-        u16::from_le_bytes([QUOTE[2], QUOTE[3]]),
-        2,
-        "ECDSA-256-with-P-256"
-    );
-    assert_eq!(
-        u32::from_le_bytes([QUOTE[4], QUOTE[5], QUOTE[6], QUOTE[7]]),
-        TDX_TEE_TYPE
-    );
+    assert_eq!(u16::from_le_bytes([QUOTE[2], QUOTE[3]]), 2, "ECDSA-256-with-P-256");
+    assert_eq!(u32::from_le_bytes([QUOTE[4], QUOTE[5], QUOTE[6], QUOTE[7]]), TDX_TEE_TYPE);
     TdxQuote::parse(QUOTE).expect("a genuine quote must parse");
 }
 
@@ -50,10 +43,7 @@ fn the_signed_region_fits_a_solana_transaction() {
     // 1 num_signatures + 1 pad + 14 offsets + 33 pubkey + 64 signature + msg.
     let precompile_ix_data = 16 + 33 + 64 + ISV_SIGNED_LEN;
     assert_eq!(precompile_ix_data, 745);
-    assert!(
-        precompile_ix_data < 1232,
-        "the whole architecture depends on this"
-    );
+    assert!(precompile_ix_data < 1232, "the whole architecture depends on this");
 
     let qe_ix_data = 16 + 33 + 64 + QE_REPORT_LEN;
     assert_eq!(qe_ix_data, 497);
@@ -99,15 +89,10 @@ fn the_attestation_key_and_signatures_are_where_the_layout_says() {
 #[test]
 fn the_qe_report_commits_to_the_attestation_key() {
     let quote = TdxQuote::parse(QUOTE).unwrap();
-    quote
-        .verify_qe_binding()
-        .expect("a genuine quote binds its attestation key");
+    quote.verify_qe_binding().expect("a genuine quote binds its attestation key");
 
     // The digest half is what the hardware actually committed to.
-    let expected = solana_program::hash::hashv(&[
-        quote.attestation_pubkey_xy().as_slice(),
-        quote.qe_auth_data(),
-    ]);
+    let expected = solana_program::hash::hashv(&[quote.attestation_pubkey_xy().as_slice(), quote.qe_auth_data()]);
     assert_eq!(&quote.qe_report_data()[..32], expected.to_bytes());
     assert_eq!(&quote.qe_report_data()[32..], &[0u8; 32]);
 }
@@ -117,10 +102,7 @@ fn a_tampered_attestation_key_breaks_the_qe_binding() {
     let mut tampered = QUOTE.to_vec();
     tampered[700] ^= 0x01;
     let quote = TdxQuote::parse(&tampered).unwrap();
-    assert!(
-        quote.verify_qe_binding().is_err(),
-        "swapping the attestation key must break the QE commitment"
-    );
+    assert!(quote.verify_qe_binding().is_err(), "swapping the attestation key must break the QE commitment");
 }
 
 #[test]
@@ -152,33 +134,17 @@ fn normalization_matches_intels_real_high_s_and_low_s_signatures() {
 
     // The ISV signature is high-S. n - s, computed independently:
     let expected_isv_s: [u8; 32] = [
-        0x5f, 0x53, 0x6c, 0x8f, 0xcd, 0x20, 0x54, 0xd3, 0x41, 0x43, 0x14, 0x38, 0xba, 0xfa, 0x14,
-        0xef, 0x92, 0xf0, 0x25, 0xcf, 0x9a, 0xd9, 0xb7, 0x1f, 0xf9, 0x7d, 0xcf, 0x94, 0x7e, 0x19,
-        0xe4, 0xf6,
+        0x5f, 0x53, 0x6c, 0x8f, 0xcd, 0x20, 0x54, 0xd3, 0x41, 0x43, 0x14, 0x38, 0xba, 0xfa, 0x14, 0xef, 0x92, 0xf0,
+        0x25, 0xcf, 0x9a, 0xd9, 0xb7, 0x1f, 0xf9, 0x7d, 0xcf, 0x94, 0x7e, 0x19, 0xe4, 0xf6,
     ];
     let normalized_isv = normalize_low_s(quote.isv_signature());
-    assert_ne!(
-        &normalized_isv,
-        quote.isv_signature(),
-        "this fixture's ISV signature is high-S"
-    );
-    assert_eq!(
-        &normalized_isv[..32],
-        &quote.isv_signature()[..32],
-        "r is untouched"
-    );
+    assert_ne!(&normalized_isv, quote.isv_signature(), "this fixture's ISV signature is high-S");
+    assert_eq!(&normalized_isv[..32], &quote.isv_signature()[..32], "r is untouched");
     assert_eq!(&normalized_isv[32..], &expected_isv_s);
-    assert_eq!(
-        normalize_low_s(&normalized_isv),
-        normalized_isv,
-        "normalization is idempotent"
-    );
+    assert_eq!(normalize_low_s(&normalized_isv), normalized_isv, "normalization is idempotent");
 
     // The QE report signature is already low-S and must be left alone.
-    assert_eq!(
-        &normalize_low_s(quote.qe_report_signature()),
-        quote.qe_report_signature()
-    );
+    assert_eq!(&normalize_low_s(quote.qe_report_signature()), quote.qe_report_signature());
 }
 
 #[test]

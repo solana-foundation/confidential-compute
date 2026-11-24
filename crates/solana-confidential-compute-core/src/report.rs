@@ -34,9 +34,7 @@ pub struct SnpReportView<'a> {
 impl<'a> SnpReportView<'a> {
     /// Attempts to create an `SnpReportView` from a byte slice, asserting exact 1,184-byte size.
     pub fn try_from_slice(bytes: &'a [u8]) -> Result<Self, ConfidentialComputeError> {
-        let raw: &[u8; SNP_REPORT_SIZE] = bytes
-            .try_into()
-            .map_err(|_| ConfidentialComputeError::ReportSizeInvalid)?;
+        let raw: &[u8; SNP_REPORT_SIZE] = bytes.try_into().map_err(|_| ConfidentialComputeError::ReportSizeInvalid)?;
         Ok(Self { raw })
     }
 
@@ -366,8 +364,7 @@ mod tests {
     #[test]
     fn test_smt_bit_is_allowed() {
         let mut dummy = valid_report();
-        dummy[8..16]
-            .copy_from_slice(&(GUEST_POLICY_SMT | GUEST_POLICY_RESERVED_MUST_BE_ONE).to_le_bytes());
+        dummy[8..16].copy_from_slice(&(GUEST_POLICY_SMT | GUEST_POLICY_RESERVED_MUST_BE_ONE).to_le_bytes());
         let view = SnpReportView::try_from_slice(&dummy).unwrap();
         assert!(view.is_smt_allowed());
         assert!(view.validate_security_invariants().is_ok());
@@ -376,30 +373,20 @@ mod tests {
     #[test]
     fn test_rejects_debug_mode() {
         let mut dummy = valid_report();
-        dummy[8..16].copy_from_slice(
-            &(GUEST_POLICY_RESERVED_MUST_BE_ONE | GUEST_POLICY_DEBUG).to_le_bytes(),
-        );
+        dummy[8..16].copy_from_slice(&(GUEST_POLICY_RESERVED_MUST_BE_ONE | GUEST_POLICY_DEBUG).to_le_bytes());
 
         let view = SnpReportView::try_from_slice(&dummy).unwrap();
         assert!(view.is_debug_enabled());
-        assert_eq!(
-            view.validate_security_invariants(),
-            Err(ConfidentialComputeError::DebugModeProhibited)
-        );
+        assert_eq!(view.validate_security_invariants(), Err(ConfidentialComputeError::DebugModeProhibited));
     }
 
     #[test]
     fn test_rejects_migrate_ma() {
         let mut dummy = valid_report();
-        dummy[8..16].copy_from_slice(
-            &(GUEST_POLICY_RESERVED_MUST_BE_ONE | GUEST_POLICY_MIGRATE_MA).to_le_bytes(),
-        );
+        dummy[8..16].copy_from_slice(&(GUEST_POLICY_RESERVED_MUST_BE_ONE | GUEST_POLICY_MIGRATE_MA).to_le_bytes());
         let view = SnpReportView::try_from_slice(&dummy).unwrap();
         assert!(view.is_migrate_ma_enabled());
-        assert_eq!(
-            view.validate_security_invariants(),
-            Err(ConfidentialComputeError::UnauthorizedPolicy)
-        );
+        assert_eq!(view.validate_security_invariants(), Err(ConfidentialComputeError::UnauthorizedPolicy));
     }
 
     #[test]
@@ -408,10 +395,7 @@ mod tests {
         dummy[8..16].copy_from_slice(&0u64.to_le_bytes());
         let view = SnpReportView::try_from_slice(&dummy).unwrap();
         assert!(!view.reserved_must_be_one());
-        assert_eq!(
-            view.validate_security_invariants(),
-            Err(ConfidentialComputeError::UnauthorizedPolicy)
-        );
+        assert_eq!(view.validate_security_invariants(), Err(ConfidentialComputeError::UnauthorizedPolicy));
     }
 
     #[test]
@@ -420,10 +404,7 @@ mod tests {
         dummy[0x30..0x34].copy_from_slice(&1u32.to_le_bytes());
         let view = SnpReportView::try_from_slice(&dummy).unwrap();
         assert_eq!(view.vmpl(), 1);
-        assert_eq!(
-            view.validate_security_invariants(),
-            Err(ConfidentialComputeError::UnauthorizedPolicy)
-        );
+        assert_eq!(view.validate_security_invariants(), Err(ConfidentialComputeError::UnauthorizedPolicy));
     }
 
     /// FLAGS word `1` is VCEK with `AUTHOR_KEY_EN`, not VLEK.
@@ -459,9 +440,6 @@ mod tests {
         dummy[0x2D5] = 0xFF;
 
         let view = SnpReportView::try_from_slice(&dummy).unwrap();
-        assert_eq!(
-            view.signature_r_be(),
-            Err(ConfidentialComputeError::InvalidSignaturePadding)
-        );
+        assert_eq!(view.signature_r_be(), Err(ConfidentialComputeError::InvalidSignaturePadding));
     }
 }

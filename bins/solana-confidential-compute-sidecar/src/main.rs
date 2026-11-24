@@ -45,9 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|path| {
             std::fs::read_to_string(path)
                 .map(Zeroizing::new)
-                .map_err(|_| {
-                    SidecarError::InvalidConfig("cannot read enrollment token file".into())
-                })
+                .map_err(|_| SidecarError::InvalidConfig("cannot read enrollment token file".into()))
         })
         .transpose()?;
     // Accept the trailing newline produced by ordinary secret-file tooling.
@@ -70,11 +68,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let provider: Arc<dyn AttestationProvider> = match config.enclave_mode {
         EnclaveMode::AmdSevSnp => Arc::new(SevSnpProvider::default()),
         EnclaveMode::AwsNitro => Arc::new(AwsNitroProvider::default()),
-        EnclaveMode::GcpConfidentialSpace => Arc::new(GcpOidcProvider::with_image_digest(
-            None,
-            None,
-            config.container_image_digest.as_deref(),
-        )?),
+        EnclaveMode::GcpConfidentialSpace => {
+            Arc::new(GcpOidcProvider::with_image_digest(None, None, config.container_image_digest.as_deref())?)
+        }
         EnclaveMode::NvidiaGpu => Arc::new(NvidiaH100Provider::for_daemon(config.dry_run)?),
         EnclaveMode::IntelTdx => Arc::new(
             solana_confidential_compute_sidecar::attestation::intel_tdx::IntelTdxProvider::for_daemon(config.dry_run)?,
@@ -83,19 +79,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // 5. Load the fee-payer key. It is never the workload signer.
-    let payer = if let Some(path) = &config.payer_keypair_path {
-        Some(load_payer_keypair(path)?)
-    } else {
-        None
-    };
+    let payer = if let Some(path) = &config.payer_keypair_path { Some(load_payer_keypair(path)?) } else { None };
 
     // 6. Initialize on-chain attestor. DRY_RUN skips transaction submission.
-    let onchain = Arc::new(OnchainAttestor::new(
-        &config.solana_rpc_url,
-        config.verifier_program_id,
-        payer,
-        config.dry_run,
-    ));
+    let onchain =
+        Arc::new(OnchainAttestor::new(&config.solana_rpc_url, config.verifier_program_id, payer, config.dry_run));
 
     // 7. Assemble application state
     let state = Arc::new(SidecarAppState {
@@ -109,11 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // 8. Spawn autonomous heartbeat daemon
-    let heartbeat = HeartbeatDaemon::new(
-        Arc::clone(&state),
-        config.poll_interval_secs,
-        config.renewal_buffer_slots,
-    );
+    let heartbeat = HeartbeatDaemon::new(Arc::clone(&state), config.poll_interval_secs, config.renewal_buffer_slots);
     let heartbeat_handle = heartbeat.spawn();
 
     // 9. Bind TCP listener on loopback
@@ -123,9 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!(bind_addr = %config.bind_addr, "Loopback HTTP server listening");
 
     // 10. Serve with graceful shutdown
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
 
     // 11. Clean shutdown: abort heartbeat and drop state (zeroizes secret key)
     heartbeat_handle.abort();
@@ -145,13 +127,12 @@ fn load_payer_keypair(path: &str) -> Result<Keypair, SidecarError> {
 fn parse_payer_material(raw: &str) -> Result<Keypair, SidecarError> {
     let trimmed = raw.trim();
     let mut bytes = if trimmed.starts_with('[') {
-        serde_json::from_str::<Vec<u8>>(trimmed).map_err(|e| {
-            SidecarError::InvalidConfig(format!("Failed to parse payer keypair JSON: {e}"))
-        })?
+        serde_json::from_str::<Vec<u8>>(trimmed)
+            .map_err(|e| SidecarError::InvalidConfig(format!("Failed to parse payer keypair JSON: {e}")))?
     } else {
-        bs58::decode(trimmed).into_vec().map_err(|e| {
-            SidecarError::InvalidConfig(format!("Payer keypair is not JSON or base58: {e}"))
-        })?
+        bs58::decode(trimmed)
+            .into_vec()
+            .map_err(|e| SidecarError::InvalidConfig(format!("Payer keypair is not JSON or base58: {e}")))?
     };
     let parsed = Keypair::try_from(bytes.as_slice())
         .map_err(|e| SidecarError::InvalidConfig(format!("Payer keypair bytes are invalid: {e}")));
@@ -161,9 +142,7 @@ fn parse_payer_material(raw: &str) -> Result<Keypair, SidecarError> {
 
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
+        tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
     };
 
     #[cfg(unix)]

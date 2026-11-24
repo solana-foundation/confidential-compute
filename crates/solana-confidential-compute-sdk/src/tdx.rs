@@ -22,9 +22,7 @@
 
 use std::sync::LazyLock;
 
-use solana_confidential_compute_cpi::{
-    ATTESTED_SIGNER_SEED, ID as SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-};
+use solana_confidential_compute_cpi::{ATTESTED_SIGNER_SEED, ID as SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID};
 use solana_message::v1::{self, TransactionConfig, MAX_TRANSACTION_SIZE};
 use solana_sdk::hash::{hash, hashv, Hash};
 use solana_sdk::instruction::{AccountMeta, Instruction};
@@ -150,10 +148,7 @@ pub fn derive_tdx_session_pda(program_id: &Pubkey, attestation_pubkey: &[u8; 33]
 
 /// [`derive_tdx_session_pda`] from the uncompressed `X || Y` the quote carries.
 /// @spec SCC-TDX-001
-pub fn derive_tdx_session_pda_from_xy(
-    program_id: &Pubkey,
-    attestation_pubkey_xy: &[u8; 64],
-) -> (Pubkey, u8) {
+pub fn derive_tdx_session_pda_from_xy(program_id: &Pubkey, attestation_pubkey_xy: &[u8; 64]) -> (Pubkey, u8) {
     derive_tdx_session_pda(program_id, &compress_p256(attestation_pubkey_xy))
 }
 
@@ -173,9 +168,7 @@ pub fn derive_attested_signer_pda(program_id: &Pubkey, signer: &Pubkey) -> (Pubk
 
 /// Source-5 backend policy, which holds the PCK, QE, platform and GPU allowlists.
 pub fn derive_tdx_backend_policy_pda(program_id: &Pubkey) -> Pubkey {
-    derive_backend_policy_pda(program_id, TDX_SOURCE)
-        .expect("source 5 is a supported backend")
-        .0
+    derive_backend_policy_pda(program_id, TDX_SOURCE).expect("source 5 is a supported backend").0
 }
 
 /// `SHA-256(subject || quote_body_digest || slot_hash || challenge_nonce)`.
@@ -203,12 +196,7 @@ pub fn derive_tdx_quote_nonce_pda(
 ) -> Result<(Pubkey, u8), TdxError> {
     require_isv_signed(isv_signed)?;
     let quote_body_digest = hashv(&[isv_signed]).to_bytes();
-    let seed = tdx_nonce_seed(
-        &workload_signer.to_bytes(),
-        &quote_body_digest,
-        slot_hash,
-        challenge_nonce,
-    );
+    let seed = tdx_nonce_seed(&workload_signer.to_bytes(), &quote_body_digest, slot_hash, challenge_nonce);
     Ok(derive_tdx_used_nonce_pda(program_id, &seed))
 }
 
@@ -226,13 +214,13 @@ pub fn compress_p256(xy: &[u8; 64]) -> [u8; 33] {
 
 /// The P-256 group order `n`, big-endian.
 const P256_ORDER: [u8; 32] = [
-    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17, 0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x51,
+    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBC, 0xE6, 0xFA,
+    0xAD, 0xA7, 0x17, 0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x51,
 ];
 /// `floor(n / 2)`, big-endian.
 const P256_HALF_ORDER: [u8; 32] = [
-    0x7F, 0xFF, 0xFF, 0xFF, 0x80, 0x00, 0x00, 0x00, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xDE, 0x73, 0x7D, 0x56, 0xD3, 0x8B, 0xCF, 0x42, 0x79, 0xDC, 0xE5, 0x61, 0x7E, 0x31, 0x92, 0xA8,
+    0x7F, 0xFF, 0xFF, 0xFF, 0x80, 0x00, 0x00, 0x00, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xDE, 0x73, 0x7D,
+    0x56, 0xD3, 0x8B, 0xCF, 0x42, 0x79, 0xDC, 0xE5, 0x61, 0x7E, 0x31, 0x92, 0xA8,
 ];
 
 fn is_low_s(s: &[u8]) -> bool {
@@ -275,11 +263,7 @@ pub fn normalize_low_s(signature: &[u8; 64]) -> [u8; 64] {
 /// other form.
 ///
 /// @spec SCC-TDX-001
-pub fn build_secp256r1_verify_ix(
-    compressed_pubkey: &[u8; 33],
-    signature: &[u8; 64],
-    message: &[u8],
-) -> Instruction {
+pub fn build_secp256r1_verify_ix(compressed_pubkey: &[u8; 33], signature: &[u8; 64], message: &[u8]) -> Instruction {
     let message_size = u16::try_from(message.len()).expect("TDX messages are 384 or 632 bytes");
     let mut data = Vec::with_capacity(SECP256R1_PRECOMPILE_OVERHEAD + message.len());
     data.push(1); // num_signatures
@@ -294,11 +278,7 @@ pub fn build_secp256r1_verify_ix(
     data.extend_from_slice(compressed_pubkey);
     data.extend_from_slice(&normalize_low_s(signature));
     data.extend_from_slice(message);
-    Instruction {
-        program_id: solana_sdk_ids::secp256r1_program::ID,
-        accounts: vec![],
-        data,
-    }
+    Instruction { program_id: solana_sdk_ids::secp256r1_program::ID, accounts: vec![], data }
 }
 
 // ---------------------------------------------------------------------------
@@ -314,9 +294,7 @@ fn require_qe_report(report: &[u8]) -> Result<&[u8], TdxError> {
 
 fn require_isv_signed(isv_signed: &[u8]) -> Result<&[u8], TdxError> {
     if isv_signed.len() != ISV_SIGNED_LEN {
-        return Err(TdxError::InvalidIsvSignedLen {
-            len: isv_signed.len(),
-        });
+        return Err(TdxError::InvalidIsvSignedLen { len: isv_signed.len() });
     }
     Ok(isv_signed)
 }
@@ -378,17 +356,8 @@ pub fn build_issue_tdx_challenge_ix_for_program(
 
 /// [`build_issue_tdx_challenge_ix_for_program`] against the canonical program.
 /// @spec SCC-TDX-005 SCC-SDK-001
-pub fn build_issue_tdx_challenge_ix(
-    payer: &Pubkey,
-    nonce: &[u8; 32],
-    nonce_slot: u64,
-) -> Instruction {
-    build_issue_tdx_challenge_ix_for_program(
-        &SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-        payer,
-        nonce,
-        nonce_slot,
-    )
+pub fn build_issue_tdx_challenge_ix(payer: &Pubkey, nonce: &[u8; 32], nonce_slot: u64) -> Instruction {
+    build_issue_tdx_challenge_ix_for_program(&SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, payer, nonce, nonce_slot)
 }
 
 // ---------------------------------------------------------------------------
@@ -417,13 +386,10 @@ pub fn build_verify_tdx_qe_report_ix_for_program(
 ) -> Result<Instruction, TdxError> {
     require_pck_pubkey(pck_pubkey)?;
     if qe_auth_data.len() > MAX_QE_AUTH_DATA_LEN {
-        return Err(TdxError::QeAuthDataTooLong {
-            len: qe_auth_data.len(),
-        });
+        return Err(TdxError::QeAuthDataTooLong { len: qe_auth_data.len() });
     }
-    let auth_len = u16::try_from(qe_auth_data.len()).map_err(|_| TdxError::QeAuthDataTooLong {
-        len: qe_auth_data.len(),
-    })?;
+    let auth_len =
+        u16::try_from(qe_auth_data.len()).map_err(|_| TdxError::QeAuthDataTooLong { len: qe_auth_data.len() })?;
 
     let (session, _) = derive_tdx_session_pda_from_xy(program_id, attestation_pubkey_xy);
 
@@ -510,13 +476,8 @@ pub fn build_verify_tdx_quote_ix_for_program(
 
     let (attested_signer, _) = derive_attested_signer_pda(program_id, workload_signer);
     let (session, _) = derive_tdx_session_pda_from_xy(program_id, attestation_pubkey_xy);
-    let (used_nonce, _) = derive_tdx_quote_nonce_pda(
-        program_id,
-        workload_signer,
-        isv_signed,
-        slot_hash,
-        challenge_nonce,
-    )?;
+    let (used_nonce, _) =
+        derive_tdx_quote_nonce_pda(program_id, workload_signer, isv_signed, slot_hash, challenge_nonce)?;
     let (challenge, _) = derive_tdx_challenge_pda(program_id, challenge_nonce);
 
     let mut data = Vec::with_capacity(VERIFY_TDX_QUOTE_IX_LEN);
@@ -699,28 +660,16 @@ pub fn build_tdx_enrolment_tx_for_program(
         config
     };
 
-    let message = v1::Message::try_compile_with_config(
-        &enrolment.payer,
-        &instructions,
-        recent_blockhash,
-        config,
-    )
-    .map_err(|e| TdxError::Compile(e.to_string()))?;
+    let message = v1::Message::try_compile_with_config(&enrolment.payer, &instructions, recent_blockhash, config)
+        .map_err(|e| TdxError::Compile(e.to_string()))?;
 
     let len = v1_transaction_size(&message);
     if len > V1_MAX_TRANSACTION_SIZE {
-        return Err(TdxError::TransactionTooLarge {
-            len,
-            max: V1_MAX_TRANSACTION_SIZE,
-        });
+        return Err(TdxError::TransactionTooLarge { len, max: V1_MAX_TRANSACTION_SIZE });
     }
 
-    let signatures =
-        vec![Signature::default(); usize::from(message.header.num_required_signatures)];
-    Ok(VersionedTransaction {
-        signatures,
-        message: VersionedMessage::V1(message),
-    })
+    let signatures = vec![Signature::default(); usize::from(message.header.num_required_signatures)];
+    Ok(VersionedTransaction { signatures, message: VersionedMessage::V1(message) })
 }
 
 /// [`build_tdx_enrolment_tx_for_program`] against the canonical program.
@@ -730,12 +679,7 @@ pub fn build_tdx_enrolment_tx(
     recent_blockhash: Hash,
     config: TransactionConfig,
 ) -> Result<VersionedTransaction, TdxError> {
-    build_tdx_enrolment_tx_for_program(
-        &SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-        enrolment,
-        recent_blockhash,
-        config,
-    )
+    build_tdx_enrolment_tx_for_program(&SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, enrolment, recent_blockhash, config)
 }
 
 #[cfg(test)]
@@ -813,18 +757,9 @@ mod tests {
     /// constants is a test failure rather than a runtime `InvalidInstruction`.
     #[test]
     fn tdx_discriminators_match_the_program() {
-        assert_eq!(
-            *ISSUE_TDX_CHALLENGE_DISCRIMINATOR,
-            vix::ISSUE_TDX_CHALLENGE_DISCRIMINATOR
-        );
-        assert_eq!(
-            *VERIFY_TDX_QE_REPORT_DISCRIMINATOR,
-            vix::VERIFY_TDX_QE_REPORT_DISCRIMINATOR
-        );
-        assert_eq!(
-            *VERIFY_TDX_QUOTE_DISCRIMINATOR,
-            vix::VERIFY_TDX_QUOTE_DISCRIMINATOR
-        );
+        assert_eq!(*ISSUE_TDX_CHALLENGE_DISCRIMINATOR, vix::ISSUE_TDX_CHALLENGE_DISCRIMINATOR);
+        assert_eq!(*VERIFY_TDX_QE_REPORT_DISCRIMINATOR, vix::VERIFY_TDX_QE_REPORT_DISCRIMINATOR);
+        assert_eq!(*VERIFY_TDX_QUOTE_DISCRIMINATOR, vix::VERIFY_TDX_QUOTE_DISCRIMINATOR);
     }
 
     #[test]
@@ -837,10 +772,7 @@ mod tests {
         assert_eq!(VERIFY_TDX_QUOTE_IX_LEN, 8 + vix::VERIFY_TDX_QUOTE_ARGS_LEN);
         assert_eq!(CHALLENGE_SEED, ChallengeAccount::SEED);
         assert_eq!(TDX_SESSION_SEED, TdxSessionAccount::SEED);
-        assert_eq!(
-            solana_sdk_ids::secp256r1_program::ID,
-            vtdx::SECP256R1_PROGRAM_ID
-        );
+        assert_eq!(solana_sdk_ids::secp256r1_program::ID, vtdx::SECP256R1_PROGRAM_ID);
     }
 
     /// Getting these wrong fails at runtime with no useful error, so they are
@@ -854,31 +786,15 @@ mod tests {
 
         let compressed = compress_p256(&f.att_xy);
         let expected_session = Pubkey::find_program_address(
-            &[
-                TdxSessionAccount::SEED,
-                &TdxSessionAccount::seed_for(&compressed),
-            ],
+            &[TdxSessionAccount::SEED, &TdxSessionAccount::seed_for(&compressed)],
             &program,
         );
-        assert_eq!(
-            derive_tdx_session_pda(&program, &compressed),
-            expected_session
-        );
-        assert_eq!(
-            derive_tdx_session_pda_from_xy(&program, &f.att_xy),
-            expected_session
-        );
+        assert_eq!(derive_tdx_session_pda(&program, &compressed), expected_session);
+        assert_eq!(derive_tdx_session_pda_from_xy(&program, &f.att_xy), expected_session);
 
         assert_eq!(
             derive_tdx_challenge_pda(&program, &f.nonce),
-            Pubkey::find_program_address(
-                &[
-                    ChallengeAccount::SEED,
-                    &[vix::TDX_ATTESTATION_SOURCE],
-                    &f.nonce
-                ],
-                &program,
-            )
+            Pubkey::find_program_address(&[ChallengeAccount::SEED, &[vix::TDX_ATTESTATION_SOURCE], &f.nonce], &program,)
         );
 
         let signer = Pubkey::new_unique();
@@ -895,19 +811,11 @@ mod tests {
         let signer = Pubkey::new_unique();
         let digest = hashv(&[f.isv_signed.as_slice()]).to_bytes();
 
-        let expected_seed =
-            vix::tdx_nonce_seed(&signer.to_bytes(), &digest, &f.slot_hash, &f.nonce);
+        let expected_seed = vix::tdx_nonce_seed(&signer.to_bytes(), &digest, &f.slot_hash, &f.nonce);
+        assert_eq!(tdx_nonce_seed(&signer.to_bytes(), &digest, &f.slot_hash, &f.nonce), expected_seed);
         assert_eq!(
-            tdx_nonce_seed(&signer.to_bytes(), &digest, &f.slot_hash, &f.nonce),
-            expected_seed
-        );
-        assert_eq!(
-            derive_tdx_quote_nonce_pda(&program, &signer, &f.isv_signed, &f.slot_hash, &f.nonce)
-                .unwrap(),
-            Pubkey::find_program_address(
-                &[b"nonce", &[vix::TDX_ATTESTATION_SOURCE], &expected_seed],
-                &program
-            )
+            derive_tdx_quote_nonce_pda(&program, &signer, &f.isv_signed, &f.slot_hash, &f.nonce).unwrap(),
+            Pubkey::find_program_address(&[b"nonce", &[vix::TDX_ATTESTATION_SOURCE], &expected_seed], &program)
         );
     }
 
@@ -923,10 +831,9 @@ mod tests {
         assert_eq!(parsed.nonce, &f.nonce);
         assert_eq!(parsed.nonce_slot, 42);
 
-        let qe = build_verify_tdx_qe_report_ix_for_program(
-            &program, &payer, &f.att_xy, &f.pck, &f.gpu, &f.model, &f.auth,
-        )
-        .unwrap();
+        let qe =
+            build_verify_tdx_qe_report_ix_for_program(&program, &payer, &f.att_xy, &f.pck, &f.gpu, &f.model, &f.auth)
+                .unwrap();
         let parsed = vix::parse_tdx_qe_report_args(&qe.data[8..]).unwrap();
         assert_eq!(parsed.attestation_pubkey_xy, &f.att_xy);
         assert_eq!(parsed.pck_pubkey, &f.pck);
@@ -976,33 +883,22 @@ mod tests {
 
         let metas = &ix.accounts;
         assert_eq!(metas.len(), 10);
-        assert_eq!(
-            metas[0].pubkey,
-            derive_attested_signer_pda(&program, &signer).0
-        );
+        assert_eq!(metas[0].pubkey, derive_attested_signer_pda(&program, &signer).0);
         assert!(metas[0].is_writable && !metas[0].is_signer);
-        assert_eq!(
-            metas[1].pubkey,
-            derive_tdx_session_pda_from_xy(&program, &f.att_xy).0
-        );
+        assert_eq!(metas[1].pubkey, derive_tdx_session_pda_from_xy(&program, &f.att_xy).0);
         assert!(!metas[1].is_writable);
         assert_eq!(metas[2].pubkey, derive_tdx_backend_policy_pda(&program));
         assert!(!metas[2].is_writable);
         assert_eq!(
             metas[3].pubkey,
-            derive_tdx_quote_nonce_pda(&program, &signer, &f.isv_signed, &f.slot_hash, &f.nonce)
-                .unwrap()
-                .0
+            derive_tdx_quote_nonce_pda(&program, &signer, &f.isv_signed, &f.slot_hash, &f.nonce).unwrap().0
         );
         assert!(metas[3].is_writable);
         assert_eq!(metas[4].pubkey, payer);
         assert!(metas[4].is_writable && metas[4].is_signer);
         assert_eq!(metas[5].pubkey, solana_sdk_ids::system_program::ID);
         assert_eq!(metas[6].pubkey, solana_sdk::sysvar::clock::ID);
-        assert_eq!(
-            metas[7].pubkey,
-            derive_tdx_challenge_pda(&program, &f.nonce).0
-        );
+        assert_eq!(metas[7].pubkey, derive_tdx_challenge_pda(&program, &f.nonce).0);
         assert!(metas[7].is_writable, "the handler tombstones the challenge");
         assert_eq!(metas[8].pubkey, signer);
         assert!(metas[8].is_signer && !metas[8].is_writable);
@@ -1015,16 +911,12 @@ mod tests {
         let payer = Pubkey::new_unique();
         let f = fixture();
 
-        let ix = build_verify_tdx_qe_report_ix_for_program(
-            &program, &payer, &f.att_xy, &f.pck, &f.gpu, &f.model, &f.auth,
-        )
-        .unwrap();
+        let ix =
+            build_verify_tdx_qe_report_ix_for_program(&program, &payer, &f.att_xy, &f.pck, &f.gpu, &f.model, &f.auth)
+                .unwrap();
         let metas = &ix.accounts;
         assert_eq!(metas.len(), 6);
-        assert_eq!(
-            metas[0].pubkey,
-            derive_tdx_session_pda_from_xy(&program, &f.att_xy).0
-        );
+        assert_eq!(metas[0].pubkey, derive_tdx_session_pda_from_xy(&program, &f.att_xy).0);
         assert!(metas[0].is_writable);
         assert_eq!(metas[1].pubkey, derive_tdx_backend_policy_pda(&program));
         assert_eq!(metas[2].pubkey, payer);
@@ -1042,10 +934,7 @@ mod tests {
         let ix = build_issue_tdx_challenge_ix_for_program(&program, &payer, &nonce, 11);
         let metas = &ix.accounts;
         assert_eq!(metas.len(), 5);
-        assert_eq!(
-            metas[0].pubkey,
-            derive_tdx_challenge_pda(&program, &nonce).0
-        );
+        assert_eq!(metas[0].pubkey, derive_tdx_challenge_pda(&program, &nonce).0);
         assert!(metas[0].is_writable);
         assert_eq!(metas[1].pubkey, payer);
         assert!(metas[1].is_writable && metas[1].is_signer);
@@ -1080,8 +969,7 @@ mod tests {
         assert_eq!(&qe_ix.data[49..113], &normalize_low_s(&f.qe_sig)[..]);
         assert_eq!(&qe_ix.data[113..], &f.qe_report[..]);
 
-        let quote_ix =
-            build_secp256r1_verify_ix(&compress_p256(&f.att_xy), &f.isv_sig, &f.isv_signed);
+        let quote_ix = build_secp256r1_verify_ix(&compress_p256(&f.att_xy), &f.isv_sig, &f.isv_signed);
         assert_eq!(quote_ix.data.len(), QUOTE_PRECOMPILE_IX_LEN);
         assert_eq!(quote_ix.data.len(), 745);
         assert_eq!(&quote_ix.data[113..], &f.isv_signed[..]);
@@ -1115,13 +1003,8 @@ mod tests {
         assert_eq!(ixs[0].data.len(), 497);
         assert_eq!(ixs[2].data.len(), 745);
 
-        let message = v1::Message::try_compile_with_config(
-            &payer,
-            &ixs,
-            Hash::default(),
-            TransactionConfig::empty(),
-        )
-        .unwrap();
+        let message =
+            v1::Message::try_compile_with_config(&payer, &ixs, Hash::default(), TransactionConfig::empty()).unwrap();
         let size = v1_transaction_size(&message);
         eprintln!("TDX enrolment v1 transaction: {size} bytes (limit {V1_MAX_TRANSACTION_SIZE})");
         assert!(
@@ -1130,13 +1013,8 @@ mod tests {
         );
         assert_eq!(size, 2048, "v1 enrolment transaction size changed");
 
-        let tx = build_tdx_enrolment_tx_for_program(
-            &program,
-            &enrolment,
-            Hash::default(),
-            TransactionConfig::empty(),
-        )
-        .unwrap();
+        let tx = build_tdx_enrolment_tx_for_program(&program, &enrolment, Hash::default(), TransactionConfig::empty())
+            .unwrap();
         // Sponsor and workload key: two signatures.
         assert_eq!(tx.signatures.len(), 2);
         assert!(matches!(tx.message, VersionedMessage::V1(_)));
@@ -1150,13 +1028,8 @@ mod tests {
         let f = fixture();
         let enrolment = f.enrolment(signer, signer);
 
-        let tx = build_tdx_enrolment_tx_for_program(
-            &program,
-            &enrolment,
-            Hash::default(),
-            TransactionConfig::empty(),
-        )
-        .unwrap();
+        let tx = build_tdx_enrolment_tx_for_program(&program, &enrolment, Hash::default(), TransactionConfig::empty())
+            .unwrap();
         assert_eq!(tx.signatures.len(), 1);
         let VersionedMessage::V1(message) = &tx.message else {
             panic!("expected a v1 message");
@@ -1180,13 +1053,9 @@ mod tests {
         let f = fixture();
         let enrolment = f.enrolment(payer, signer);
 
-        let plain = build_tdx_enrolment_tx_for_program(
-            &program,
-            &enrolment,
-            Hash::default(),
-            TransactionConfig::empty(),
-        )
-        .unwrap();
+        let plain =
+            build_tdx_enrolment_tx_for_program(&program, &enrolment, Hash::default(), TransactionConfig::empty())
+                .unwrap();
         let budgeted = build_tdx_enrolment_tx_for_program(
             &program,
             &enrolment,
@@ -1213,15 +1082,7 @@ mod tests {
         let mut bad_pck = f.pck;
         bad_pck[0] = 0x04;
         assert_eq!(
-            build_verify_tdx_qe_report_ix_for_program(
-                &program,
-                &payer,
-                &f.att_xy,
-                &bad_pck,
-                &f.gpu,
-                &f.model,
-                &[],
-            ),
+            build_verify_tdx_qe_report_ix_for_program(&program, &payer, &f.att_xy, &bad_pck, &f.gpu, &f.model, &[],),
             Err(TdxError::InvalidPckPubkey)
         );
 
@@ -1235,9 +1096,7 @@ mod tests {
                 &f.model,
                 &vec![0u8; MAX_QE_AUTH_DATA_LEN + 1],
             ),
-            Err(TdxError::QeAuthDataTooLong {
-                len: MAX_QE_AUTH_DATA_LEN + 1
-            })
+            Err(TdxError::QeAuthDataTooLong { len: MAX_QE_AUTH_DATA_LEN + 1 })
         );
 
         assert_eq!(
@@ -1267,9 +1126,7 @@ mod tests {
                 &f.slot_hash,
                 &f.nonce,
             ),
-            Err(TdxError::InvalidIsvSignedLen {
-                len: ISV_SIGNED_LEN - 1
-            })
+            Err(TdxError::InvalidIsvSignedLen { len: ISV_SIGNED_LEN - 1 })
         );
     }
 
@@ -1285,21 +1142,13 @@ mod tests {
         let f = fixture();
         let enrolment = f.enrolment(payer, Pubkey::new_unique());
 
-        let tx = build_tdx_enrolment_tx_for_program(
-            &program,
-            &enrolment,
-            Hash::default(),
-            TransactionConfig::empty(),
-        )
-        .unwrap();
+        let tx = build_tdx_enrolment_tx_for_program(&program, &enrolment, Hash::default(), TransactionConfig::empty())
+            .unwrap();
 
         let VersionedMessage::V1(message) = tx.message else {
             panic!("the enrolment must compile to a v1 message");
         };
-        assert_eq!(
-            message.config.loaded_accounts_data_size_limit,
-            Some(DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT),
-        );
+        assert_eq!(message.config.loaded_accounts_data_size_limit, Some(DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT),);
     }
 
     // Filling in the default must not overwrite a caller who chose a value,
@@ -1322,9 +1171,6 @@ mod tests {
         let VersionedMessage::V1(message) = tx.message else {
             panic!("the enrolment must compile to a v1 message");
         };
-        assert_eq!(
-            message.config.loaded_accounts_data_size_limit,
-            Some(777_216)
-        );
+        assert_eq!(message.config.loaded_accounts_data_size_limit, Some(777_216));
     }
 }

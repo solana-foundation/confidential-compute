@@ -50,10 +50,7 @@ pub fn encode_integer(bytes: &[u8]) -> Vec<u8> {
     }
 }
 
-pub fn encode_minimal_p384_cert(
-    subject_xy: &[u8; 96],
-    issuer: &p384::ecdsa::SigningKey,
-) -> Vec<u8> {
+pub fn encode_minimal_p384_cert(subject_xy: &[u8; 96], issuer: &p384::ecdsa::SigningKey) -> Vec<u8> {
     encode_p384_cert(subject_xy, issuer, &[])
 }
 
@@ -80,10 +77,7 @@ pub fn encode_vcek_with_identity(
     let tcb_int = tlv(0x02, &tcb_be);
 
     let mut extensions = Vec::new();
-    for (oid, inner) in [
-        (OID_HWID, hwid_inner.as_slice()),
-        (OID_TCB_VERSION, tcb_int.as_slice()),
-    ] {
+    for (oid, inner) in [(OID_HWID, hwid_inner.as_slice()), (OID_TCB_VERSION, tcb_int.as_slice())] {
         let mut body = Vec::new();
         body.extend(tlv(0x06, oid));
         body.extend(tlv(0x04, inner));
@@ -92,11 +86,7 @@ pub fn encode_vcek_with_identity(
     encode_p384_cert(subject_xy, issuer, &extensions)
 }
 
-pub fn encode_p384_cert(
-    subject_xy: &[u8; 96],
-    issuer: &p384::ecdsa::SigningKey,
-    extensions: &[u8],
-) -> Vec<u8> {
+pub fn encode_p384_cert(subject_xy: &[u8; 96], issuer: &p384::ecdsa::SigningKey, extensions: &[u8]) -> Vec<u8> {
     use p384::ecdsa::signature::hazmat::PrehashSigner;
     use sha2::{Digest, Sha384};
 
@@ -117,10 +107,7 @@ pub fn encode_p384_cert(
     let spki = tlv(0x30, &spki_body);
 
     let serial = tlv(0x02, &[0x01]);
-    let sigalg = tlv(
-        0x30,
-        &tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03]),
-    );
+    let sigalg = tlv(0x30, &tlv(0x06, &[0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03]));
     let issuer_name = tlv(0x30, &[]);
     let mut validity_body = Vec::new();
     validity_body.extend(tlv(0x17, b"250101000000Z"));

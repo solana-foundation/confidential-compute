@@ -6,10 +6,7 @@ type Events = Vec<Vec<Vec<u8>>>;
 struct Logs(Arc<Mutex<Events>>);
 impl SyscallStubs for Logs {
     fn sol_log_data(&self, fields: &[&[u8]]) {
-        self.0
-            .lock()
-            .unwrap()
-            .push(fields.iter().map(|x| x.to_vec()).collect());
+        self.0.lock().unwrap().push(fields.iter().map(|x| x.to_vec()).collect());
     }
 }
 struct Guard(Option<Box<dyn SyscallStubs>>);
@@ -65,21 +62,12 @@ fn backend_policy_configuration_is_governed_bounded_and_source_specific() {
             AccountInfo::new(&policy, false, true, c, &mut pd, &pid, false),
             AccountInfo::new(&system, false, false, d, &mut sd, &system, true),
         ];
-        let call = [
-            accounts[0].clone(),
-            accounts[1].clone(),
-            accounts[2].clone(),
-            accounts[0].clone(),
-            accounts[3].clone(),
-        ];
+        let call =
+            [accounts[0].clone(), accounts[1].clone(), accounts[2].clone(), accounts[0].clone(), accounts[3].clone()];
         let mut ix = SET_BACKEND_POLICY_DISCRIMINATOR.to_vec();
-        SetBackendPolicyArgs {
-            source,
-            measurement_count: count,
-            measurements: [[7; 48]; 8],
-        }
-        .serialize(&mut ix)
-        .unwrap();
+        SetBackendPolicyArgs { source, measurement_count: count, measurements: [[7; 48]; 8] }
+            .serialize(&mut ix)
+            .unwrap();
         logs.lock().unwrap().clear();
         let before = solana_program::hash::hashv(&[&call[2].try_borrow_data().unwrap()]);
         assert_eq!(Processor::process(&pid, &call, &ix).is_ok(), success);

@@ -45,10 +45,7 @@ fn registry(program_id: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[b"policy_registry"], program_id).0
 }
 fn authority_accounts(program_id: &Pubkey, authority: &Pubkey) -> Vec<AccountMeta> {
-    vec![
-        AccountMeta::new_readonly(*authority, true),
-        AccountMeta::new(registry(program_id), false),
-    ]
+    vec![AccountMeta::new_readonly(*authority, true), AccountMeta::new(registry(program_id), false)]
 }
 
 /// Updates monotonic AMD TCB floors and legacy measurements, not backend policy.
@@ -67,27 +64,15 @@ pub fn build_update_policy_ix(
     for i in 0..8 {
         data.extend_from_slice(policy.measurements.get(i).unwrap_or(&[0; 48]));
     }
-    Ok(Instruction {
-        program_id: *program_id,
-        accounts: authority_accounts(program_id, authority),
-        data,
-    })
+    Ok(Instruction { program_id: *program_id, accounts: authority_accounts(program_id, authority), data })
 }
 
 /// Legacy wire builder. The pinned-Milan verifier rejects mutable root rotation
 /// after #172; constructing this instruction does not make that operation supported.
-pub fn build_rotate_root_cert_ix(
-    program_id: &Pubkey,
-    authority: &Pubkey,
-    new_ark_pubkey_xy: &[u8; 96],
-) -> Instruction {
+pub fn build_rotate_root_cert_ix(program_id: &Pubkey, authority: &Pubkey, new_ark_pubkey_xy: &[u8; 96]) -> Instruction {
     let mut data = ROTATE_ROOT_CERT_DISCRIMINATOR.to_vec();
     data.extend_from_slice(new_ark_pubkey_xy);
-    Instruction {
-        program_id: *program_id,
-        accounts: authority_accounts(program_id, authority),
-        data,
-    }
+    Instruction { program_id: *program_id, accounts: authority_accounts(program_id, authority), data }
 }
 
 pub fn derive_jwks_pda(program_id: &Pubkey, kid_hash: &[u8; 32]) -> Pubkey {
@@ -109,47 +94,26 @@ pub fn build_register_jwks_key_ix(
         return Err(GovernanceError::InvalidRsaKey);
     }
     let mut accounts = authority_accounts(program_id, authority);
-    accounts.push(AccountMeta::new(
-        derive_jwks_pda(program_id, &hash(kid).to_bytes()),
-        false,
-    ));
+    accounts.push(AccountMeta::new(derive_jwks_pda(program_id, &hash(kid).to_bytes()), false));
     // Registry is read-only for key registration.
     accounts[1].is_writable = false;
     accounts.push(AccountMeta::new(*payer, true));
-    accounts.push(AccountMeta::new_readonly(
-        solana_sdk_ids::system_program::ID,
-        false,
-    ));
+    accounts.push(AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false));
     let mut data = REGISTER_JWKS_KEY_DISCRIMINATOR.to_vec();
     data.extend_from_slice(&(kid.len() as u32).to_le_bytes());
     data.extend_from_slice(kid);
     data.extend_from_slice(modulus);
     data.extend_from_slice(&exponent.to_le_bytes());
-    Ok(Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    })
+    Ok(Instruction { program_id: *program_id, accounts, data })
 }
 
-pub fn build_revoke_jwks_key_ix(
-    program_id: &Pubkey,
-    authority: &Pubkey,
-    kid_hash: [u8; 32],
-) -> Instruction {
+pub fn build_revoke_jwks_key_ix(program_id: &Pubkey, authority: &Pubkey, kid_hash: [u8; 32]) -> Instruction {
     let mut accounts = authority_accounts(program_id, authority);
     accounts[1].is_writable = false;
-    accounts.push(AccountMeta::new(
-        derive_jwks_pda(program_id, &kid_hash),
-        false,
-    ));
+    accounts.push(AccountMeta::new(derive_jwks_pda(program_id, &kid_hash), false));
     let mut data = REVOKE_JWKS_KEY_DISCRIMINATOR.to_vec();
     data.extend_from_slice(&kid_hash);
-    Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    }
+    Instruction { program_id: *program_id, accounts, data }
 }
 
 /// Both the current and receiving authority must sign the resulting transaction.
@@ -163,29 +127,18 @@ pub fn build_rotate_authority_ix(
     }
     let mut accounts = authority_accounts(program_id, authority);
     accounts.push(AccountMeta::new_readonly(*receiving_authority, true));
-    Ok(Instruction {
-        program_id: *program_id,
-        accounts,
-        data: ROTATE_AUTHORITY_DISCRIMINATOR.to_vec(),
-    })
+    Ok(Instruction { program_id: *program_id, accounts, data: ROTATE_AUTHORITY_DISCRIMINATOR.to_vec() })
 }
 
 /// Discriminator for the additive governance revocation operation (#171).
 pub const REVOKE_ATTESTED_SIGNER_DISCRIMINATOR: [u8; 8] = [174, 9, 66, 138, 2, 191, 81, 61];
 /// Canonical CPI signer namespace; migrates with enrollment.
-pub fn build_revoke_attested_signer_ix(
-    program_id: &Pubkey,
-    authority: &Pubkey,
-    signer: &Pubkey,
-) -> Instruction {
+pub fn build_revoke_attested_signer_ix(program_id: &Pubkey, authority: &Pubkey, signer: &Pubkey) -> Instruction {
     let mut accounts = authority_accounts(program_id, authority);
     accounts[1].is_writable = false;
     accounts.push(AccountMeta::new(
         Pubkey::find_program_address(
-            &[
-                solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED,
-                signer.as_ref(),
-            ],
+            &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, signer.as_ref()],
             program_id,
         )
         .0,
@@ -193,11 +146,7 @@ pub fn build_revoke_attested_signer_ix(
     ));
     let mut data = REVOKE_ATTESTED_SIGNER_DISCRIMINATOR.to_vec();
     data.extend_from_slice(signer.as_ref());
-    Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    }
+    Instruction { program_id: *program_id, accounts, data }
 }
 
 /// Discriminator for governed V2 VCEK cache revocation (#176).
@@ -213,24 +162,14 @@ pub fn build_revoke_vcek_ix(
 ) -> Instruction {
     let mut accounts = authority_accounts(program_id, authority);
     accounts[1].is_writable = false;
-    accounts.push(AccountMeta::new(
-        crate::builder::derive_vcek_pda(program_id, chip_id_hash, tcb_version),
-        false,
-    ));
+    accounts.push(AccountMeta::new(crate::builder::derive_vcek_pda(program_id, chip_id_hash, tcb_version), false));
     accounts.extend([
-        AccountMeta::new(
-            crate::derive_amd_revocation_pda(program_id, chip_id_hash).0,
-            false,
-        ),
+        AccountMeta::new(crate::derive_amd_revocation_pda(program_id, chip_id_hash).0, false),
         AccountMeta::new(*payer, true),
         AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
     ]);
     let mut data = REVOKE_VCEK_DISCRIMINATOR.to_vec();
     data.extend_from_slice(chip_id_hash);
     data.extend_from_slice(&tcb_version.to_le_bytes());
-    Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    }
+    Instruction { program_id: *program_id, accounts, data }
 }

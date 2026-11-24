@@ -2,13 +2,13 @@
 //! Consume runs the existing on-chain handler; its trust, identity and replay checks apply.
 use super::Processor;
 use crate::payload::{
-    REGISTER_VCEK_DISCRIMINATOR, VERIFY_AND_REGISTER_DISCRIMINATOR,
-    VERIFY_NITRO_ATTESTATION_DISCRIMINATOR, VERIFY_NITRO_MODE_A,
+    REGISTER_VCEK_DISCRIMINATOR, VERIFY_AND_REGISTER_DISCRIMINATOR, VERIFY_NITRO_ATTESTATION_DISCRIMINATOR,
+    VERIFY_NITRO_MODE_A,
 };
 use solana_confidential_compute_core::SignatureVerifier;
 use solana_program::{
-    account_info::AccountInfo, clock::Clock, entrypoint::ProgramResult, hash::hash,
-    program_error::ProgramError, pubkey::Pubkey, sysvar::Sysvar,
+    account_info::AccountInfo, clock::Clock, entrypoint::ProgramResult, hash::hash, program_error::ProgramError,
+    pubkey::Pubkey, sysvar::Sysvar,
 };
 
 pub const BEGIN: [u8; 8] = *b"stagebeg";
@@ -25,9 +25,7 @@ const MAGIC: &[u8; 8] = b"TETSTG01";
 const SEED: &[u8] = b"attestation_stage";
 
 pub fn is_transport(tag: &[u8]) -> bool {
-    [BEGIN, UPLOAD, SEAL, CONSUME, CLOSE]
-        .iter()
-        .any(|t| tag == t)
+    [BEGIN, UPLOAD, SEAL, CONSUME, CLOSE].iter().any(|t| tag == t)
 }
 
 fn invalid() -> ProgramError {
@@ -68,16 +66,11 @@ impl Processor {
             let length = u32_at(rest, 32);
             let expiry = u64::from_le_bytes(rest[36..44].try_into().unwrap());
             let now = Clock::get()?.slot;
-            if !(8..=MAX_PAYLOAD).contains(&length)
-                || expiry <= now
-                || expiry - now > MAX_LIFETIME_SLOTS
-            {
+            if !(8..=MAX_PAYLOAD).contains(&length) || expiry <= now || expiry - now > MAX_LIFETIME_SLOTS {
                 return Err(invalid());
             }
-            let (expected, bump) = Pubkey::find_program_address(
-                &[SEED, authority.key.as_ref(), &rest[..32]],
-                program_id,
-            );
+            let (expected, bump) =
+                Pubkey::find_program_address(&[SEED, authority.key.as_ref(), &rest[..32]], program_id);
             if stage.key != &expected {
                 return Err(ProgramError::InvalidSeeds);
             }
@@ -108,10 +101,7 @@ impl Processor {
         if data.len() < HEADER || &data[..8] != MAGIC || &data[8..40] != authority.key.as_ref() {
             return Err(ProgramError::InvalidAccountData);
         }
-        let (expected, _) = Pubkey::find_program_address(
-            &[SEED, authority.key.as_ref(), &data[40..72]],
-            program_id,
-        );
+        let (expected, _) = Pubkey::find_program_address(&[SEED, authority.key.as_ref(), &data[40..72]], program_id);
         if stage.key != &expected {
             return Err(ProgramError::InvalidSeeds);
         }
@@ -125,10 +115,7 @@ impl Processor {
                 return Err(invalid());
             }
             // Owner may cancel any stage. Refund only its authenticated authority.
-            let balance = authority
-                .lamports()
-                .checked_add(stage.lamports())
-                .ok_or(ProgramError::ArithmeticOverflow)?;
+            let balance = authority.lamports().checked_add(stage.lamports()).ok_or(ProgramError::ArithmeticOverflow)?;
             **authority.try_borrow_mut_lamports()? = balance;
             **stage.try_borrow_mut_lamports()? = 0;
             data.fill(0);
@@ -170,9 +157,7 @@ impl Processor {
         }
         // Stage cannot alias any handler account. The handler payer must be this
         // authority (so uploads confer no signing authority on another payer).
-        if remaining.first().map(|a| a.key) != Some(authority.key)
-            || remaining.iter().any(|a| a.key == stage.key)
-        {
+        if remaining.first().map(|a| a.key) != Some(authority.key) || remaining.iter().any(|a| a.key == stage.key) {
             return Err(invalid());
         }
         if !allowed(&data[HEADER..]) {
@@ -182,21 +167,11 @@ impl Processor {
         if data[HEADER..].starts_with(&REGISTER_VCEK_DISCRIMINATOR) {
             Self::process_register_vcek(program_id, remaining, &data[HEADER + 8..])?;
         } else if data[HEADER..].starts_with(&VERIFY_AND_REGISTER_DISCRIMINATOR) {
-            Self::process_verify_and_register(
-                verifier,
-                program_id,
-                remaining,
-                &data[HEADER + 8..],
-            )?;
+            Self::process_verify_and_register(verifier, program_id, remaining, &data[HEADER + 8..])?;
         } else {
             // No staged atomic consumer adapter exists. `allowed` rejects Mode B
             // both at seal and consume; never downgrade to Mode A.
-            Self::process_verify_nitro_attestation(
-                verifier,
-                program_id,
-                remaining,
-                &data[HEADER + 8..],
-            )?;
+            Self::process_verify_nitro_attestation(verifier, program_id, remaining, &data[HEADER + 8..])?;
         }
         data[88] = 2;
         Ok(())

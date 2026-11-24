@@ -71,14 +71,7 @@ fn profile(der: &[u8]) -> Result<Profile<'_>, CryptoError> {
     if !explicit.is_empty() || !tbs.is_empty() {
         return Err(bad());
     }
-    let mut p = Profile {
-        issuer,
-        subject,
-        ca: false,
-        bc_critical: false,
-        usage: None,
-        path_len: None,
-    };
+    let mut p = Profile { issuer, subject, ca: false, bc_critical: false, usage: None, path_len: None };
     let mut seen = [&[][..]; 32];
     let mut count = 0;
     while !extensions.is_empty() {
@@ -128,10 +121,8 @@ fn profile(der: &[u8]) -> Result<Profile<'_>, CryptoError> {
                         }
                         let mut length = 0u32;
                         for b in n {
-                            length = length
-                                .checked_mul(256)
-                                .and_then(|x| x.checked_add(u32::from(*b)))
-                                .ok_or_else(bad)?;
+                            length =
+                                length.checked_mul(256).and_then(|x| x.checked_add(u32::from(*b))).ok_or_else(bad)?;
                         }
                         p.path_len = Some(length);
                     }
@@ -152,14 +143,7 @@ fn profile(der: &[u8]) -> Result<Profile<'_>, CryptoError> {
                 {
                     return Err(bad());
                 }
-                p.usage = Some(
-                    u16::from(bits[1])
-                        | if bits.len() == 3 {
-                            u16::from(bits[2]) << 8
-                        } else {
-                            0
-                        },
-                );
+                p.usage = Some(u16::from(bits[1]) | if bits.len() == 3 { u16::from(bits[2]) << 8 } else { 0 });
             }
             // These constraints need processing even if noncritical. They are
             // absent from the authentic supported AWS fixture; reject rather than ignore.
@@ -176,8 +160,7 @@ fn profile(der: &[u8]) -> Result<Profile<'_>, CryptoError> {
 /// encoded names are outside this bounded profile. No CRL/network lookup occurs.
 /// Root key pinning, signatures and trusted-time validity are separate mandatory checks.
 pub fn validate_nitro_path_constraints(cabundle: &[&[u8]], leaf: &[u8]) -> Result<(), CryptoError> {
-    if cabundle.is_empty() || cabundle.len() > solana_confidential_compute_core::MAX_NITRO_CABUNDLE
-    {
+    if cabundle.is_empty() || cabundle.len() > solana_confidential_compute_core::MAX_NITRO_CABUNDLE {
         return Err(bad());
     }
     let mut parent: Option<Profile<'_>> = None;
@@ -208,10 +191,7 @@ pub fn validate_nitro_path_constraints(cabundle: &[&[u8]], leaf: &[u8]) -> Resul
     let leaf = profile(leaf)?;
     if leaf.issuer != parent.ok_or_else(bad)?.subject
         || leaf.ca
-        || leaf
-            .usage
-            .map(|u| u & 0x80 == 0 || u & 4 != 0)
-            .unwrap_or(false)
+        || leaf.usage.map(|u| u & 0x80 == 0 || u & 4 != 0).unwrap_or(false)
     {
         return Err(bad());
     }

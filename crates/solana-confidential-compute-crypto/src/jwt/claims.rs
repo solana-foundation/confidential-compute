@@ -171,14 +171,8 @@ impl<'a> GoogleClaims<'a> {
             return Err(CryptoError::MalformedJwt);
         }
         let mut raw = [0u8; 64];
-        decode_mode_a_nonce(
-            self.eat_nonce_at(0).ok_or(CryptoError::MalformedJwt)?,
-            &mut raw[..32],
-        )?;
-        decode_mode_a_nonce(
-            self.eat_nonce_at(1).ok_or(CryptoError::MalformedJwt)?,
-            &mut raw[32..],
-        )?;
+        decode_mode_a_nonce(self.eat_nonce_at(0).ok_or(CryptoError::MalformedJwt)?, &mut raw[..32])?;
+        decode_mode_a_nonce(self.eat_nonce_at(1).ok_or(CryptoError::MalformedJwt)?, &mut raw[32..])?;
         Ok(raw)
     }
 
@@ -192,10 +186,7 @@ impl<'a> GoogleClaims<'a> {
             return Err(CryptoError::MalformedJwt);
         }
         let mut raw = [0u8; 32];
-        decode_mode_a_nonce(
-            self.eat_nonce_at(0).ok_or(CryptoError::MalformedJwt)?,
-            &mut raw,
-        )?;
+        decode_mode_a_nonce(self.eat_nonce_at(0).ok_or(CryptoError::MalformedJwt)?, &mut raw)?;
         Ok(raw)
     }
 
@@ -263,9 +254,7 @@ pub fn parse_header_kid_b64(header_b64: &[u8]) -> Result<[u8; MAX_KID], CryptoEr
     Ok(parse_header_kid_with_len(header_b64)?.0)
 }
 
-pub(crate) fn parse_header_kid_with_len(
-    header_b64: &[u8],
-) -> Result<([u8; MAX_KID], u8), CryptoError> {
+pub(crate) fn parse_header_kid_with_len(header_b64: &[u8]) -> Result<([u8; MAX_KID], u8), CryptoError> {
     let mut claims = GoogleClaims::empty(header_b64);
     parse_json(B64Src(B64Decoder::new(header_b64)), &mut claims)?;
     if claims.seen & SEEN_KID == 0 || claims.kid_len == 0 {
@@ -276,10 +265,7 @@ pub(crate) fn parse_header_kid_with_len(
 
 /// Enforce Confidential Space policy and optional wall-clock freshness.
 /// @spec SCC-JWT-002
-pub fn enforce_google_policy(
-    claims: &GoogleClaims<'_>,
-    now_unix: Option<u64>,
-) -> Result<(), CryptoError> {
+pub fn enforce_google_policy(claims: &GoogleClaims<'_>, now_unix: Option<u64>) -> Result<(), CryptoError> {
     if claims.iss() != REQUIRED_ISS {
         return Err(CryptoError::PolicyViolation);
     }
@@ -603,11 +589,7 @@ fn parse_key<R: Pull>(r: &mut Reader<R>) -> Result<u16, CryptoError> {
     })
 }
 
-fn capture_string<R: Pull>(
-    r: &mut Reader<R>,
-    out: &mut GoogleClaims<'_>,
-    key_id: u16,
-) -> Result<(), CryptoError> {
+fn capture_string<R: Pull>(r: &mut Reader<R>, out: &mut GoogleClaims<'_>, key_id: u16) -> Result<(), CryptoError> {
     match key_id {
         SEEN_ISS => {
             out.mark(SEEN_ISS)?;
@@ -785,10 +767,7 @@ fn decode_mode_a_nonce(encoded: &[u8], out: &mut [u8]) -> Result<(), CryptoError
 
 /// `eat_nonce` array of exactly two strings. Any other array shape fails closed.
 /// @spec SCC-JWT-005
-fn parse_eat_nonce_array<R: Pull>(
-    r: &mut Reader<R>,
-    out: &mut GoogleClaims<'_>,
-) -> Result<(), CryptoError> {
+fn parse_eat_nonce_array<R: Pull>(r: &mut Reader<R>, out: &mut GoogleClaims<'_>) -> Result<(), CryptoError> {
     out.mark(SEEN_EAT_NONCE)?;
     for index in 0..MAX_EAT_NONCE_VALUES {
         skip_ws(r)?;
@@ -815,10 +794,7 @@ fn parse_eat_nonce_array<R: Pull>(
 
 /// One-element array of `sha256:<hex>` strings. Every other array shape fails closed.
 /// @spec SCC-JWT-005
-fn parse_image_digest_array<R: Pull>(
-    r: &mut Reader<R>,
-    out: &mut GoogleClaims<'_>,
-) -> Result<(), CryptoError> {
+fn parse_image_digest_array<R: Pull>(r: &mut Reader<R>, out: &mut GoogleClaims<'_>) -> Result<(), CryptoError> {
     out.mark(SEEN_IMAGE_DIGEST)?;
     skip_ws(r)?;
     if r.read_req()? != b'"' {

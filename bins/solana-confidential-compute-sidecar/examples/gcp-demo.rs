@@ -7,8 +7,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
 use solana_confidential_compute_core::SnpReportView;
 use solana_confidential_compute_sidecar::{
-    attestation::sev_snp::SevSnpProvider, AttestationProvider, AttestationReport,
-    EphemeralKeyManager, OnchainAttestor,
+    attestation::sev_snp::SevSnpProvider, AttestationProvider, AttestationReport, EphemeralKeyManager, OnchainAttestor,
 };
 use solana_sdk::{
     hash::{hash, Hash},
@@ -26,8 +25,7 @@ use std::{
 };
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-const ASK: &[u8] =
-    include_bytes!("../../../crates/solana-confidential-compute-crypto/tests/data/milan_ask.der");
+const ASK: &[u8] = include_bytes!("../../../crates/solana-confidential-compute-crypto/tests/data/milan_ask.der");
 const ACTION_DISCRIMINATOR: &[u8] = b"gcp-demo";
 const ACTION_DATA: &[u8] = b"manual packet-limit demonstration";
 
@@ -117,8 +115,8 @@ fn vcek_key(der: &[u8]) -> Result<[u8; 96]> {
     let spki = openssl(&["pkey", "-pubin", "-outform", "DER"], &pem)?;
     // Canonical DER: id-ecPublicKey + secp384r1 + BIT STRING uncompressed point.
     const PREFIX: &[u8] = &[
-        0x30, 0x76, 0x30, 0x10, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x05,
-        0x2b, 0x81, 0x04, 0x00, 0x22, 0x03, 0x62, 0x00, 0x04,
+        0x30, 0x76, 0x30, 0x10, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x05, 0x2b, 0x81, 0x04,
+        0x00, 0x22, 0x03, 0x62, 0x00, 0x04,
     ];
     if spki.len() != PREFIX.len() + 96 || !spki.starts_with(PREFIX) {
         return Err("OpenSSL VCEK output is not a canonical uncompressed P-384 SPKI".into());
@@ -134,45 +132,26 @@ fn openssl(args: &[&str], input: &[u8]) -> Result<Vec<u8>> {
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("openssl is required for public certificate parsing: {e}"))?;
-    child
-        .stdin
-        .take()
-        .ok_or("openssl stdin unavailable")?
-        .write_all(input)?;
+    child.stdin.take().ok_or("openssl stdin unavailable")?.write_all(input)?;
     let output = child.wait_with_output()?;
     if !output.status.success() {
-        return Err(format!(
-            "openssl public certificate parsing failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )
-        .into());
+        return Err(
+            format!("openssl public certificate parsing failed: {}", String::from_utf8_lossy(&output.stderr)).into()
+        );
     }
     Ok(output.stdout)
 }
 
-fn verify_report(
-    report: &[u8],
-    vcek: &[u8],
-    pubkey: &Pubkey,
-    nonce: &[u8; 32],
-    at: u64,
-) -> Result<u64> {
+fn verify_report(report: &[u8], vcek: &[u8], pubkey: &Pubkey, nonce: &[u8; 32], at: u64) -> Result<u64> {
     let view = SnpReportView::try_from_slice(report)?;
     view.validate_security_invariants()?;
     if view.key_sel() != 0 || view.is_vlek() {
-        return Err(
-            "only Milan VCEK reports are supported; VLEK/masked-chip reports are unsupported"
-                .into(),
-        );
+        return Err("only Milan VCEK reports are supported; VLEK/masked-chip reports are unsupported".into());
     }
     let xy = vcek_key(vcek)?;
-    let deadline =
-        solana_confidential_compute_crypto::validate_vcek_chain_at(&[0; 96], ASK, vcek, &xy, at)?;
+    let deadline = solana_confidential_compute_crypto::validate_vcek_chain_at(&[0; 96], ASK, vcek, &xy, at)?;
     let identity = solana_confidential_compute_crypto::parse_vcek_identity(vcek)?;
-    if identity.subject_is_vlek
-        || identity.chip_id != *view.chip_id()
-        || identity.tcb_version != view.reported_tcb()
-    {
+    if identity.subject_is_vlek || identity.chip_id != *view.chip_id() || identity.tcb_version != view.reported_tcb() {
         return Err("VCEK chip/TCB identity does not match report".into());
     }
     if view.pubkey() != pubkey.to_bytes() || view.nonce() != *nonce {
@@ -181,11 +160,7 @@ fn verify_report(
     let mut rs = [0; 96];
     rs[..48].copy_from_slice(&view.signature_r_be()?);
     rs[48..].copy_from_slice(&view.signature_s_be()?);
-    if !solana_confidential_compute_crypto::verify_snp_report_signature(
-        &xy,
-        view.signed_body(),
-        &rs,
-    )? {
+    if !solana_confidential_compute_crypto::verify_snp_report_signature(&xy, view.signed_body(), &rs)? {
         return Err("SNP report signature verification failed".into());
     }
     Ok(deadline)
@@ -193,9 +168,7 @@ fn verify_report(
 
 fn kds_url(view: &SnpReportView<'_>) -> Result<String> {
     if view.key_sel() != 0 || view.is_vlek() {
-        return Err(
-            "AMD Milan KDS requires a nonzero VCEK chip identity; VLEK is unsupported".into(),
-        );
+        return Err("AMD Milan KDS requires a nonzero VCEK chip identity; VLEK is unsupported".into());
     }
     let t = view.reported_tcb_components();
     Ok(format!(
@@ -209,16 +182,12 @@ fn kds_url(view: &SnpReportView<'_>) -> Result<String> {
 }
 
 async fn genuine_report(pubkey: &Pubkey, nonce: &[u8; 32]) -> Result<(Vec<u8>, Vec<u8>, u64)> {
-    let AttestationReport::SevSnp { report, .. } = SevSnpProvider::default()
-        .request_attestation(pubkey, nonce)
-        .await?
+    let AttestationReport::SevSnp { report, .. } = SevSnpProvider::default().request_attestation(pubkey, nonce).await?
     else {
         return Err("SNP provider returned a non-SNP report".into());
     };
     let url = kds_url(&SnpReportView::try_from_slice(&report)?)?;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()?;
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(60)).build()?;
     let response = client.get(url).send().await?.error_for_status()?;
     // Endorsement certificates are small; never accept an unbounded KDS body.
     let mut response = response;
@@ -258,10 +227,7 @@ fn verify_artifacts(path: &Path) -> Result<()> {
 
 fn verify_artifacts_at(path: &Path, at: u64) -> Result<()> {
     let manifest: Manifest = serde_json::from_slice(&fs::read(path.join("manifest.json"))?)?;
-    if manifest.schema_version != 1
-        || manifest.report_file != "report.bin"
-        || manifest.vcek_file != "vcek.der"
-    {
+    if manifest.schema_version != 1 || manifest.report_file != "report.bin" || manifest.vcek_file != "vcek.der" {
         return Err("unsupported artifact manifest schema/filenames".into());
     }
     let report = fs::read(path.join("report.bin"))?;
@@ -275,13 +241,7 @@ fn verify_artifacts_at(path: &Path, at: u64) -> Result<()> {
     {
         return Err("artifact manifest does not match report/certificate bytes".into());
     }
-    let deadline = verify_report(
-        &report,
-        &vcek,
-        &manifest.public_key.parse()?,
-        &manifest.nonce,
-        at,
-    )?;
+    let deadline = verify_report(&report, &vcek, &manifest.public_key.parse()?, &manifest.nonce, at)?;
     if manifest.certificate_valid_until_unix != deadline {
         return Err("manifest certificate deadline mismatch".into());
     }
@@ -294,54 +254,31 @@ fn verify_artifacts_at(path: &Path, at: u64) -> Result<()> {
 
 fn payer(path: Option<&Path>, submit: bool) -> Result<Keypair> {
     match path {
-        Some(path) => read_keypair_file(path)
-            .map_err(|e| format!("failed to read payer {}: {e}", path.display()).into()),
-        None if submit => {
-            Err("--submit requires --payer PATH to an explicitly funded payer".into())
+        Some(path) => {
+            read_keypair_file(path).map_err(|e| format!("failed to read payer {}: {e}", path.display()).into())
         }
+        None if submit => Err("--submit requires --payer PATH to an explicitly funded payer".into()),
         None => Ok(Keypair::new()),
     }
 }
 
-async fn live_prerequisites(
-    rpc_url: &str,
-    program: &Pubkey,
-    payer: &Pubkey,
-    report: &[u8],
-) -> Result<()> {
+async fn live_prerequisites(rpc_url: &str, program: &Pubkey, payer: &Pubkey, report: &[u8]) -> Result<()> {
     let rpc = RpcClient::new_with_commitment(rpc_url.into(), CommitmentConfig::confirmed());
-    if !rpc
-        .get_account(program)
-        .await
-        .map_err(|e| format!("verifier program missing: {e}"))?
-        .executable
-    {
+    if !rpc.get_account(program).await.map_err(|e| format!("verifier program missing: {e}"))?.executable {
         return Err("--program-id is not an executable verifier".into());
     }
     if rpc.get_balance(payer).await? == 0 {
-        return Err(
-            "live submission requires a funded --payer; no automatic funding is performed".into(),
-        );
+        return Err("live submission requires a funded --payer; no automatic funding is performed".into());
     }
     let client = solana_confidential_compute_sdk::ConfidentialComputeClient::new(*program);
     let view = SnpReportView::try_from_slice(report)?;
     let registry = client.derive_policy_registry_pda().0;
-    let vcek = client
-        .derive_vcek_pda(&hash(view.chip_id()).to_bytes(), view.reported_tcb())
-        .0;
-    for (label, key) in [
-        ("configured verifier policy", registry),
-        ("pre-registered VCEK", vcek),
-    ] {
-        let account = rpc
-            .get_account(&key)
-            .await
-            .map_err(|e| format!("live prerequisite absent: {label} at {key}: {e}"))?;
+    let vcek = client.derive_vcek_pda(&hash(view.chip_id()).to_bytes(), view.reported_tcb()).0;
+    for (label, key) in [("configured verifier policy", registry), ("pre-registered VCEK", vcek)] {
+        let account =
+            rpc.get_account(&key).await.map_err(|e| format!("live prerequisite absent: {label} at {key}: {e}"))?;
         if account.owner != *program || account.data.is_empty() {
-            return Err(format!(
-                "live prerequisite invalid: {label} at {key}; configure it before --submit"
-            )
-            .into());
+            return Err(format!("live prerequisite invalid: {label} at {key}; configure it before --submit").into());
         }
     }
     // Full policy, cache expiry/revocation and measurement checks remain the verifier's job.
@@ -378,21 +315,11 @@ async fn enroll(rpc_url: &str, args: Enrollment) -> Result<()> {
     Ok(())
 }
 
-fn mode_b_packet(
-    program: &Pubkey,
-    consumer: &Pubkey,
-    payer: &Pubkey,
-    report: &[u8],
-    slot: u64,
-) -> Result<()> {
+fn mode_b_packet(program: &Pubkey, consumer: &Pubkey, payer: &Pubkey, report: &[u8], slot: u64) -> Result<()> {
     let view = SnpReportView::try_from_slice(report)?;
-    let action_hash =
-        solana_confidential_compute_sdk::hash_action(ACTION_DISCRIMINATOR, &[], ACTION_DATA);
-    let consumer_ix = Instruction {
-        program_id: *consumer,
-        accounts: vec![],
-        data: [ACTION_DISCRIMINATOR, ACTION_DATA].concat(),
-    };
+    let action_hash = solana_confidential_compute_sdk::hash_action(ACTION_DISCRIMINATOR, &[], ACTION_DATA);
+    let consumer_ix =
+        Instruction { program_id: *consumer, accounts: vec![], data: [ACTION_DISCRIMINATOR, ACTION_DATA].concat() };
     match solana_confidential_compute_sdk::build_atomic_attestation_tx_for_program(program, payer, consumer, action_hash, view.measurement(), report, consumer_ix, Hash::default(), slot) {
         Err(solana_confidential_compute_sdk::SdkError::PacketTooLarge { len }) => Err(format!("BLOCKED: PacketTooLarge: serialized Mode B transaction is {len} bytes (limit 1232). Public SDK refused it; nothing broadcast. This is not a positive end-to-end consumer demonstration.").into()),
         Err(e) => Err(e.into()),
@@ -406,24 +333,16 @@ async fn main() -> Result<()> {
     match cli.command {
         DemoCommand::Verify { artifacts } => verify_artifacts(&artifacts),
         DemoCommand::Capture { out_dir } => {
-            let client = reqwest::Client::builder()
-                .timeout(Duration::from_secs(15))
-                .build()?;
+            let client = reqwest::Client::builder().timeout(Duration::from_secs(15)).build()?;
             let status: serde_json::Value = client
-                .get(format!(
-                    "{}/v1/status",
-                    cli.sidecar_url.trim_end_matches('/')
-                ))
+                .get(format!("{}/v1/status", cli.sidecar_url.trim_end_matches('/')))
                 .send()
                 .await?
                 .error_for_status()?
                 .json()
                 .await?;
-            let public_key: Pubkey = status
-                .get("public_key")
-                .and_then(|v| v.as_str())
-                .ok_or("sidecar status has no public_key")?
-                .parse()?;
+            let public_key: Pubkey =
+                status.get("public_key").and_then(|v| v.as_str()).ok_or("sidecar status has no public_key")?.parse()?;
             let onchain = OnchainAttestor::new(&cli.rpc_url, None, None, true);
             let (slot, nonce) = onchain.get_recent_slot_challenge().await?;
             let (report, vcek, deadline) = genuine_report(&public_key, &nonce).await?;
@@ -431,44 +350,20 @@ async fn main() -> Result<()> {
             fs::create_dir_all(&out_dir)?;
             fs::write(out_dir.join("report.bin"), report)?;
             fs::write(out_dir.join("vcek.der"), vcek)?;
-            fs::write(
-                out_dir.join("manifest.json"),
-                serde_json::to_vec_pretty(&manifest)?,
-            )?;
-            println!(
-                "Captured and locally verified public artifacts in {}",
-                out_dir.display()
-            );
+            fs::write(out_dir.join("manifest.json"), serde_json::to_vec_pretty(&manifest)?)?;
+            println!("Captured and locally verified public artifacts in {}", out_dir.display());
             Ok(())
         }
         DemoCommand::Enroll(args) | DemoCommand::ModeA(args) => enroll(&cli.rpc_url, args).await,
-        DemoCommand::ModeB {
-            program_id,
-            consumer_program_id,
-            payer: payer_path,
-        } => {
+        DemoCommand::ModeB { program_id, consumer_program_id, payer: payer_path } => {
             let payer = payer(payer_path.as_deref(), false)?;
             let keys = EphemeralKeyManager::new();
             let onchain = OnchainAttestor::new(&cli.rpc_url, Some(program_id), None, true);
             let (slot, slot_hash) = onchain.get_recent_slot_challenge().await?;
-            let action = solana_confidential_compute_sdk::hash_action(
-                ACTION_DISCRIMINATOR,
-                &[],
-                ACTION_DATA,
-            );
-            let nonce = solana_confidential_compute_sdk::compute_commitment(
-                &slot_hash,
-                &action,
-                &consumer_program_id,
-            );
+            let action = solana_confidential_compute_sdk::hash_action(ACTION_DISCRIMINATOR, &[], ACTION_DATA);
+            let nonce = solana_confidential_compute_sdk::compute_commitment(&slot_hash, &action, &consumer_program_id);
             let (report, _, _) = genuine_report(&keys.pubkey(), &nonce).await?;
-            mode_b_packet(
-                &program_id,
-                &consumer_program_id,
-                &payer.pubkey(),
-                &report,
-                slot,
-            )
+            mode_b_packet(&program_id, &consumer_program_id, &payer.pubkey(), &report, slot)
         }
     }
 }
@@ -489,14 +384,7 @@ mod tests {
         let mut tampered = REPORT.to_vec();
         tampered[0x90] ^= 1;
         assert!(verify_report(&tampered, VCEK, &key, &view.nonce(), FIXTURE_TIME).is_err());
-        assert!(verify_report(
-            REPORT,
-            VCEK,
-            &Pubkey::new_unique(),
-            &view.nonce(),
-            FIXTURE_TIME
-        )
-        .is_err());
+        assert!(verify_report(REPORT, VCEK, &Pubkey::new_unique(), &view.nonce(), FIXTURE_TIME).is_err());
         let mut nonce = view.nonce();
         nonce[0] ^= 1;
         assert!(verify_report(REPORT, VCEK, &key, &nonce, FIXTURE_TIME).is_err());
@@ -509,26 +397,15 @@ mod tests {
 
     #[test]
     fn offline_artifacts_accept_fixture_and_reject_modified_files() {
-        let path =
-            std::env::temp_dir().join(format!("solana-cc-gcp-demo-{}", Pubkey::new_unique()));
+        let path = std::env::temp_dir().join(format!("solana-cc-gcp-demo-{}", Pubkey::new_unique()));
         fs::create_dir(&path).unwrap();
         let view = SnpReportView::try_from_slice(REPORT).unwrap();
-        let deadline = verify_report(
-            REPORT,
-            VCEK,
-            &Pubkey::new_from_array(view.pubkey()),
-            &view.nonce(),
-            FIXTURE_TIME,
-        )
-        .unwrap();
+        let deadline =
+            verify_report(REPORT, VCEK, &Pubkey::new_from_array(view.pubkey()), &view.nonce(), FIXTURE_TIME).unwrap();
         let manifest = make_manifest(REPORT, VCEK, 1, deadline).unwrap();
         fs::write(path.join("report.bin"), REPORT).unwrap();
         fs::write(path.join("vcek.der"), VCEK).unwrap();
-        fs::write(
-            path.join("manifest.json"),
-            serde_json::to_vec(&manifest).unwrap(),
-        )
-        .unwrap();
+        fs::write(path.join("manifest.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
         assert!(verify_artifacts_at(&path, FIXTURE_TIME).is_ok());
         let mut tampered = REPORT.to_vec();
         tampered[0x90] ^= 1;
@@ -537,11 +414,7 @@ mod tests {
         fs::write(path.join("report.bin"), REPORT).unwrap();
         let mut bad_manifest = manifest;
         bad_manifest.public_key = Pubkey::new_unique().to_string();
-        fs::write(
-            path.join("manifest.json"),
-            serde_json::to_vec(&bad_manifest).unwrap(),
-        )
-        .unwrap();
+        fs::write(path.join("manifest.json"), serde_json::to_vec(&bad_manifest).unwrap()).unwrap();
         assert!(verify_artifacts_at(&path, FIXTURE_TIME).is_err());
         for filename in ["report.bin", "vcek.der", "manifest.json"] {
             fs::remove_file(path.join(filename)).unwrap();
@@ -559,37 +432,19 @@ mod tests {
 
     #[test]
     fn public_mode_b_builder_blocks_packet() {
-        let err = mode_b_packet(
-            &Pubkey::new_unique(),
-            &Pubkey::new_unique(),
-            &Pubkey::new_unique(),
-            REPORT,
-            1,
-        )
-        .unwrap_err();
+        let err =
+            mode_b_packet(&Pubkey::new_unique(), &Pubkey::new_unique(), &Pubkey::new_unique(), REPORT, 1).unwrap_err();
         assert!(err.to_string().contains("PacketTooLarge"), "{err}");
     }
 
     #[test]
     fn submit_requires_explicit_payer_and_cli_contract() {
-        assert!(Cli::try_parse_from([
-            "demo",
-            "enroll",
-            "--program-id",
-            &Pubkey::new_unique().to_string(),
-            "--submit"
-        ])
-        .is_err());
+        assert!(Cli::try_parse_from(["demo", "enroll", "--program-id", &Pubkey::new_unique().to_string(), "--submit"])
+            .is_err());
         assert!(payer(None, true).is_err());
-        assert!(Cli::try_parse_from([
-            "demo",
-            "capture",
-            "--rpc-url",
-            "http://localhost",
-            "--out-dir",
-            "/tmp/demo"
-        ])
-        .is_ok());
+        assert!(
+            Cli::try_parse_from(["demo", "capture", "--rpc-url", "http://localhost", "--out-dir", "/tmp/demo"]).is_ok()
+        );
         assert!(Cli::try_parse_from(["demo", "verify", "--artifacts", "/tmp/demo"]).is_ok());
     }
 }
