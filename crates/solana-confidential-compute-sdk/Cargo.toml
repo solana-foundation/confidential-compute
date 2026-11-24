@@ -38,7 +38,7 @@ sha2 = { version = "0.10", features = ["oid"] }  # oid: RS256 DigestInfo prefix
 # be re-pointed at a keypair a real runtime can sign with. issue_211 mints its
 # own RS256 token instead.
 rsa = { version = "0.9" }
-rand = { version = "0.8" }
+rand = { version = "0.10" }
 
 [features]
 default = []

@@ -5858,7 +5858,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "p384",
- "rand 0.8.8",
+ "rand 0.10.4",
  "rsa",
  "sha2 0.10.9",
  "solana-address-lookup-table-interface 4.0.0",
