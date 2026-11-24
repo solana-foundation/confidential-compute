@@ -16,12 +16,12 @@ workspace = true
 solana-confidential-compute-core = { workspace = true }
 crypto-bigint = { version = "0.7.10", default-features = false }
 thiserror = { version = "2.0", default-features = false }
-p384 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa"] }
+p384 = { version = "0.14", default-features = false, features = ["arithmetic", "ecdsa"] }
 sha2 = { version = "0.10", default-features = false }
 
 [dev-dependencies]
 hex = "0.4"
-p384 = { version = "0.13", features = ["test-vectors", "alloc", "std"] }
+p384 = { version = "0.14", features = ["test-vectors", "alloc", "std"] }
 ring = "0.17.14"
 
 [features]

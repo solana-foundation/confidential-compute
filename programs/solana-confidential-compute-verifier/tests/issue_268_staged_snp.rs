@@ -79,7 +79,7 @@ async fn full_snp_bank_staging_preserves_real_crypto_consent_and_nonce_one_shot(
     let mut scalar = [0; 48];
     scalar[47] = 33;
     let signing = SigningKey::from_slice(&scalar).unwrap();
-    let encoded = signing.verifying_key().to_encoded_point(false);
+    let encoded = signing.verifying_key().to_sec1_point(false);
     let xy: [u8; 96] = encoded.as_bytes()[1..].try_into().unwrap();
     let chip_id = [0x51; 64];
     let chip_hash = hash(&chip_id).to_bytes();

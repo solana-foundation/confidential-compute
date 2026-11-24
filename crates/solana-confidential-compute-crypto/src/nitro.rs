@@ -576,7 +576,7 @@ mod tests {
         let mut seed = [0u8; 48];
         seed[47] = seed_lsb;
         let signing_key = SigningKey::from_slice(&seed).expect("valid scalar");
-        let encoded = signing_key.verifying_key().to_encoded_point(false);
+        let encoded = signing_key.verifying_key().to_sec1_point(false);
         let mut xy = [0u8; 96];
         xy[..48].copy_from_slice(encoded.x().unwrap().as_slice());
         xy[48..].copy_from_slice(encoded.y().unwrap().as_slice());
@@ -848,8 +848,8 @@ mod tests {
     #[test]
     fn leaf_pubkey_roundtrip_with_verifying_key() {
         let fx = fixture();
-        let encoded = fx.leaf_sk.verifying_key().to_encoded_point(false);
-        let vk = VerifyingKey::from_encoded_point(&encoded).unwrap();
+        let encoded = fx.leaf_sk.verifying_key().to_sec1_point(false);
+        let vk = VerifyingKey::from_sec1_point(&encoded).unwrap();
         let digest = [0x11u8; 48];
         let (sig, _) = fx.leaf_sk.sign_prehash(&digest).unwrap();
         vk.verify_prehash(&digest, &sig).unwrap();

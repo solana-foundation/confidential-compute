@@ -183,7 +183,7 @@ fn sign_report(workload: [u8; 32], nonce: [u8; 32], measurement: [u8; 48]) -> ([
     let mut seed = [0u8; 48];
     seed[47] = 0x21;
     let signing_key = SigningKey::from_slice(&seed).expect("scalar");
-    let encoded = signing_key.verifying_key().to_encoded_point(false);
+    let encoded = signing_key.verifying_key().to_sec1_point(false);
     let mut xy = [0u8; 96];
     xy[..48].copy_from_slice(encoded.x().unwrap());
     xy[48..].copy_from_slice(encoded.y().unwrap());
@@ -265,7 +265,7 @@ async fn boot_mode_b() -> ModeBBoot {
     let mut seed = [0u8; 48];
     seed[47] = 0x21;
     let signing_key = SigningKey::from_slice(&seed).expect("scalar");
-    let encoded = signing_key.verifying_key().to_encoded_point(false);
+    let encoded = signing_key.verifying_key().to_sec1_point(false);
     let mut vcek_xy = [0u8; 96];
     vcek_xy[..48].copy_from_slice(encoded.x().unwrap());
     vcek_xy[48..].copy_from_slice(encoded.y().unwrap());

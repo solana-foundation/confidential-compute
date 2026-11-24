@@ -36,7 +36,7 @@ use rsa::{
     pkcs1v15::SigningKey,
     signature::{SignatureEncoding, Signer as _},
     traits::PublicKeyParts,
-    RsaPrivateKey,
+    PrivateKey,
 };
 use sha2::Sha256;
 use solana_confidential_compute_cpi::AttestationPlatform;
@@ -86,7 +86,7 @@ fn b64url(bytes: &[u8]) -> String {
 
 /// Mints the token the Google Confidential Space issuer would have produced,
 /// with the Mode A binding pointed at a workload key this test can sign for.
-fn mint_jwt(key: &RsaPrivateKey, workload: &Pubkey, slot_hash: &[u8; 32], iat: i64) -> String {
+fn mint_jwt(key: &PrivateKey, workload: &Pubkey, slot_hash: &[u8; 32], iat: i64) -> String {
     let header = br#"{"alg":"RS256","kid":"solana-cc-test","typ":"JWT"}"#;
     let claims = format!(
         concat!(
@@ -136,9 +136,9 @@ async fn issued_session_stops_at_credential_expiry_and_governed_revocation() {
     let mut measurement = [0; 48];
     measurement[..32].fill(0xab);
 
-    let key = RsaPrivateKey::new(&mut rand::thread_rng(), 2048).unwrap();
+    let key = PrivateKey::new(&mut rand::rng(), 2048).unwrap();
     let mut modulus = [0u8; 256];
-    modulus.copy_from_slice(&key.n().to_bytes_be());
+    modulus.copy_from_slice(&key.n_bytes());
 
     let (registry, rb) = Pubkey::find_program_address(&[b"policy_registry"], &pid);
     let kid_hash = solana_confidential_compute_crypto_kid_hash(KID);
