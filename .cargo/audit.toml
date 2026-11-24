@@ -1,0 +1,273 @@
+# cargo-audit configuration, read by `cargo audit` (CI: .github/workflows/security.yml).
+#
+# Policy
+# - Vulnerabilities fail the job (the cargo-audit default). Warnings (unmaintained,
+#   unsound, yanked) are printed but do not fail it. Do not add `deny`,
+#   `informational_warnings` or `severity_threshold` here to change either behavior.
+# - Every ignored advisory has a comment above it: what the advisory is, why it is
+#   accepted today, and which follow-up removes it. Delete the entry when that follow-up
+#   lands. An ignore without a written reason must not be merged.
+# - A yanked crate has no advisory ID, so it cannot be listed here. yoke-derive 0.8.3 is
+#   yanked: it is printed as a warning and does not fail the job. The lockfile refresh
+#   below moves it to 0.8.4.
+# - Last reviewed 2026-11-24 with cargo-audit 0.23.0 against the RustSec advisory-db.
+#
+# Follow-ups named in the entries
+# - PR 3: the Solana 5 crate upgrade.
+# - PR 4: the RustCrypto upgrade (p256/p384 0.14, rand 0.10).
+# - Lockfile refresh: a `cargo update` that only moves crates to patch releases already
+#   allowed by the current version requirements: url 2.5.9, quinn-proto 0.11.19,
+#   quinn-udp 0.5.16, zstd 0.13.6, zstd-safe 7.4.2, zstd-sys 2.2.0, rustix 1.1.6,
+#   yoke-derive 0.8.4 (checked with `cargo update --dry-run`). It is deferred only because
+#   PR 3 and PR 4 own Cargo.lock right now. It is not opened yet: open it after PR 3 merges.
+# - Upstream: no fix this repository can apply; an upstream crate has to move first.
+#
+# "Dev-only" below means `cargo metadata` shows no path from any workspace member to the
+# crate except through dev-dependencies (the solana-program-test test harness, or a
+# test-only crate). Such crates are not compiled into the sidecar, the CLI, or any SBF
+# program.
+
+[advisories]
+ignore = [
+    # ---------------------------------------------------------------------------------
+    # Vulnerabilities (these would fail the job without an entry)
+    # ---------------------------------------------------------------------------------
+
+    # RUSTSEC-2026-0387, crypto-bigint 0.5.5: several operations meant to be constant-time
+    # branch on secret values, a timing side channel for secret integers (patched 0.7.6).
+    # Why accepted: path is p384 0.13.1 -> elliptic-curve 0.13.8 -> crypto-bigint 0.5.5, used
+    # by the crypto crate (verifier program, sidecar) and the CLI. The fix is a semver-major
+    # p384 bump, which is a Cargo.toml change that PR 4 owns. Production code here only
+    # verifies P-384 signatures over public data; `SigningKey` appears in #[cfg(test)]
+    # modules and in the CLI mock attestation generator (a fixed throwaway key).
+    # Removed by: PR 4. p384 0.14.0 needs elliptic-curve ^0.14.1, which needs crypto-bigint
+    # ^0.7.8 (crates.io index).
+    "RUSTSEC-2026-0387",
+
+    # RUSTSEC-2024-0344, curve25519-dalek 3.2.0: timing variability in Scalar29::sub and
+    # Scalar52::sub (patched 4.1.3). Dependabot alert for GHSA-x4gp-pqpj-f43q.
+    # Why accepted: dev-only. Path is solana-program-test -> solana-runtime ->
+    # agave-precompiles -> ed25519-dalek =1.0.1 -> curve25519-dalek 3.2.0. Agave pins
+    # ed25519-dalek exactly, so this repository cannot move it.
+    # Removed by: PR 3 (expected). agave-precompiles 5.0.0-alpha.1 lists
+    # ed25519-dalek =1.0.1 only as a dev-dependency, so it should leave our graph; re-check
+    # when PR 3 merges.
+    "RUSTSEC-2024-0344",
+
+    # RUSTSEC-2022-0093, ed25519-dalek 1.0.1: a signing API that accepts a decoupled
+    # public key can be used as an oracle to extract the private key (patched 2.0).
+    # Dependabot alert for GHSA-w5vr-6qhr-36cc.
+    # Why accepted: dev-only, same path as curve25519-dalek above (agave-precompiles pins
+    # =1.0.1). Nothing in this repository calls ed25519-dalek 1.x.
+    # Removed by: PR 3 (expected), same as RUSTSEC-2024-0344.
+    "RUSTSEC-2022-0093",
+
+    # RUSTSEC-2026-0523, quinn-proto 0.11.18: a MAX_STREAM_DATA frame can open streams
+    # beyond the stream limit, a QUIC denial of service (patched 0.11.19).
+    # Why accepted: not compiled. Cargo.lock lists quinn 0.11.12 and quinn-proto 0.11.18
+    # only as reqwest 0.12's optional dependency, which reqwest's `http3` feature turns on
+    # and this workspace does not enable. `cargo build --all-targets --all-features
+    # --unit-graph` contains neither crate. The QUIC stack that is built is Anza's fork
+    # (anza-quinn-proto, via solana-client); cargo audit does not match it by name, so its
+    # patch status is decided by Agave, not by this entry.
+    # Removed by: lockfile refresh (`cargo update -p quinn-proto` gives 0.11.19).
+    "RUSTSEC-2026-0523",
+
+    # RUSTSEC-2026-0524, quinn-proto 0.11.18: a long Retry token can panic or exhaust memory
+    # in a QUIC client (patched 0.11.19).
+    # Why accepted: not compiled, same reason as RUSTSEC-2026-0523.
+    # Removed by: lockfile refresh (`cargo update -p quinn-proto` gives 0.11.19).
+    "RUSTSEC-2026-0524",
+
+    # RUSTSEC-2026-0538, quinn-udp 0.5.15: the receive loop can spin after a truncated
+    # datagram, a denial of service (patched 0.5.16).
+    # Why accepted: transitive, sidecar -> solana-client -> solana-quic-client -> anza-quinn
+    # -> quinn-udp. The advisory limits the bug to targets that read one datagram per
+    # recvmsg (Apple without fast-apple-datapath, OpenBSD, NetBSD, Solaris, illumos) and says
+    # Linux, Android, FreeBSD and Windows are not affected. The sidecar ships as a Linux
+    # container (bins/solana-confidential-compute-sidecar/Dockerfile).
+    # Removed by: lockfile refresh (`cargo update -p quinn-udp` gives 0.5.16).
+    "RUSTSEC-2026-0538",
+
+    # RUSTSEC-2023-0071, rsa 0.9.10: Marvin attack, a timing side channel in RSA private-key
+    # operations (patched 0.10.0).
+    # Why accepted: dev-only. `rsa` is a dev-dependency of the sdk crate, used by
+    # crates/solana-confidential-compute-sdk/tests/issue_211.rs to mint a throwaway RS256
+    # test token. Production RS256 verification is in-repo code (the crypto crate's
+    # src/jwt/rsa.rs and src/rsa_pss.rs), which does not depend on the `rsa` crate.
+    # Removed by: PR 4, provided it also moves the sdk dev-dependency `rsa` to 0.10 (0.10.0 is
+    # released and needs crypto-bigint ^0.7.11). PR 4 scope must include it.
+    "RUSTSEC-2023-0071",
+
+    # RUSTSEC-2026-0592, url 2.5.8: Url::origin() recurses without limit on nested `blob:`
+    # URLs and overflows the stack, which aborts the process (patched 2.5.9).
+    # Why accepted: transitive, sidecar -> reqwest 0.12 and solana-rpc-client -> url. The
+    # trigger is Url::origin() on an untrusted URL. The sidecar never parses URLs itself,
+    # its Solana RPC URL is operator configuration (onchain.rs), and its GCP OIDC client
+    # disables redirects (attestation/gcp_oidc.rs).
+    # Removed by: lockfile refresh (`cargo update -p url` gives 2.5.9).
+    "RUSTSEC-2026-0592",
+
+    # RUSTSEC-2026-0391, zstd 0.13.3: data from an abandoned stream leaks into the next
+    # stream when a context is reused through `with_context` (patched 0.13.4 and later).
+    # Why accepted: transitive, sidecar -> solana-client -> solana-pubsub-client ->
+    # solana-account-decoder-client-types -> zstd, where it decodes base64+zstd RPC account
+    # data with zstd::stream::read::Decoder. This repository calls no zstd API itself.
+    # Removed by: lockfile refresh (`cargo update -p zstd` gives 0.13.6).
+    "RUSTSEC-2026-0391",
+
+    # RUSTSEC-2026-0403, zstd-safe 7.3.0: uninitialized memory is exposed when streaming
+    # decompression of a legacy frame fails (patched 7.4.0).
+    # Why accepted: transitive through zstd, same path as RUSTSEC-2026-0391. The advisory
+    # says `zstd::stream::read::Decoder`, the entry point used there, is not affected.
+    # Removed by: lockfile refresh (`cargo update -p zstd-safe` gives 7.4.2).
+    "RUSTSEC-2026-0403",
+
+    # RUSTSEC-2026-0398, zstd-safe 7.3.0: Seekable::decompress sets a Vec length beyond its
+    # capacity for offsets past the end (patched 7.4.0). Needs the `seekable` feature.
+    # Why accepted: transitive through zstd, same path as RUSTSEC-2026-0391. This repository
+    # calls no zstd API.
+    # Removed by: lockfile refresh (`cargo update -p zstd-safe` gives 7.4.2).
+    "RUSTSEC-2026-0398",
+
+    # RUSTSEC-2026-0410, zstd-sys 2.1.0: on wasm32 the allocator shim corrupts memory on
+    # allocation failure (patched 2.1.2).
+    # Why accepted: wasm32 only. Transitive through zstd-safe, same path as
+    # RUSTSEC-2026-0391; the sidecar builds for Linux and no Rust target in this repository
+    # builds for wasm32.
+    # Removed by: lockfile refresh (`cargo update -p zstd-sys` gives 2.2.0).
+    "RUSTSEC-2026-0410",
+
+    # ---------------------------------------------------------------------------------
+    # Unmaintained (warnings, listed so each one has a written reason)
+    # ---------------------------------------------------------------------------------
+
+    # RUSTSEC-2025-0141, bincode 1.3.3: the bincode team stopped development permanently and
+    # considers 1.3.3 complete; there is no patched version.
+    # Why accepted: direct dependency of the sidecar, CLI and sdk crates, and of the Solana
+    # crates (solana-system-interface `bincode` feature). bincode 1.x is the Solana wire
+    # format, so it cannot be swapped out in this repository alone. Dependabot already
+    # ignores bincode major bumps (.github/dependabot.yml).
+    # Removed by: nothing scheduled. Re-check at each Solana upgrade (starting with PR 3)
+    # for a move to wincode, which the advisory lists as an alternative.
+    "RUSTSEC-2025-0141",
+
+    # RUSTSEC-2026-0543, chrono 0.4.45: all versions are unmaintained; no patched version.
+    # Why accepted: dev-only. Path is solana-program-test -> chrono-humanize -> chrono.
+    # Removed by: upstream. solana-program-test 5.0.0-alpha.1 still depends on
+    # chrono-humanize ^0.2.3, so PR 3 does not remove it.
+    "RUSTSEC-2026-0543",
+
+    # RUSTSEC-2026-0542, humantime 2.4.0: unmaintained because it wraps chrono; no patched
+    # version.
+    # Why accepted: dev-only. Path is solana-program-test -> solana-banks-client ->
+    # tarpc 0.29 -> humantime.
+    # Removed by: upstream (Agave's tarpc dependency).
+    "RUSTSEC-2026-0542",
+
+    # RUSTSEC-2024-0388, derivative 2.2.0: unmaintained; no patched version.
+    # Why accepted: dev-only. Path is solana-program-test -> solana-runtime ->
+    # solana-syscalls -> solana-poseidon -> ark-bn254 0.4 -> ark-ec 0.4.2 -> derivative.
+    # Removed by: upstream (arkworks 0.4 inside Agave).
+    "RUSTSEC-2024-0388",
+
+    # RUSTSEC-2025-0161, libsecp256k1 0.7.2: unmaintained, k256 is the suggested
+    # replacement; no patched version.
+    # Why accepted: dev-only. Path is solana-program-test -> solana-runtime ->
+    # agave-precompiles -> libsecp256k1.
+    # Removed by: upstream. agave-precompiles 5.0.0-alpha.1 still depends on it, so PR 3 does
+    # not remove it.
+    "RUSTSEC-2025-0161",
+
+    # RUSTSEC-2024-0436, paste 1.0.15: unmaintained and archived; no patched version.
+    # Why accepted: a proc-macro, so it runs at compile time and is not linked into the SBF
+    # binary. Path is verifier program -> solana-bn254 3.2.1 -> ark-ff 0.5.0 -> paste. No
+    # known vulnerability, only the maintenance status.
+    # Removed by: upstream (arkworks or solana-bn254 moving to a maintained fork such as
+    # pastey). Re-check at PR 3.
+    "RUSTSEC-2024-0436",
+
+    # ---------------------------------------------------------------------------------
+    # Unsound (warnings, listed so each one has a written reason)
+    # ---------------------------------------------------------------------------------
+
+    # RUSTSEC-2026-0186, memmap2 0.5.10: advise_range, flush_range and related functions do
+    # not validate offset and len and can pass an out-of-bounds pointer to madvise and msync
+    # (patched 0.9.11).
+    # Why accepted: dev-only. Path is solana-program-test -> solana-genesis-config ->
+    # memmap2 ^0.5.10. A semver-major move that Agave has to make.
+    # Removed by: upstream. solana-genesis-config 5.0.x still requires ^0.5.10, so PR 3
+    # does not remove it.
+    "RUSTSEC-2026-0186",
+
+    # RUSTSEC-2026-0097, rand 0.7.3: unsound only when the `log` and `thread_rng` features
+    # are on, a custom logger calls rand::thread_rng(), and ThreadRng reseeds from inside
+    # that logger. There is no patched 0.7 release. Dependabot alert for GHSA-cq8v-f236-94qc.
+    # Why accepted: dev-only. Path is ed25519-dalek 1.0.1 -> rand 0.7.3, the Agave
+    # precompile pin described under RUSTSEC-2024-0344. The repository's own rand
+    # dependency (an sdk dev-dependency) resolves to 0.8.8, which is patched.
+    # Removed by: PR 3 (expected), when ed25519-dalek 1.0.1 leaves the graph.
+    "RUSTSEC-2026-0097",
+
+    # RUSTSEC-2026-0486, rustix 1.1.5: the xattr functions mark unwritten bytes as
+    # initialized for a zero-length buffer (patched 1.1.6).
+    # Why accepted: transitive, sidecar -> solana-client -> solana-connection-cache ->
+    # solana-metrics -> gethostname -> rustix, which uses it for the hostname, not xattr.
+    # This repository calls no xattr function.
+    # Removed by: lockfile refresh (`cargo update -p rustix` gives 1.1.6).
+    "RUSTSEC-2026-0486",
+
+    # The ten zstd-safe 7.3.0 entries below are unsound APIs, all patched in 7.4.0. Each has
+    # the same path as RUSTSEC-2026-0391 (sidecar -> solana-client -> solana-pubsub-client ->
+    # solana-account-decoder-client-types -> zstd -> zstd-safe). This repository calls no
+    # zstd API; the only caller is that decoder's zstd::stream::read::Decoder. The fix for
+    # every one is the lockfile refresh (`cargo update -p zstd-safe` gives 7.4.2).
+
+    # RUSTSEC-2026-0395, zstd-safe 7.3.0: use-after-free with CParameter::StableInBuffer
+    # (needs the `experimental` feature).
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0395",
+
+    # RUSTSEC-2026-0402, zstd-safe 7.3.0: heap buffer overflow in CCtx::try_clone on a
+    # multithreaded context.
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0402",
+
+    # RUSTSEC-2026-0406, zstd-safe 7.3.0: use-after-free when changing a multithreaded
+    # context that has an unfinished frame.
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0406",
+
+    # RUSTSEC-2026-0404, zstd-safe 7.3.0: double free in DCtx::try_clone.
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0404",
+
+    # RUSTSEC-2026-0400, zstd-safe 7.3.0: use-after-free of a dictionary after a one-shot
+    # call on a context with an open stream.
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0400",
+
+    # RUSTSEC-2026-0399, zstd-safe 7.3.0: use-after-free through init_using_cdict and
+    # init_using_ddict.
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0399",
+
+    # RUSTSEC-2026-0401, zstd-safe 7.3.0: out-of-bounds read in train_from_buffer when
+    # sample sizes overflow.
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0401",
+
+    # RUSTSEC-2026-0405, zstd-safe 7.3.0: out-of-bounds read with an out-of-range
+    # InBuffer::pos.
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0405",
+
+    # RUSTSEC-2026-0397, zstd-safe 7.3.0: OutBuffer::around_pos exposes uninitialized memory.
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0397",
+
+    # RUSTSEC-2026-0396, zstd-safe 7.3.0: Seekable reads a NULL or out-of-bounds seek table
+    # (needs the `seekable` feature).
+    # Why accepted: see the block comment above. Removed by: lockfile refresh.
+    "RUSTSEC-2026-0396",
+]
