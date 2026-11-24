@@ -47,10 +47,8 @@ const ATTESTATION_TTL_SLOTS: u64 = 216_000;
 // A fresh simulated ledger hash per process; every document, fake SlotHashes
 // entry, PDA and replay assertion below shares it. This is not an ECDSA nonce.
 static SLOT_HASH: std::sync::LazyLock<[u8; 32]> = std::sync::LazyLock::new(|| {
-    use p384::elliptic_curve::rand_core::{OsRng, RngCore};
-    let mut hash = [0; 32];
-    OsRng.fill_bytes(&mut hash);
-    hash
+    use p384::elliptic_curve::Generate;
+    <[u8; 32]>::generate()
 });
 const PCR0: [u8; 48] = [0x42; 48];
 const USER_DATA: [u8; 32] = [0x99; 32];
@@ -59,7 +57,7 @@ fn keypair(seed_lsb: u8) -> (SigningKey, [u8; 96]) {
     let mut seed = [0u8; 48];
     seed[47] = seed_lsb;
     let signing_key = SigningKey::from_slice(&seed).expect("valid scalar");
-    let encoded = signing_key.verifying_key().to_encoded_point(false);
+    let encoded = signing_key.verifying_key().to_sec1_point(false);
     let mut xy = [0u8; 96];
     xy[..48].copy_from_slice(encoded.x().unwrap().as_slice());
     xy[48..].copy_from_slice(encoded.y().unwrap().as_slice());

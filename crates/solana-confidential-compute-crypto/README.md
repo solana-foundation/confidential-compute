@@ -68,6 +68,10 @@ The function builds a SEC1 point (`0x04 || X || Y`). It rejects an all-zero key,
  signature r||s (96) ---------------+
 ```
 
+On `target_os = "solana"`, `verify_p384_signature` always returns `CryptoError::InvalidP384Signature`. It does not run the curve code. Every function that calls it also returns an error on that target. These functions are `verify_snp_report_signature`, `verify_cose_sign1`, `validate_nitro_cert_chain`, and `verify_nitro_document`.
+
+The reason is the SBF stack frame limit. The `ecdsa` verify routine needs a 9,216-byte stack frame. The SBF limit is 4,096 bytes. Software P-384 is also not an on-chain backend (`@spec SCC-PERF-001`). The verifier program does not call these functions on SBF. It accepts a P-384 signature only through a preceding sigverify instruction. Host builds are not affected.
+
 ---
 
 ## 3. X.509 DER walker

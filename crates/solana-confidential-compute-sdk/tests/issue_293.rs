@@ -82,7 +82,7 @@ async fn sdk_amd_mode_b_supplies_instructions_sysvar_and_consumes_nonce() {
     let mut scalar = [0; 48];
     scalar[47] = 33;
     let signing = SigningKey::from_slice(&scalar).unwrap();
-    let encoded = signing.verifying_key().to_encoded_point(false);
+    let encoded = signing.verifying_key().to_sec1_point(false);
     let xy: [u8; 96] = encoded.as_bytes()[1..].try_into().unwrap();
     let consumer_ix = Instruction::new_with_bytes(consumer_id, &[], vec![]);
     let action_hash = solana_confidential_compute_core::action::hash_instruction(&consumer_ix);

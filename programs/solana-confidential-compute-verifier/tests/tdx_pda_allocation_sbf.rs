@@ -112,7 +112,7 @@ fn key(seed_byte: u8) -> SigningKey {
 }
 
 fn compressed(key: &SigningKey) -> [u8; 33] {
-    let point = key.verifying_key().to_encoded_point(true);
+    let point = key.verifying_key().to_sec1_point(true);
     let mut out = [0u8; 33];
     out.copy_from_slice(point.as_bytes());
     out
@@ -120,7 +120,7 @@ fn compressed(key: &SigningKey) -> [u8; 33] {
 
 /// Uncompressed `X || Y`, the shape a quote carries an attestation key in.
 fn uncompressed_xy(key: &SigningKey) -> [u8; 64] {
-    let point = key.verifying_key().to_encoded_point(false);
+    let point = key.verifying_key().to_sec1_point(false);
     let mut out = [0u8; 64];
     out.copy_from_slice(&point.as_bytes()[1..]);
     out
@@ -129,7 +129,7 @@ fn uncompressed_xy(key: &SigningKey) -> [u8; 64] {
 /// Low-S normalized `r || s`; the precompile rejects the other form.
 fn sign(key: &SigningKey, message: &[u8]) -> [u8; 64] {
     let signature: p256::ecdsa::Signature = key.sign(message);
-    let normalized = signature.normalize_s().unwrap_or(signature);
+    let normalized = signature.normalize_s();
     let mut out = [0u8; 64];
     out.copy_from_slice(&normalized.to_bytes());
     out

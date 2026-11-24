@@ -43,8 +43,8 @@ solana-confidential-compute-sidecar = { path = "../../bins/solana-confidential-c
 # Decodes the `Program data:` log lines that replace `sol_log_data` stubs on SBF.
 base64 = "0.23"
 borsh = { version = "1.5", features = ["derive"] }
-p256 = { version = "0.13", features = ["ecdsa"] }
-p384 = { version = "0.13", features = ["test-vectors", "alloc", "std"] }
+p256 = { version = "0.14", features = ["ecdsa"] }
+p384 = { version = "0.14", features = ["test-vectors", "alloc", "std"] }
 sha2 = { version = "0.10" }
 solana-program = "4.1"
 solana-program-test = { version = "4.3", features = ["agave-unstable-api"] }

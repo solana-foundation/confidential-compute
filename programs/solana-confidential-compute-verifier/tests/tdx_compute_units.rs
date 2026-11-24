@@ -53,7 +53,7 @@ fn signing_key() -> SigningKey {
 }
 
 fn compressed_verifying_key(key: &SigningKey) -> [u8; 33] {
-    let point = key.verifying_key().to_encoded_point(true);
+    let point = key.verifying_key().to_sec1_point(true);
     let mut out = [0u8; 33];
     out.copy_from_slice(point.as_bytes());
     out
@@ -62,7 +62,7 @@ fn compressed_verifying_key(key: &SigningKey) -> [u8; 33] {
 /// Low-S normalized `r || s`, which is what the precompile requires.
 fn sign_p256(key: &SigningKey, message: &[u8]) -> [u8; 64] {
     let signature: p256::ecdsa::Signature = key.sign(message);
-    let normalized = signature.normalize_s().unwrap_or(signature);
+    let normalized = signature.normalize_s();
     let bytes = normalized.to_bytes();
     let mut out = [0u8; 64];
     out.copy_from_slice(&bytes);

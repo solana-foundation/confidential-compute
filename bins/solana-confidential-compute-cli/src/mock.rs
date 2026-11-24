@@ -27,7 +27,7 @@ pub fn mock_signing_key() -> SigningKey {
 
 /// Returns the 96-byte uncompressed mock VCEK public key (X || Y).
 pub fn mock_vcek_public_key_xy() -> [u8; 96] {
-    let encoded = mock_signing_key().verifying_key().to_encoded_point(false);
+    let encoded = mock_signing_key().verifying_key().to_sec1_point(false);
     let mut xy = [0u8; 96];
     xy[..48].copy_from_slice(encoded.x().expect("uncompressed point has x").as_slice());
     xy[48..].copy_from_slice(encoded.y().expect("uncompressed point has y").as_slice());

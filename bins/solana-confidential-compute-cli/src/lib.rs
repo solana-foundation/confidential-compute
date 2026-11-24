@@ -317,7 +317,7 @@ mod tests {
         let mut seed = [0u8; 48];
         seed[47] = 0x42;
         let signing_key = SigningKey::from_slice(&seed).expect("valid P-384 scalar");
-        let encoded = signing_key.verifying_key().to_encoded_point(false);
+        let encoded = signing_key.verifying_key().to_sec1_point(false);
         let mut xy = [0u8; 96];
         xy[..48].copy_from_slice(encoded.x().expect("x").as_slice());
         xy[48..].copy_from_slice(encoded.y().expect("y").as_slice());

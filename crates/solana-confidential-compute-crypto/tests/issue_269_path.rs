@@ -7,7 +7,7 @@ fn key(n: u8) -> (SigningKey, [u8; 96]) {
     let mut s = [0; 48];
     s[47] = n;
     let k = SigningKey::from_slice(&s).unwrap();
-    let p = k.verifying_key().to_encoded_point(false);
+    let p = k.verifying_key().to_sec1_point(false);
     (k, p.as_bytes()[1..].try_into().unwrap())
 }
 #[test]
