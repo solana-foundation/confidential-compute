@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/*",
+    "programs/*",
+    "bins/*",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/solana-foundation/confidential-compute"
+homepage = "https://github.com/solana-foundation/confidential-compute"
+
+[workspace.dependencies]
+solana-confidential-compute-core = { path = "crates/solana-confidential-compute-core", version = "0.1.0", default-features = false }
+solana-confidential-compute-crypto = { path = "crates/solana-confidential-compute-crypto", version = "0.1.0", default-features = false }
+solana-confidential-compute-cpi = { path = "crates/solana-confidential-compute-cpi", version = "0.1.0" }
+solana-confidential-compute-sdk = { path = "crates/solana-confidential-compute-sdk", version = "0.1.0" }
+
+[profile.release]
+opt-level = 3
+overflow-checks = true
+panic = "abort"

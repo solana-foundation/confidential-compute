@@ -1,0 +1,50 @@
+name: Bug report
+description: Report something that is broken
+body:
+  - type: markdown
+    attributes:
+      value: Do not report security vulnerabilities here. Use the private reporting link on the issue chooser.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What is wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands, inputs, or transactions that trigger the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected and actual behavior
+      description: What you expected to happen, and what happened instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Verifier program
+        - Consumer reference program
+        - Core / crypto crates
+        - CPI / SDK crates
+        - Sidecar
+        - CLI
+        - TypeScript SDK
+        - Docs / docs-site
+        - CI / deploy
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Release version or git commit SHA.
+    validations:
+      required: true

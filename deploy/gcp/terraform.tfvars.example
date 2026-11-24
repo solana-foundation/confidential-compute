@@ -1,0 +1,31 @@
+# Copy to terraform.tfvars; use public configuration only. Never put payer keys,
+# credentials, or RPC API tokens here: Terraform state and VM metadata retain it.
+project = "your-gcp-project"
+
+# Required: replace with a published 40-character commit SHA containing the demo.
+# Branches and tags are deliberately rejected.
+source_ref = "REPLACE_WITH_FULL_40_HEX_COMMIT_SHA"
+
+# Required: the verifier program deployed on your selected cluster.
+verifier_program_id = "REPLACE_WITH_VERIFIER_PROGRAM_PUBLIC_KEY"
+
+region       = "us-central1"
+zone         = "us-central1-c"
+machine_type = "REPLACE_WITH_TESTED_N2D_MACHINE_TYPE"
+boot_image   = "REPLACE_WITH_TESTED_GCE_IMAGE_RESOURCE"
+# Required configuration, not inferred from PR #307. Select one compatible pair:
+# native_snp + SEV_SNP (Ubuntu), or confidential_space + SEV (Confidential Space).
+provider_config = {
+  deployment_mode            = "REPLACE_WITH_SELECTED_PATH"
+  confidential_instance_type = "REPLACE_WITH_COMPATIBLE_SEV_TYPE"
+}
+# For native_snp explicitly set both to "". For Confidential Space, obtain the
+# existing launch-policy-compatible sidecar image and exact digest from its publisher.
+container_image        = "REPLACE_WITH_TESTED_REGISTRY_REPOSITORY_IMAGE"
+container_image_digest = "REPLACE_WITH_TESTED_SHA256_DIGEST"
+rpc_url      = "https://api.devnet.solana.com"
+# For localnet, use a credential-free HTTP(S) address reachable FROM the VM.
+# rpc_url = "http://YOUR_REACHABLE_LOCALNET_HOST:8899"
+# consumer_program_id = "YOUR_CONSUMER_PROGRAM_PUBLIC_KEY"
+boot_disk_size_gb = 100
+boot_disk_type    = "pd-balanced"

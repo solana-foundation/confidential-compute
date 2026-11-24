@@ -1,0 +1,63 @@
+name: SBFv0 Compute Regression
+
+on:
+  pull_request:
+    paths:
+      - 'crates/solana-confidential-compute-core/**'
+      - 'crates/solana-confidential-compute-crypto/**'
+      - 'programs/solana-confidential-compute-verifier/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'bins/solana-confidential-compute-sidecar/**'
+      - 'fixtures/jwt_compute_165.txt'
+      - '.github/workflows/sbf-compute.yml'
+      - '.github/actions/setup/**'
+      - 'justfile'
+      - 'rust-toolchain.toml'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/solana-confidential-compute-core/**'
+      - 'crates/solana-confidential-compute-crypto/**'
+      - 'programs/solana-confidential-compute-verifier/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'bins/solana-confidential-compute-sidecar/**'
+      - 'fixtures/jwt_compute_165.txt'
+      - '.github/workflows/sbf-compute.yml'
+      - '.github/actions/setup/**'
+      - 'justfile'
+      - 'rust-toolchain.toml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sbf-compute-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  compute:
+    name: Actual SBFv0 registration and JWT compute (runtime 2.2)
+    runs-on: ubuntu-latest
+    env:
+      CARGO_BUILD_JOBS: '4'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          sbf: 'true'
+          rust-cache-key: compute-sbfv0-v1.56
+      - name: Build real SBFv0 artifact for the locked 2.2 runtime and meter it with initialization and signature controls
+        run: just compute-regression
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: issue165-sbfv0-compute-evidence
+          path: |
+            target/issue165-v0-build.log
+            target/issue165-v0-meter.log
+            target/deploy-compute-v0/solana_confidential_compute_verifier.so
+          if-no-files-found: error

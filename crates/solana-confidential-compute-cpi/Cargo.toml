@@ -1,0 +1,24 @@
+[package]
+name = "solana-confidential-compute-cpi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "On-chain CPI helpers for Solana Confidential Compute consumer programs."
+keywords = ["solana", "attestation", "cpi"]
+categories = ["cryptography"]
+
+[dependencies]
+solana-program = "4.1"
+solana-confidential-compute-core = { workspace = true }
+solana-confidential-compute-crypto = { workspace = true }
+thiserror = { version = "2.0" }
+bytemuck = { version = "1.21", features = ["derive"] }
+
+[dev-dependencies]
+hex = "0.4"
+
+[features]
+default = []
+test-bpf = []

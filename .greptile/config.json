@@ -1,0 +1,131 @@
+{
+  "ignorePatterns": "fixtures/**",
+  "rules": [
+    {
+      "id": "account-validation",
+      "severity": "high",
+      "scope": ["programs/*/src/**", "crates/solana-confidential-compute-cpi/src/**"],
+      "rule": "Each instruction must examine each account before it reads or writes that account. It must examine:\n- the owner\n- the signer flag\n- the writable flag\n- the PDA address, derived again with create_program_address and the bump\n- the discriminator, before a typed load\nReport a new or changed handler that does not do all of these checks. Also report a new account in a handler that does not get all of these checks.\nSource: SDLC 3.4.1 and the PR template checklist."
+    },
+    {
+      "id": "no-panic-checked-math",
+      "severity": "high",
+      "scope": [
+        "programs/*/src/**",
+        "crates/solana-confidential-compute-core/src/**",
+        "crates/solana-confidential-compute-crypto/src/**",
+        "crates/solana-confidential-compute-cpi/src/**"
+      ],
+      "rule": "Program code must not panic. Outside #[cfg(test)] code, report:\n- unwrap, expect, panic!, unreachable! and todo!\n- a slice or array index that can go out of bounds\n- integer + - * / without a check, when a value comes from input or account data\n- an `as` cast that can truncate a value\nUse checked arithmetic, get() and try_from. Return an error.\nSource: SDLC 3.2.8 and SCC-SEC-008."
+    },
+    {
+      "id": "bounded-parsing",
+      "severity": "high",
+      "scope": [
+        "programs/*/src/**",
+        "crates/solana-confidential-compute-core/src/**",
+        "crates/solana-confidential-compute-crypto/src/**",
+        "crates/solana-confidential-compute-cpi/src/**"
+      ],
+      "rule": "Parsers for reports, CBOR, COSE, DER and JWT must:\n- examine the length before each slice\n- have a limit on recursion and on each loop\n- return Result\nReport a change that increases or removes MAX_CBOR_SKIP_DEPTH, MAX_NITRO_DOCUMENT_LEN or MAX_CERT_DER_LEN. Report a read from an SNP report that is shorter than 1,184 bytes (SnpReportView).\nSource: SCC-SEC-008."
+    },
+    {
+      "id": "signed-bytes-only",
+      "severity": "high",
+      "scope": ["programs/*/src/**", "crates/solana-confidential-compute-core/src/**"],
+      "rule": "Read these values only from the signed report or document bytes:\n- measurement\n- REPORT_DATA\n- chip_id\n- TCB version\n- enclave public keys\nDo not read them from instruction data. Do not read them from a struct that the caller supplies. Report a change that reads one of these values from an unsigned source.\nSource: high-level design, section 4.5."
+    },
+    {
+      "id": "fail-closed",
+      "severity": "high",
+      "scope": [
+        "programs/*/src/**",
+        "crates/solana-confidential-compute-crypto/src/**",
+        "crates/solana-confidential-compute-cpi/src/**"
+      ],
+      "rule": "Verification must fail closed. Report a path that returns success in one of these conditions:\n- The program did not verify a signature.\n- The expected precompile instruction (EXPECTED_SIGVERIFY_PROGRAM_ID or the native secp256r1 program) is missing.\n- The precompile instruction verifies a different message.\n- The backend source or the report version is unknown.\n- A Mode B call has no nonce.\nAlso report unwrap_or_default or a fallback value on Clock or on a different sysvar.\nSource: SCC-SEC-003 and SCC-SEC-004."
+    },
+    {
+      "id": "hardware-policy-gates",
+      "severity": "high",
+      "scope": ["programs/*/src/**", "crates/solana-confidential-compute-core/src/**"],
+      "rule": "Report a change that makes one of these checks less strict:\n- SNP policy bit 19 (DEBUG) is 0.\n- SNP policy bit 18 (MIGRATE_MA) is 0.\n- SNP policy bit 17 is 1.\n- VMPL is 0.\n- The report version is in 1..=5.\n- signature_algo is 1.\n- The program rejects an all-zero measurement.\n- The signed measurement is on the BackendPolicy allowlist for its source.\n- The TCB floor applies.\n- TDX rejects a debug QE (ATTRIBUTES.FLAGS bit 1).\n- TDX rejects a debug TD (TD_ATTRIBUTES bit 0).\nSource: SCC-SEC-001 and SCC-SEC-002."
+    },
+    {
+      "id": "freshness-and-replay",
+      "severity": "high",
+      "scope": ["programs/*/src/**", "crates/solana-confidential-compute-cpi/src/**"],
+      "rule": "Report a change to one of these rules:\n- An attestation is not older than 150 slots.\n- Slot hashes come only from the real SlotHashes sysvar address.\n- The UsedNonceAccount PDA seeds stay the same.\n- Each path that uses a nonce rejects the legacy 17-byte record and the 49-byte record with NonceAlreadyUsed.\n- close_stale_nonce closes a record only after 150 slots.\n- close_stale_nonce sends the lamports only to the recorded refund_pubkey.\n- The TDX challenge tombstone (expires_slot = 0) is permanent.\n- Mode B introspection accepts only a top-level call frame (InvalidConsumerStackHeight).\nSource: SCC-SEC-004 and SCC-SEC-005."
+    },
+    {
+      "id": "action-commitment",
+      "severity": "high",
+      "scope": [
+        "programs/**",
+        "crates/solana-confidential-compute-cpi/**",
+        "crates/solana-confidential-compute-sdk/**",
+        "sdks/typescript/**",
+        "bins/solana-confidential-compute-sidecar/**"
+      ],
+      "rule": "These five parts must use the same V3 action_hash encoding:\n- the verifier\n- the CPI helpers\n- the Rust SDK\n- the TypeScript SDK\n- the sidecar function screen_transaction\nThe contract is in section 4 of crates/solana-confidential-compute-cpi/README.md. Report a pull request that does one of these things:\n- It changes the encoding in some of the five parts, but not in all of them.\n- It adds a fallback to V1 or V2 digests.\n- It removes duplicate accounts from the hash.\n- It removes the effective signer and writable flags from the hash.\n- It calculates the hash before the final message has its payer and accounts.\nSource: SCC-SEC-006."
+    },
+    {
+      "id": "trust-roots-and-authority",
+      "severity": "high",
+      "scope": [
+        "programs/*/src/**",
+        "crates/solana-confidential-compute-crypto/src/**",
+        "crates/solana-confidential-compute-cpi/src/**"
+      ],
+      "rule": "Always report a change to MILAN_ARK_MODULUS, AWS_NITRO_ROOT_CA_PUBKEY_XY, EXPECTED_SIGVERIFY_PROGRAM_ID or a declare_id! program ID. Ask for the source of the new value.\nAlso report a change that does one of these things:\n- It makes the PolicyRegistry.authority signer check less strict.\n- It lets rotate_root_cert do more than refuse the request.\n- It lets init_policy_registry run without the loader-owned ProgramData account.\n- It lets init_policy_registry run without the current upgrade authority as signer.\n- It lets rotate_authority run without signatures from both authorities.\n- It lets a policy update decrease a TCB component.\n- It allows more than eight legacy measurements.\nSource: SECURITY.md, section \"Administrative authorities and trust roots\"."
+    },
+    {
+      "id": "account-layout",
+      "severity": "medium",
+      "scope": ["programs/*/src/**", "crates/solana-confidential-compute-cpi/src/**"],
+      "rule": "Deployed accounts keep their old layout. Report a change to one of these items:\n- an account size\n- a field offset\n- a discriminator\n- a report byte offset\nReport the change only if the pull request does not tell how existing accounts and clients migrate."
+    },
+    {
+      "id": "mock-isolation",
+      "severity": "high",
+      "scope": [
+        "programs/**",
+        "crates/solana-confidential-compute-sdk/**",
+        "bins/solana-confidential-compute-sidecar/**",
+        "justfile",
+        "scripts/**"
+      ],
+      "rule": "Mocks must not get into a real deployment. Report a change that does one of these things:\n- It lets the mock-crypto feature build for Solana SBF.\n- It makes `just sbf-mock-guard` less strict, or removes it.\n- It makes test-utils or test-bpf a default feature.\n- It lets the sidecar use the mock provider or synthetic evidence when dry_run is false (fail_closed_live_mock)."
+    },
+    {
+      "id": "sidecar-key-hygiene",
+      "severity": "high",
+      "scope": ["bins/solana-confidential-compute-sidecar/**"],
+      "rule": "Signing key material must derive Zeroize and ZeroizeOnDrop. The sidecar must drop the old key when it rotates the key.\nReport code that does one of these things with key material:\n- It writes the key to a log.\n- It formats the key with Debug or Display.\n- It serializes the key.\n- It returns the key over HTTP.\n- It writes the key to disk.\nThe API must stay on loopback. Report a change to the 127.0.0.1:8080 default or to validate_loopback_addr.\nBefore the sidecar releases a signature, it must run screen_transaction in server.rs (SCC-SIDECAR-001) on the complete transaction. Report a path that does not do this. Also report a change that makes screen_transaction or validate_compute_budget in signing_policy.rs less strict.\nSource: SCC-SEC-007."
+    },
+    {
+      "id": "ci-and-release",
+      "severity": "high",
+      "scope": [".github/**", "deploy/**", "scripts/**"],
+      "rule": "Pin each third-party action to a full commit SHA, with a version comment. Give each workflow a permissions block with the minimum permissions.\nReport:\n- pull_request_target together with a checkout of the pull request head\n- secrets that go to untrusted code\n- secrets that go into logs\n- a publish step that uses a long-lived token and not OIDC trusted publishing\nSource: SDLC 3.4.5 and 6.3."
+    },
+    {
+      "id": "dependencies",
+      "severity": "medium",
+      "scope": ["**/Cargo.toml", "Cargo.lock", "sdks/typescript/package.json", "docs-site/package.json"],
+      "rule": "Report one of these items if the pull request description does not give a reason for it under \"New dependencies\":\n- a new dependency\n- a git source or a path source\n- a registry that is not crates.io or npm\nA new dependency of the verifier program, core, crypto, cpi or the sidecar needs an acknowledgment from the security team (PR template)."
+    },
+    {
+      "id": "docs-in-sync",
+      "severity": "medium",
+      "scope": ["programs/**", "crates/**", "bins/**", "sdks/**"],
+      "rule": "Some changes alter behavior that a document describes. Examples are an error code, a PDA seed, an account layout, a limit or a @spec clause. These documents describe behavior:\n- SECURITY.md\n- docs/intent/confidential-compute-verifier-specs.md\n- docs/high-level-design.md\n- the crate README files\nThe same pull request must update the document. Report the passage that is not correct.\nSource: SDLC 3.4.1."
+    },
+    {
+      "id": "compute-budget",
+      "severity": "low",
+      "scope": ["programs/*/src/**", "crates/solana-confidential-compute-cpi/src/**"],
+      "rule": "Tell the author when a change can increase compute units on a hot path. assert_attestation_atomic must use 2,500 CU or less (SCC-CONSUMER-002). The measured Mode A consumer check uses 355 CU. When a verification path changes, ask for the output of `just compute-regression`."
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+[package]
+name = "solana-confidential-compute-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Rust client SDK for Solana Confidential Compute publishers and on-chain consumers."
+keywords = ["solana", "attestation", "tee"]
+categories = ["cryptography"]
+
+[dependencies]
+bincode = "1.3.3"
+solana-confidential-compute-core = { workspace = true, features = ["std"] }
+solana-confidential-compute-cpi = { workspace = true }
+solana-sdk = "4.1"
+solana-system-interface = { version = "3.3", features = ["bincode"] }
+solana-compute-budget-interface = "3.1"
+solana-packet = "4.4"
+solana-sdk-ids = "3.1"
+solana-message = "4.6"
+thiserror = { version = "2.0" }
+
+[dev-dependencies]
+solana-program = "4.1"
+solana-program-test = { version = "4.3", features = ["agave-unstable-api"] }
+solana-address-lookup-table-interface = "4.0"
+solana-confidential-compute-verifier = { path = "../../programs/solana-confidential-compute-verifier" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+# Real P-384 report signing for the SBF harnesses; the natively linked
+# `MockVerifier` path cannot read sysvars under solana 4.x.
+p384 = { version = "0.13", features = ["test-vectors", "alloc", "std"] }
+sha2 = { version = "0.10", features = ["oid"] }  # oid: RS256 DigestInfo prefix
+# The shared GCP JWT fixture has no private key, so its workload binding cannot
+# be re-pointed at a keypair a real runtime can sign with. issue_211 mints its
+# own RS256 token instead.
+rsa = { version = "0.9" }
+rand = { version = "0.8" }
+
+[features]
+default = []
+test-bpf = ["solana-confidential-compute-cpi/test-bpf", "test-utils"]
+# Explicitly opt into raw packers for native harnesses; never a packet-limit bypass.
+test-utils = []
+
+[[test]]
+name = "backend_policy_tests"
+required-features = ["test-utils"]
+
+[[test]]
+name = "nonce_migration_tests"
+required-features = ["test-utils"]
+
+# Without these the `#![cfg(feature = "test-utils")]` bodies compile away and
+# the targets silently report "0 tests" instead of being skipped.
+[[test]]
+name = "issue_293"
+required-features = ["test-utils"]
+
+[[test]]
+name = "issue_294"
+required-features = ["test-utils"]
+
+# Uses solana-confidential-compute-cpi's `assert_attestation_signer_at_slot` test seam.
+[[test]]
+name = "issue_211"
+required-features = ["test-bpf"]

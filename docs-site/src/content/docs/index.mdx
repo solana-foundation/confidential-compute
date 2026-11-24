@@ -1,0 +1,67 @@
+---
+title: Solana Confidential Compute
+description: Verifiable Compute Layer for Solana. Bind Ed25519 signing keys to AMD SEV-SNP, AWS Nitro Enclaves, and Intel TDX.
+template: splash
+hero:
+  title: Solana Confidential Compute
+  tagline: Verifiable Compute Layer for Solana. Bind Ed25519 signing keys to hardware-isolated enclaves.
+  actions:
+    - text: Quickstart
+      link: /overview/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: Architecture
+      link: /architecture/mode-a-stateful/
+      icon: document
+      variant: secondary
+    - text: GitHub repo
+      link: https://github.com/solana-foundation/confidential-compute
+      icon: github
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Start here
+
+<CardGrid>
+	<LinkCard
+		title="Quickstart"
+		href="/overview/introduction/"
+		description="What Solana Confidential Compute is, hardware trust roots, and the live program id."
+	/>
+	<LinkCard
+		title="Architecture"
+		href="/architecture/mode-a-stateful/"
+		description="Mode A session caching and Mode B one-transaction atomic attestation."
+	/>
+	<LinkCard
+		title="GitHub repo"
+		href="https://github.com/solana-foundation/confidential-compute"
+		description="Source, issues, and pull requests for solana-foundation/confidential-compute."
+	/>
+</CardGrid>
+
+## Choose a path
+
+<CardGrid stagger>
+	<Card title="Mode A — Stateful" icon="approve-check">
+		Register once with `verify_and_register`. Later consumer transactions
+		use native Ed25519 and skip P-384. See
+		[Mode A](/architecture/mode-a-stateful/).
+	</Card>
+	<Card title="Mode B — Atomic" icon="list-format">
+		One transaction: `verify_atomic_with_nonce` then the consumer instruction.
+		Replay defense is a `UsedNonceAccount` PDA. See
+		[Mode B](/architecture/mode-b-atomic/).
+	</Card>
+	<Card title="Integrate" icon="puzzle">
+		Three-line Rust helper, Anchor adapters, and the TypeScript builder.
+		See [Rust CPI](/integration/rust-cpi/) and the
+		[TypeScript SDK](/integration/typescript-sdk/).
+	</Card>
+	<Card title="Deploy" icon="rocket">
+		Run the sidecar inside the enclave. Bind loopback HTTP. Build with Docker.
+		See [Sidecar](/deployment/sidecar/).
+	</Card>
+</CardGrid>

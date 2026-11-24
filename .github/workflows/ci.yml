@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test:
+    name: Rust Test Suite
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: '0'
+      # Native dev/test builds only: keep file:line backtraces but drop full
+      # debuginfo so workspace test binaries fit the hosted runner disk.
+      # Release and SBF builds are unaffected.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      # The test profile needs it too, and separately: the ProgramTest suites
+      # link solana-program-test into dozens of integration test binaries, and
+      # full DWARF across all of them exhausts the runner disk.
+      CARGO_PROFILE_TEST_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The runner image leaves about 9 GB free and this job's target
+      # directory grows past 12 GB, so it ran out of disk mid-compile. Reclaim
+       # the preinstalled toolchains this job never uses.
+      - name: Reclaim runner disk
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+                      /usr/local/share/boost /usr/local/lib/node_modules \
+                      /usr/share/swift /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h /
+      - uses: ./.github/actions/setup
+        with:
+          sbf: 'true'
+      - name: Disk usage (after cache restore)
+        run: |
+          df -h /
+          du -sh target 2>/dev/null || true
+      - name: Format Check
+        run: just fmt-check
+      - name: Clippy
+        run: just lint
+      - name: Build SBF artifacts and run Rust tests
+        run: just test-rs
+      - name: Disk usage (after tests)
+        if: always()
+        run: |
+          df -h /
+          du -sh target 2>/dev/null || true
+      - name: Check Sidecar and CLI
+        run: just check-bins
+      - name: Release artifact integrity controls (#190) and SBPFv3 build gate self-test (SCC-DEPLOY-001)
+        run: just test-scripts
+      - name: Disk usage (end of job)
+        if: always()
+        run: |
+          df -h /
+          du -sh target 2>/dev/null || true
+
+  # Separate runner so Bun extraction never competes with Rust build output.
+  anchor:
+    name: Anchor Front End
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          sbf: 'true'
+          rust-cache-key: anchor
+      # A separate job on purpose. The Rust Test Suite runner is at its disk
+      # limit, and compiling this crate under a second feature set there
+      # exhausted it.
+      - name: Clippy and tests with the Anchor front end
+        run: just test-anchor
+      - name: SBF build with the Anchor front end
+        run: just build-program-anchor
+      - name: Disk usage (end of job)
+        if: always()
+        run: df -h /
+
+  typescript:
+    name: TypeScript SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          rust: 'false'
+          ts: 'true'
+      - name: Disk usage (before install)
+        run: df -h /
+      - name: Install TypeScript dependencies (Bun)
+        run: just install-ts
+      - name: TypeScript SDK Build & Test (Bun)
+        run: just test-ts
+      - name: Disk usage (end of job)
+        if: always()
+        run: df -h /
+
+  # Keeps the "Test Suite" check: green only when both jobs above succeeded.
+  test-suite:
+    name: Test Suite
+    needs: [test, anchor, typescript]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require Rust and TypeScript jobs
+        env:
+          RUST_RESULT: ${{ needs.test.result }}
+          ANCHOR_RESULT: ${{ needs.anchor.result }}
+          TYPESCRIPT_RESULT: ${{ needs.typescript.result }}
+        run: |
+          echo "Rust Test Suite: $RUST_RESULT; Anchor Front End: $ANCHOR_RESULT; TypeScript SDK: $TYPESCRIPT_RESULT"
+          test "$RUST_RESULT" = success && test "$ANCHOR_RESULT" = success && test "$TYPESCRIPT_RESULT" = success
+
+  sbpf:
+    name: Real SBPFv3 Artifact
+    # Only push-to-main runs attest; PR jobs remain integrity checks.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '4'
+      SOLANA_CC_SBF_TOOLS_VERSION: v1.56
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          sbf: 'true'
+          rust-cache-key: sbpf-v1.56
+      - name: Build and inspect release artifact
+        run: just build-sbpfv3 -- --locked -j4
+      - name: Record artifact and build inputs
+        run: just record-sbpfv3-provenance
+      - name: Attest release artifact and build record (#297)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            target/deploy/solana_confidential_compute_verifier.so
+            target/deploy/artifact-provenance.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: solana-confidential-compute-verifier-sbpfv3
+          path: |
+            target/deploy/solana_confidential_compute_verifier.so
+            target/deploy/build-inputs.txt
+            target/deploy/artifact-provenance.json
+          if-no-files-found: error
+      - name: Build compatibility feature with real verification
+        run: just build-sbpfv3 -- --locked -j4 --features test-bpf
+      - name: Reject every mock feature combination on SBF
+        run: just sbf-mock-guard
+
+  artifact-integrity:
+    name: Release Artifact Integrity
+    permissions:
+      contents: read
+      attestations: read
+    needs: sbpf
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          rust: 'false'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: solana-confidential-compute-verifier-sbpfv3
+          path: target/deploy
+      - name: Authenticate main release artifact and record (#297)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: just verify-sbpfv3-attestation
+      - name: Check downloaded artifact integrity (does not establish authenticity)
+        run: just verify-sbpfv3-integrity

@@ -1,0 +1,54 @@
+name: Setup
+description: Install just and the pinned toolchains that the requested just recipes need.
+
+inputs:
+  rust:
+    description: Install the Rust toolchain from rust-toolchain.toml and restore the cargo cache.
+    required: false
+    default: 'true'
+  sbf:
+    description: Install the pinned cargo-build-sbf through just install-sbf.
+    required: false
+    default: 'false'
+  ts:
+    description: Install Node from .nvmrc and the pinned Bun.
+    required: false
+    default: 'false'
+  rust-cache-key:
+    description: Passed to Swatinem/rust-cache as shared-key when non-empty.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install just
+      uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+      with:
+        tool: just@1.59.0
+    - name: Install Rust toolchain
+      if: inputs.rust == 'true'
+      shell: bash
+      run: rustup toolchain install --profile minimal --no-self-update
+    - name: Restore Rust cache
+      if: inputs.rust == 'true' && inputs.rust-cache-key == ''
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+    - name: Restore Rust cache (shared key)
+      if: inputs.rust == 'true' && inputs.rust-cache-key != ''
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      with:
+        shared-key: ${{ inputs.rust-cache-key }}
+    - name: Install pinned SBF builder
+      if: inputs.sbf == 'true'
+      shell: bash
+      run: just install-sbf
+    - name: Set up Node
+      if: inputs.ts == 'true'
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        node-version-file: .nvmrc
+    - name: Set up Bun
+      if: inputs.ts == 'true'
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version: 1.4.4

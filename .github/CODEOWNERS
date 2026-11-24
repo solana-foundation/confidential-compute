@@ -1,0 +1,14 @@
+* @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/programs/ @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/crates/solana-confidential-compute-core/ @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/crates/solana-confidential-compute-crypto/ @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/crates/solana-confidential-compute-cpi/ @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/bins/solana-confidential-compute-sidecar/src/keys.rs @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/bins/solana-confidential-compute-sidecar/src/signing_policy.rs @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/bins/solana-confidential-compute-sidecar/src/attestation/ @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/bins/solana-confidential-compute-sidecar/src/tdx_enrolment.rs @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/.github/ @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/deploy/ @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/scripts/artifact_provenance.py @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/Cargo.lock @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee
+/rust-toolchain.toml @GuiBibeau @ChewingGlass @dev-jodee @lgalabru @catmcgee

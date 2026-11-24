@@ -1,0 +1,134 @@
+#!/bin/bash
+# Root-only GCE startup script. Public values are encoded by Terraform; no keys
+# or tokens belong in metadata. A reboot reruns this without deleting guest data.
+set -euo pipefail
+umask 022
+
+# Serialize manual and guest-agent reruns.
+exec 9>/run/lock/confidential-compute-bootstrap.lock
+flock 9
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y --no-install-recommends \
+  build-essential ca-certificates clang cmake curl git libclang-dev \
+  libssl-dev openssl pkg-config python3 protobuf-compiler libudev-dev
+
+getent group confidential-compute >/dev/null || groupadd --system confidential-compute
+id -u confidential-compute >/dev/null 2>&1 || useradd --create-home --gid confidential-compute --shell /bin/bash confidential-compute
+install -d -m 0755 -o confidential-compute -g confidential-compute /opt/confidential-compute
+install -d -m 0700 -o confidential-compute -g confidential-compute /var/lib/confidential-compute
+install -d -m 0755 /usr/local/libexec
+
+source_ref=$(printf '%s' '${source_ref_b64}' | base64 --decode)
+[[ "$source_ref" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid source commit' >&2; exit 1; }
+
+# The only source origin is the public project repository. Never reset/clean an
+# existing checkout: stop rather than discard operator edits or adjacent data.
+if [[ ! -e /opt/confidential-compute/src ]]; then
+  runuser -u confidential-compute -- git init /opt/confidential-compute/src
+  runuser -u confidential-compute -- git -C /opt/confidential-compute/src remote add origin https://github.com/solana-foundation/confidential-compute.git
+fi
+[[ $(runuser -u confidential-compute -- git -C /opt/confidential-compute/src remote get-url origin) == https://github.com/solana-foundation/confidential-compute.git ]]
+if ! runuser -u confidential-compute -- git -C /opt/confidential-compute/src rev-parse --verify HEAD >/dev/null 2>&1; then
+  runuser -u confidential-compute -- git -C /opt/confidential-compute/src fetch --depth 1 origin "$source_ref"
+  runuser -u confidential-compute -- git -C /opt/confidential-compute/src checkout --detach "$source_ref"
+fi
+[[ $(runuser -u confidential-compute -- git -C /opt/confidential-compute/src rev-parse HEAD) == "$source_ref" ]] || {
+  echo 'Existing source differs from pinned commit; preserve it and inspect manually.' >&2
+  exit 1
+}
+[[ -z $(runuser -u confidential-compute -- git -C /opt/confidential-compute/src status --porcelain) ]] || {
+  echo 'Source checkout has local changes; preserve them and inspect manually.' >&2
+  exit 1
+}
+
+# Match the checked-in Rust pin, and fail instead of silently building with a
+# drifting toolchain if a different source commit changes it.
+rust_pin=$(python3 -c 'import tomllib; print(tomllib.load(open("/opt/confidential-compute/src/rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+[[ "$rust_pin" == '1.98.1' ]] || { echo 'Unexpected Rust toolchain pin' >&2; exit 1; }
+if [[ ! -x /home/confidential-compute/.cargo/bin/rustup ]]; then
+  installer=$(mktemp)
+  trap 'rm -f "$installer"' EXIT
+  curl --proto '=https' --tlsv1.2 --fail --silent --show-error https://sh.rustup.rs -o "$installer"
+  chmod 0644 "$installer"
+  runuser -u confidential-compute -- env HOME=/home/confidential-compute sh "$installer" -y --profile minimal --default-toolchain none --no-modify-path
+  rm -f "$installer"
+  trap - EXIT
+fi
+runuser -u confidential-compute -- env HOME=/home/confidential-compute /home/confidential-compute/.cargo/bin/rustup toolchain install "$rust_pin" --profile minimal
+runuser -u confidential-compute -- env HOME=/home/confidential-compute PATH="/home/confidential-compute/.cargo/bin:$PATH" \
+  bash -c 'cd /opt/confidential-compute/src && cargo build --locked --release --jobs 2 -p solana-confidential-compute-sidecar --bin solana-confidential-compute-sidecar --example gcp-demo'
+
+# Stop only after successful builds; do not replace an executable in use.
+systemctl stop solana-confidential-compute-sidecar.service || true
+install -m 0755 /opt/confidential-compute/src/target/release/solana-confidential-compute-sidecar /usr/local/bin/solana-confidential-compute-sidecar
+install -m 0755 /opt/confidential-compute/src/target/release/examples/gcp-demo /usr/local/bin/confidential-compute-gcp-demo
+
+cat >/etc/udev/rules.d/70-confidential-compute-sev-guest.rules <<'UDEV'
+SUBSYSTEM=="misc", KERNEL=="sev-guest", GROUP="confidential-compute", MODE="0660"
+UDEV
+udevadm control --reload-rules
+# Some images build this driver into the kernel; absence of a module is benign.
+modprobe sev-guest || true
+udevadm trigger --subsystem-match=misc --sysname-match=sev-guest
+udevadm settle
+if [[ -c /dev/sev-guest ]]; then
+  chgrp confidential-compute /dev/sev-guest
+  chmod 0660 /dev/sev-guest
+else
+  echo 'Warning: /dev/sev-guest is absent; inspect confidential VM/kernel configuration.' >&2
+fi
+
+# Decode only into quoted environment assignments at runtime. The service never
+# sources shell text supplied in Terraform variables. It has no fee payer.
+cat >/usr/local/libexec/solana-cc-sidecar-start <<'LAUNCHER'
+#!/bin/bash
+set -euo pipefail
+SOLANA_CC_SOLANA_RPC_URL="$(printf '%s' '${rpc_url_b64}' | base64 --decode)"
+SOLANA_CC_VERIFIER_PROGRAM_ID="$(printf '%s' '${verifier_program_id_b64}' | base64 --decode)"
+export SOLANA_CC_SOLANA_RPC_URL SOLANA_CC_VERIFIER_PROGRAM_ID
+consumer_program_id="$(printf '%s' '${consumer_program_id_b64}' | base64 --decode)"
+unset SOLANA_CC_PAYER_KEYPAIR_PATH SOLANA_CC_ALLOWED_CONSUMER_PROGRAM_ID
+if [[ -n "$consumer_program_id" ]]; then
+  export SOLANA_CC_ALLOWED_CONSUMER_PROGRAM_ID="$consumer_program_id"
+fi
+export SOLANA_CC_ENCLAVE_MODE=amd-sev-snp
+export SOLANA_CC_BIND_ADDR=127.0.0.1:8080
+export DRY_RUN=true
+exec /usr/local/bin/solana-confidential-compute-sidecar
+LAUNCHER
+chmod 0755 /usr/local/libexec/solana-cc-sidecar-start
+
+cat >/etc/systemd/system/solana-confidential-compute-sidecar.service <<'UNIT'
+[Unit]
+Description=Solana confidential compute AMD SEV-SNP demo sidecar (dry-run, loopback only)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=confidential-compute
+Group=confidential-compute
+WorkingDirectory=/opt/confidential-compute/src
+ExecStart=/usr/local/libexec/solana-cc-sidecar-start
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# Keep the real /dev/sev-guest visible; PrivateDevices would hide it.
+DevicePolicy=closed
+DeviceAllow=/dev/sev-guest rw
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now solana-confidential-compute-sidecar.service
+echo 'Bootstrap complete; solana-confidential-compute-sidecar is dry-run with no payer, listening on 127.0.0.1:8080.'

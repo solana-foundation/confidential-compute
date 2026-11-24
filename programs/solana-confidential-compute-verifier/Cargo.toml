@@ -1,0 +1,58 @@
+[package]
+name = "solana-confidential-compute-verifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Solana on-chain verifier program for Solana Confidential Compute hardware attestations."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+borsh = { version = "1.5", default-features = false, features = ["derive"] }
+solana-program = "4.1"
+solana-bn254 = "3.2"
+solana-system-interface = { version = "3.3", features = ["bincode"] }
+solana-sdk-ids = "3.1"
+solana-sysvar = { version = "4.3", features = ["bincode"] }
+solana-confidential-compute-core = { workspace = true }
+solana-confidential-compute-crypto = { workspace = true }
+sha2 = { version = "0.10", default-features = false }
+thiserror = { version = "2.0" }
+anchor-lang = { version = "1.2", default-features = false, features = ["solana-v4"], optional = true }
+
+[features]
+default = []
+no-entrypoint = []
+# Anchor front end: generated IDL and Anchor entrypoint over the same processor.
+anchor = ["dep:anchor-lang"]
+# Anchor IDL generation (`anchor idl build`).
+idl-build = ["anchor", "anchor-lang/idl-build"]
+mock-crypto = []
+# Compatibility flag only. Native mocks must be selected explicitly.
+test-bpf = []
+
+[dev-dependencies]
+solana-confidential-compute-sidecar = { path = "../../bins/solana-confidential-compute-sidecar" }
+# Decodes the `Program data:` log lines that replace `sol_log_data` stubs on SBF.
+base64 = "0.23"
+borsh = { version = "1.5", features = ["derive"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+p384 = { version = "0.13", features = ["test-vectors", "alloc", "std"] }
+sha2 = { version = "0.10" }
+solana-program = "4.1"
+solana-program-test = { version = "4.3", features = ["agave-unstable-api"] }
+solana-sdk = "4.1"
+solana-compute-budget-interface = "3.1"
+solana-message = "4.6"
+solana-packet = "4.4"
+solana-confidential-compute-core = { workspace = true, features = ["std"] }
+# Client-side instruction builders and PDA derivations, so the SBF harnesses
+# exercise the path a real caller takes rather than a hand-packed copy of it.
+solana-confidential-compute-sdk = { workspace = true }
+solana-confidential-compute-crypto = { workspace = true, features = ["std"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+

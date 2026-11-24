@@ -1,0 +1,41 @@
+name: Feature request
+description: Propose a new feature or change
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What do you want to add or change?
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem does this solve, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: threat-model
+    attributes:
+      label: Threat model
+      description: |
+        Required when the change introduces or modifies a trust boundary, creates a new value-movement path, or changes who can do what. Otherwise leave blank.
+
+        1. What is being built or changed, and what data or value does it touch?
+        2. What are the trust boundaries? Who can call this, and with what authority?
+        3. What external dependencies are introduced or changed? What happens if they fail, lie, or disappear?
+        4. What is the worst-case impact if this component is fully compromised?
+    validations:
+      required: false
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Expected change tier
+      description: When in doubt, classify up.
+      options:
+        - Critical
+        - Standard
+        - Low
+    validations:
+      required: true

@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "path": "SECURITY.md",
+      "description": "Threat model, trust boundaries, administrative authorities and the invariants SCC-SEC-001 to SCC-SEC-010. Each change must keep these invariants."
+    },
+    {
+      "path": "docs/intent/confidential-compute-verifier-specs.md",
+      "description": "The @spec catalog for the verifier. Each SCC-* identifier has the same meaning as in SECURITY.md."
+    },
+    {
+      "path": "docs/high-level-design.md",
+      "description": "Architecture. Section 4 gives the design invariants: packet size, two-stage verification, freshness, PDA lifecycle and signed byte parsing."
+    },
+    {
+      "path": "crates/solana-confidential-compute-cpi/README.md",
+      "description": "Consumer contract: Mode A account checks, Mode B introspection, the V3 hash_action encoding, error codes and discriminators.",
+      "scope": [
+        "programs/**",
+        "crates/solana-confidential-compute-cpi/**",
+        "crates/solana-confidential-compute-sdk/**",
+        "sdks/typescript/**",
+        "bins/solana-confidential-compute-sidecar/**"
+      ]
+    },
+    {
+      "path": "docs/intent/confidential-compute-sidecar-specs.md",
+      "description": "Sidecar specification: key handling, loopback API and attestation backends.",
+      "scope": ["bins/solana-confidential-compute-sidecar/**"]
+    },
+    {
+      "path": "CLAUDE.md",
+      "description": "Known problems and conventions for persons and agents that change the code."
+    },
+    {
+      "path": "GLOSSARY.md",
+      "description": "Project terms."
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "description": "The sections that each pull request completes: change tier, threat model, new dependencies and the Critical-tier checklist."
+    }
+  ]
+}
