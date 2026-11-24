@@ -27,8 +27,8 @@ class SidecarBuildInputTests(unittest.TestCase):
         recipe = (ROOT / "bins/solana-confidential-compute-sidecar/Dockerfile").read_text()
         self.assertIn("ARG SOURCE_DATE_EPOCH=0", recipe)
         self.assertIn("SOURCE_DATE_EPOCH=0", recipe)
-        self.assertIn("snapshot.debian.org/archive/debian/20261001T000000Z", recipe)
-        self.assertIn("snapshot.debian.org/archive/debian-security/20261001T000000Z", recipe)
+        self.assertIn("snapshot.debian.org/archive/debian/20261124T000000Z", recipe)
+        self.assertIn("snapshot.debian.org/archive/debian-security/20261124T000000Z", recipe)
         self.assertNotIn("trusted=yes", recipe)
 
 

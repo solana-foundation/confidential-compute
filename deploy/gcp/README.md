@@ -196,7 +196,7 @@ run the Cargo command through that host's heavy-build queue.
 
 For the existing no-cloud proofs, run `cargo test --locked -p solana-confidential-compute-crypto --test
 milan_kds`. The existing [Dockerfile](../../bins/solana-confidential-compute-sidecar/Dockerfile) already
-pins Rust 1.98.1, matching the workspace; this VM recipe builds natively and does
+pins Rust 1.99.1, matching the workspace; this VM recipe builds natively and does
 not build, publish, or use that container image.
 
 ## Manual run
