@@ -8,6 +8,9 @@ homepage.workspace = true
 description = "Command-line interface to prove and verify Solana keypairs in hardware enclaves."
 publish = false
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "solana-confidential-compute"
 path = "src/main.rs"

@@ -9,6 +9,9 @@ description = "On-chain CPI helpers for Solana Confidential Compute consumer pro
 keywords = ["solana", "attestation", "cpi"]
 categories = ["cryptography"]
 
+[lints]
+workspace = true
+
 [dependencies]
 solana-program = "4.1"
 solana-confidential-compute-core = { workspace = true }

@@ -19,6 +19,15 @@ solana-confidential-compute-crypto = { path = "crates/solana-confidential-comput
 solana-confidential-compute-cpi = { path = "crates/solana-confidential-compute-cpi", version = "0.1.0" }
 solana-confidential-compute-sdk = { path = "crates/solana-confidential-compute-sdk", version = "0.1.0" }
 
+[workspace.lints.rust]
+unused_imports = "deny"
+dead_code = "warn"
+unused_variables = "warn"
+deprecated = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+
 [profile.release]
 opt-level = 3
 overflow-checks = true

@@ -8,6 +8,9 @@ homepage.workspace = true
 description = "Confidential hardware enclave sidecar daemon for Solana Confidential Compute."
 publish = false
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "solana-confidential-compute-sidecar"
 path = "src/main.rs"
