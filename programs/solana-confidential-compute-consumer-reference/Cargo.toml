@@ -19,7 +19,7 @@ default = []
 no-entrypoint = []
 
 [dependencies]
-solana-program = "4.1"
+solana-program = "5.2"
 solana-confidential-compute-cpi = { workspace = true }
 thiserror = { version = "2.0" }
 

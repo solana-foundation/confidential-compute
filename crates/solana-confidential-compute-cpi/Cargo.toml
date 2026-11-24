@@ -13,7 +13,7 @@ categories = ["cryptography"]
 workspace = true
 
 [dependencies]
-solana-program = "4.1"
+solana-program = "5.2"
 solana-confidential-compute-core = { workspace = true }
 solana-confidential-compute-crypto = { workspace = true }
 thiserror = { version = "2.0" }

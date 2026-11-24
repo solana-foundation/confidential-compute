@@ -16,7 +16,7 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 borsh = { version = "1.5", default-features = false, features = ["derive"] }
-solana-program = "4.1"
+solana-program = "5.2"
 solana-bn254 = "3.2"
 solana-system-interface = { version = "3.3", features = ["bincode"] }
 solana-sdk-ids = "3.1"
@@ -46,7 +46,7 @@ borsh = { version = "1.5", features = ["derive"] }
 p256 = { version = "0.13", features = ["ecdsa"] }
 p384 = { version = "0.13", features = ["test-vectors", "alloc", "std"] }
 sha2 = { version = "0.10" }
-solana-program = "4.1"
+solana-program = "5.2"
 solana-program-test = { version = "4.3", features = ["agave-unstable-api"] }
 solana-sdk = "4.1"
 solana-compute-budget-interface = "3.1"
