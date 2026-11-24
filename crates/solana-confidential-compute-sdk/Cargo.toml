@@ -13,7 +13,7 @@ categories = ["cryptography"]
 bincode = "1.3.3"
 solana-confidential-compute-core = { workspace = true, features = ["std"] }
 solana-confidential-compute-cpi = { workspace = true }
-solana-sdk = "4.1"
+solana-sdk = "5.0"
 solana-system-interface = { version = "3.3", features = ["bincode"] }
 solana-compute-budget-interface = "3.1"
 solana-packet = "4.4"

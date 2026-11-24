@@ -45,7 +45,7 @@ p384 = { version = "0.13", features = ["test-vectors", "alloc", "std"] }
 sha2 = { version = "0.10" }
 solana-program = "4.1"
 solana-program-test = { version = "4.3", features = ["agave-unstable-api"] }
-solana-sdk = "4.1"
+solana-sdk = "5.0"
 solana-compute-budget-interface = "3.1"
 solana-message = "4.6"
 solana-packet = "4.4"
