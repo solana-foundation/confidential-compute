@@ -5,7 +5,7 @@
 # 1. Build Stage
 # ------------------------------------------------------------------------------
 ARG SOURCE_DATE_EPOCH=0
-FROM rust:1.98.1-slim-bookworm@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730 AS builder
+FROM rust:1.99.1-slim-bookworm@sha256:f2c004e3d2d8b547e8cf7ffbc29205385f4e71d23e53e4e383065db5e9f822cd AS builder
 
 WORKDIR /build
 
@@ -13,8 +13,8 @@ WORKDIR /build
 # transitive packages. Signatures are still required; only snapshot expiry is ignored.
 RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/* \
     && printf '%s\n' \
-       'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20261001T000000Z bookworm main' \
-       'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20261001T000000Z bookworm-security main' \
+       'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20261124T000000Z bookworm main' \
+       'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20261124T000000Z bookworm-security main' \
        > /etc/apt/sources.list \
     && apt-get update && apt-get install -y --no-install-recommends \
        pkg-config libssl-dev protobuf-compiler \
@@ -22,7 +22,7 @@ RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/* \
 
 # Use the image's preinstalled compiler, with no rustup download caused by the
 # repository's developer components. Fail if the repository pin changes.
-ENV RUSTUP_TOOLCHAIN=1.98.1 SOURCE_DATE_EPOCH=0
+ENV RUSTUP_TOOLCHAIN=1.99.1 SOURCE_DATE_EPOCH=0
 COPY rust-toolchain.toml ./
 RUN test "$(sed -n 's/^channel = "\([^"]*\)"/\1/p' rust-toolchain.toml)" = "$RUSTUP_TOOLCHAIN" \
     && rustc --version --verbose && cargo --version

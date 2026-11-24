@@ -46,7 +46,7 @@ fi
 # Match the checked-in Rust pin, and fail instead of silently building with a
 # drifting toolchain if a different source commit changes it.
 rust_pin=$(python3 -c 'import tomllib; print(tomllib.load(open("/opt/confidential-compute/src/rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
-[[ "$rust_pin" == '1.98.1' ]] || { echo 'Unexpected Rust toolchain pin' >&2; exit 1; }
+[[ "$rust_pin" == '1.99.1' ]] || { echo 'Unexpected Rust toolchain pin' >&2; exit 1; }
 if [[ ! -x /home/confidential-compute/.cargo/bin/rustup ]]; then
   installer=$(mktemp)
   trap 'rm -f "$installer"' EXIT

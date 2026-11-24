@@ -32,7 +32,7 @@ def record(artifact, lockfile, source_sha, build_inputs):
         "build_inputs_sha256": digest(build_inputs),
         "cargo_features": [],
         "default_features": True,
-        "rust_toolchain": "1.98.1",
+        "rust_toolchain": "1.99.1",
         "sbf_builder": "cargo-build-sbf 4.2.0",
         "platform_tools": "v1.56",
         "sbf_arch": "v3",
