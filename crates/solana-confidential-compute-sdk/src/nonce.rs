@@ -24,7 +24,13 @@ pub fn derive_used_nonce_pda_for_source(
     if ![1, 2].contains(&source) {
         return Err(NonceError::InvalidSource);
     }
-    Ok(Pubkey::find_program_address(&[b"nonce", &[source], signer, nonce], program_id))
+    Ok(used_nonce_pda(program_id, source, signer, nonce))
+}
+/// Address for a source tag that a builder in this crate passes as a constant
+/// (`AMD_SOURCE` or `NITRO_SOURCE`). [`derive_used_nonce_pda_for_source`] accepts
+/// both, so this skips its source check.
+pub(crate) fn used_nonce_pda(program_id: &Pubkey, source: u8, signer: &[u8; 32], nonce: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"nonce", &[source], signer, nonce], program_id)
 }
 /// Canonical pre-upgrade account, required as readonly migration guard.
 pub fn derive_legacy_used_nonce_pda(program_id: &Pubkey, signer: &[u8; 32], nonce: &[u8; 32]) -> (Pubkey, u8) {

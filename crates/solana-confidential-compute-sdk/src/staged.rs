@@ -107,7 +107,7 @@ pub fn stage_vcek_registration(
     if source.data.len() < 176 || source.accounts.len() < 3 {
         return Err(StageError::InvalidSize);
     }
-    let tcb = u64::from_le_bytes(source.data[72..80].try_into().unwrap());
+    let tcb = u64::from_le_bytes(*source.data.get(72..).and_then(<[u8]>::first_chunk).ok_or(StageError::InvalidSize)?);
     let candidates = [hash(&source.data[8..72]).to_bytes(), hash(&source.data[80..176]).to_bytes()];
     let identity = candidates
         .iter()
@@ -140,7 +140,9 @@ pub fn stage_nitro_registration(
     if source.data.len() < 53 {
         return Err(StageError::InvalidSize);
     }
-    let doc_len = u32::from_le_bytes(source.data[49..53].try_into().unwrap()) as usize;
+    let doc_len =
+        u32::from_le_bytes(*source.data.get(49..).and_then(<[u8]>::first_chunk).ok_or(StageError::InvalidSize)?)
+            as usize;
     if doc_len == 0
         || doc_len > solana_confidential_compute_core::MAX_NITRO_DOCUMENT_LEN
         || source.data.len() != 53 + doc_len
@@ -169,8 +171,8 @@ pub fn build_staged_nitro_registration(
     }
     let registry = crate::builder::derive_policy_registry_pda(&program_id);
     let (signer, _) = crate::builder::derive_signer_pda(&program_id, &workload.to_bytes());
-    let (used_nonce, _) = crate::derive_used_nonce_pda_for_source(&program_id, 2, &workload.to_bytes(), &nonce)
-        .expect("fixed Nitro source");
+    let (used_nonce, _) =
+        crate::nonce::used_nonce_pda(&program_id, crate::backend_policy::NITRO_SOURCE, &workload.to_bytes(), &nonce);
     let accounts = vec![
         AccountMeta::new(authority, true),
         AccountMeta::new_readonly(registry, false),

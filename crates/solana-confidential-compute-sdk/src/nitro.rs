@@ -59,8 +59,8 @@ fn nitro_accounts(
     let signer_bytes = workload_signer.to_bytes();
     let policy_registry = derive_policy_registry_pda(program_id);
     // Nitro instruction data does not carry bump bytes. The program derives them.
-    let (used_nonce, _) = crate::nonce::derive_used_nonce_pda_for_source(program_id, 2, &signer_bytes, nonce)
-        .expect("fixed Nitro source");
+    let (used_nonce, _) =
+        crate::nonce::used_nonce_pda(program_id, crate::backend_policy::NITRO_SOURCE, &signer_bytes, nonce);
     let attested_signer = if mode == VERIFY_NITRO_MODE_A {
         let (attested_signer, _) = derive_signer_pda(program_id, &signer_bytes);
         AccountMeta::new(attested_signer, false)
