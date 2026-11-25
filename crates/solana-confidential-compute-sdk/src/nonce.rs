@@ -67,7 +67,8 @@ mod tests {
     #[test]
     fn builder_source_tags_pass_the_public_check() {
         let program_id = Pubkey::new_unique();
-        let (signer, nonce) = ([1u8; 32], [2u8; 32]);
+        // Distinct arbitrary seeds. They are PDA seeds, not key material.
+        let (signer, nonce) = (Pubkey::new_unique().to_bytes(), Pubkey::new_unique().to_bytes());
         for source in [AMD_SOURCE, NITRO_SOURCE] {
             assert_eq!(
                 derive_used_nonce_pda_for_source(&program_id, source, &signer, &nonce),
