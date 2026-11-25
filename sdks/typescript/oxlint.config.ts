@@ -8,9 +8,8 @@
 // options.typeAware and ignorePatterns are root-config-only in Oxlint and
 // cannot be inherited via `extends`, so set them here in your own config.
 
-import { defineConfig } from 'oxlint';
-
 import solanaConfig from '@solana-config/oxc/oxlint';
+import { defineConfig } from 'oxlint';
 
 export default defineConfig({
     extends: [solanaConfig],

@@ -33,20 +33,20 @@ A passing run reports **17 passed**: 7 in `test/packet.test.cjs` and 10 in `test
 
 ## 1. Constants
 
-| Export | Value |
-| :--- | :--- |
+| Export                                   | Value                                         |
+| :--------------------------------------- | :-------------------------------------------- |
 | `SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID` | `EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh` |
-| `SNP_REPORT_SIZE` | 1184 |
-| `ATTESTED_SIGNER_ACCOUNT_SIZE` | **154** |
-| `MAX_NITRO_DOCUMENT_LEN` | **8192** |
-| `PACKET_DATA_SIZE` | 1232 |
-| `ATTESTATION_TTL_SLOTS` | `216000n` |
-| `VERIFY_AND_REGISTER_IX_LEN` | 1202 (8 + 8 + 1184 + 2 bumps) |
-| `VERIFY_ATOMIC_WITH_NONCE_IX_LEN` | 1265 (8 + 72 + 1184 + 1 bump) |
-| `VERIFY_NITRO_ATTESTATION_HEADER_LEN` | 53 (8 + 1 + 8 + 32 + 4) |
-| `VERIFY_NITRO_MODE_A` | 0 |
-| `VERIFY_NITRO_MODE_B` | 1 |
-| `MODE_B_REQUIRE_NONCE_DEFAULT` | `true` |
+| `SNP_REPORT_SIZE`                        | 1184                                          |
+| `ATTESTED_SIGNER_ACCOUNT_SIZE`           | **154**                                       |
+| `MAX_NITRO_DOCUMENT_LEN`                 | **8192**                                      |
+| `PACKET_DATA_SIZE`                       | 1232                                          |
+| `ATTESTATION_TTL_SLOTS`                  | `216000n`                                     |
+| `VERIFY_AND_REGISTER_IX_LEN`             | 1202 (8 + 8 + 1184 + 2 bumps)                 |
+| `VERIFY_ATOMIC_WITH_NONCE_IX_LEN`        | 1265 (8 + 72 + 1184 + 1 bump)                 |
+| `VERIFY_NITRO_ATTESTATION_HEADER_LEN`    | 53 (8 + 1 + 8 + 32 + 4)                       |
+| `VERIFY_NITRO_MODE_A`                    | 0                                             |
+| `VERIFY_NITRO_MODE_B`                    | 1                                             |
+| `MODE_B_REQUIRE_NONCE_DEFAULT`           | `true`                                        |
 
 The consumer reference program id, used as `--consumer-program` in the CLI, is `A5cSGHXvQmAejZSVu3D1HwMuaVBJnrt2khz7GVy4cUZZ`. This package pins the verifier id. Pass the consumer id into `computeCommitment` and into the Mode B builders.
 
@@ -90,14 +90,14 @@ There is no `idl.json` in this directory. There is no Anchor codegen step. The 8
 
 `tsc` emits the TypeScript declarations in `dist/index.d.ts`. That file is the type surface.
 
-| Export | Bytes |
-| :--- | :--- |
-| `INIT_POLICY_REGISTRY_DISCRIMINATOR` | `[90, 53, 0, 89, 164, 70, 107, 186]` |
-| `VERIFY_AND_REGISTER_DISCRIMINATOR` | `[246, 249, 100, 14, 102, 116, 92, 145]` |
-| `VERIFY_ATOMIC_DISCRIMINATOR` | `[65, 19, 195, 149, 67, 219, 25, 75]` |
-| `VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR` | `[209, 4, 10, 239, 3, 142, 223, 250]` |
-| `VERIFY_NITRO_ATTESTATION_DISCRIMINATOR` | `[107, 76, 178, 169, 215, 146, 23, 95]` |
-| `ATTESTED_SIGNER_DISCRIMINATOR` | `[43, 255, 114, 40, 233, 28, 127, 238]` |
+| Export                                   | Bytes                                    |
+| :--------------------------------------- | :--------------------------------------- |
+| `INIT_POLICY_REGISTRY_DISCRIMINATOR`     | `[90, 53, 0, 89, 164, 70, 107, 186]`     |
+| `VERIFY_AND_REGISTER_DISCRIMINATOR`      | `[246, 249, 100, 14, 102, 116, 92, 145]` |
+| `VERIFY_ATOMIC_DISCRIMINATOR`            | `[65, 19, 195, 149, 67, 219, 25, 75]`    |
+| `VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR` | `[209, 4, 10, 239, 3, 142, 223, 250]`    |
+| `VERIFY_NITRO_ATTESTATION_DISCRIMINATOR` | `[107, 76, 178, 169, 215, 146, 23, 95]`  |
+| `ATTESTED_SIGNER_DISCRIMINATOR`          | `[43, 255, 114, 40, 233, 28, 127, 238]`  |
 
 `parseAttestedSignerAccount` reads a 154-byte account:
 
@@ -131,13 +131,13 @@ Flags are 0/1; retain duplicates and all consumer accounts. The discriminator/pa
 
 PDA helpers:
 
-| Function | Seeds |
-| :--- | :--- |
-| `deriveSignerPda` | `["attested_signer_v2", signer]` |
-| `deriveVcekPda` | `["vcek_v2", chipIdHash, tcb_le]` |
-| `derivePolicyRegistryPda` | `["policy_registry"]` |
+| Function                      | Seeds                                                 |
+| :---------------------------- | :---------------------------------------------------- |
+| `deriveSignerPda`             | `["attested_signer_v2", signer]`                      |
+| `deriveVcekPda`               | `["vcek_v2", chipIdHash, tcb_le]`                     |
+| `derivePolicyRegistryPda`     | `["policy_registry"]`                                 |
 | `deriveUsedNoncePdaForSource` | `["nonce", [source], signer, nonce]` (AMD=1, Nitro=2) |
-| `deriveLegacyUsedNoncePda` | `["nonce", signer, nonce]` (readonly migration guard) |
+| `deriveLegacyUsedNoncePda`    | `["nonce", signer, nonce]` (readonly migration guard) |
 
 `@spec SCC-ARCH-001` is the on-chain create path. These helpers call `PublicKey.findProgramAddressSync`.
 
@@ -158,10 +158,10 @@ npm run build
 Derive the Mode A account for a workload key:
 
 ```javascript
-const { PublicKey } = require("@solana/web3.js");
-const { deriveSignerPda, SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID } = require("./dist/index.js");
+const { PublicKey } = require('@solana/web3.js');
+const { deriveSignerPda, SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID } = require('./dist/index.js');
 
-const workload = new PublicKey("<WORKLOAD_ED25519_PUBKEY>");
+const workload = new PublicKey('<WORKLOAD_ED25519_PUBKEY>');
 const [pda, bump] = deriveSignerPda(workload, SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID);
 console.log(pda.toBase58(), bump);
 ```
@@ -169,19 +169,19 @@ console.log(pda.toBase58(), bump);
 V3 hashes the complete consumer bytes and ordered effective account privileges, retaining duplicates. Compile the complete message with the final payer before obtaining evidence; `hashCompiledAction(message, consumerIndex)` resolves effective privileges. After filling evidence and transport addresses, call `validateCompiledAction` on the final message. Unresolved lookup tables and requested writable reserved accounts reject. Keep digest-derived nonce/upload accounts out of consumer accounts. Upgrade verifier, consumer helpers, SDKs and sidecar together and obtain fresh V3 evidence; there is no V1/V2 fallback. The low-level equivalent below requires already resolved effective metadata:
 
 ```javascript
-const { PublicKey } = require("@solana/web3.js");
-const { hashAction, computeCommitment } = require("./dist/index.js");
+const { PublicKey } = require('@solana/web3.js');
+const { hashAction, computeCommitment } = require('./dist/index.js');
 
-const consumer = new PublicKey("A5cSGHXvQmAejZSVu3D1HwMuaVBJnrt2khz7GVy4cUZZ");
+const consumer = new PublicKey('A5cSGHXvQmAejZSVu3D1HwMuaVBJnrt2khz7GVy4cUZZ');
 const actionHash = hashAction(
-  Uint8Array.of(1),
-  [/* {pubkey, isSigner, isWritable}, effective compiled flags in order */],
-  new Uint8Array(),
+    Uint8Array.of(1),
+    [/* {pubkey, isSigner, isWritable}, effective compiled flags in order */],
+    new Uint8Array(),
 );
 const commitment = computeCommitment(
-  new Uint8Array(32), // slot hash from SlotHashes
-  actionHash,
-  consumer,
+    new Uint8Array(32), // slot hash from SlotHashes
+    actionHash,
+    consumer,
 );
 ```
 
@@ -196,7 +196,6 @@ The local session builder receives a workload `Keypair` and signs locally. Keep 
 `test/packet.test.cjs` locks the 1,232-byte rejection for a raw SNP report. `test/nitro.test.cjs` locks `MAX_NITRO_DOCUMENT_LEN` at 8192, the Nitro header length, and the packet rejection for a document that fits the parser and misses the packet.
 
 `@spec SCC-SEC-001` is not re-implemented here. A debug-policy report is rejected by `solana-confidential-compute-core` and by `solana-confidential-compute-verifier`.
-
 
 ### Current Mode A V2 contract
 

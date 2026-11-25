@@ -7,8 +7,7 @@
 // Oxfmt has no `extends` mechanism, so spread the shared config into your own
 // defineConfig({...}).
 
-import { defineConfig } from 'oxfmt';
-
 import solanaFmt from '@solana-config/oxc/oxfmt';
+import { defineConfig } from 'oxfmt';
 
 export default defineConfig({ ...solanaFmt });

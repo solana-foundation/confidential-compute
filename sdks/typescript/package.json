@@ -1,40 +1,40 @@
 {
-  "name": "@solana/confidential-compute",
-  "version": "0.1.0",
-  "description": "TypeScript client SDK for Solana Confidential Compute Mode A and Mode B attestation.",
-  "license": "Apache-2.0",
-  "packageManager": "bun@1.4.4",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "src"
-  ],
-  "scripts": {
-    "build": "tsc",
-    "format": "oxfmt .",
-    "format:check": "oxfmt --check .",
-    "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit",
-    "test": "bun run build && node --test test/*.test.cjs"
-  },
-  "dependencies": {
-    "@noble/hashes": "^1.7.1",
-    "@solana/web3.js": "^1.98.4"
-  },
-  "devDependencies": {
-    "@solana-config/oxc": "0.1.1",
-    "@types/node": "^26.6.2",
-    "oxfmt": "0.80.0",
-    "oxlint": "1.95.0",
-    "oxlint-tsgolint": "7.0.2008",
-    "typescript": "^5.7.3"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  }
+    "name": "@solana/confidential-compute",
+    "version": "0.1.0",
+    "description": "TypeScript client SDK for Solana Confidential Compute Mode A and Mode B attestation.",
+    "license": "Apache-2.0",
+    "files": [
+        "dist",
+        "src"
+    ],
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "require": "./dist/index.js",
+            "default": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "format": "oxfmt .",
+        "format:check": "oxfmt --check .",
+        "lint": "oxlint --deny-warnings",
+        "typecheck": "tsc --noEmit",
+        "test": "bun run build && node --test test/*.test.cjs"
+    },
+    "dependencies": {
+        "@noble/hashes": "^1.7.1",
+        "@solana/web3.js": "^1.98.4"
+    },
+    "devDependencies": {
+        "@solana-config/oxc": "0.1.1",
+        "@types/node": "^26.6.2",
+        "oxfmt": "0.80.0",
+        "oxlint": "1.95.0",
+        "oxlint-tsgolint": "7.0.2008",
+        "typescript": "^5.7.3"
+    },
+    "packageManager": "bun@1.4.4"
 }
