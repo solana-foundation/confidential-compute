@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // Explicit governance policy fixtures for tests that previously configured the global allowlist.
 use solana_confidential_compute_core::SignatureVerifier;
 use solana_confidential_compute_verifier::state::{BackendPolicy, PolicyRegistry};

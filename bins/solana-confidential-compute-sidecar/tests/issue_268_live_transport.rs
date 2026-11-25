@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unreachable)]
 //! RPC routing proof only. Fixture bindings are changed to local test keys,
 //! invalidating their signatures; this fake does not claim crypto feasibility.
 use axum::{routing::post, Json, Router};

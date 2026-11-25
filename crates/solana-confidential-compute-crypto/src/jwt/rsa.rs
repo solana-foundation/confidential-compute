@@ -35,20 +35,19 @@ impl U2048 {
 
     pub fn from_be_bytes(bytes: &[u8; RSA2048_LEN]) -> Self {
         let mut limbs = [0u64; 32];
-        for (i, limb) in limbs.iter_mut().enumerate() {
-            let off = (31 - i) * 8;
-            let mut chunk = [0u8; 8];
-            chunk.copy_from_slice(&bytes[off..off + 8]);
-            *limb = u64::from_be_bytes(chunk);
+        // Limb 0 is the least significant, so it takes the last 8 bytes.
+        let (chunks, _) = bytes.as_chunks::<8>();
+        for (limb, chunk) in limbs.iter_mut().zip(chunks.iter().rev()) {
+            *limb = u64::from_be_bytes(*chunk);
         }
         Self(limbs)
     }
 
     pub fn to_be_bytes(self) -> [u8; RSA2048_LEN] {
         let mut bytes = [0u8; RSA2048_LEN];
-        for (i, limb) in self.0.iter().enumerate() {
-            let off = (31 - i) * 8;
-            bytes[off..off + 8].copy_from_slice(&limb.to_be_bytes());
+        let (chunks, _) = bytes.as_chunks_mut::<8>();
+        for (chunk, limb) in chunks.iter_mut().rev().zip(self.0.iter()) {
+            *chunk = limb.to_be_bytes();
         }
         bytes
     }
@@ -151,8 +150,8 @@ fn verify_pkcs1_sha256(em: &[u8; RSA2048_LEN], hash: &[u8; 32]) -> Result<(), Cr
         pad_diff |= b ^ 0xFF;
     }
     pad_diff |= em[204];
-    for (i, p) in DIGESTINFO_SHA256.iter().enumerate() {
-        pad_diff |= em[205 + i] ^ p;
+    for (b, p) in em[205..].iter().zip(DIGESTINFO_SHA256.iter()) {
+        pad_diff |= b ^ p;
     }
     if pad_diff != 0 {
         return Err(CryptoError::InvalidPadding);
@@ -219,6 +218,8 @@ fn add_mod(a: &U2048, b: &U2048, n: &U2048) -> U2048 {
 }
 
 #[cfg(test)]
+// Test-only reference arithmetic. The `u128` sum cannot overflow: 3 * (2^64 - 1) < 2^128.
+#[allow(clippy::arithmetic_side_effects)]
 fn add_carry(a: &U2048, b: &U2048) -> (U2048, u64) {
     let mut out = U2048::zero();
     let mut carry = 0u64;
@@ -262,6 +263,9 @@ fn cmp_ge(a: &U2048, b: &U2048) -> bool {
 
 /// Montgomery multiplication: $a b R^{-1} \bmod n$.
 #[cfg(test)]
+// Test-only reference arithmetic. The `u128` sums cannot overflow:
+// (2^64 - 1)^2 + 2 * (2^64 - 1) = 2^128 - 1.
+#[allow(clippy::arithmetic_side_effects)]
 fn mont_mul(a: &U2048, b: &U2048, n: &U2048, n0: u64) -> U2048 {
     let mut t = [0u64; 66];
     for i in 0..32 {
@@ -311,6 +315,16 @@ fn mont_mul(a: &U2048, b: &U2048, n: &U2048, n0: u64) -> U2048 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Limb 0 holds the least significant 8 bytes of the big-endian input.
+    #[test]
+    fn u2048_limb_order_is_little_endian_over_big_endian_bytes() {
+        let bytes: [u8; RSA2048_LEN] = core::array::from_fn(|i| i as u8);
+        let n = U2048::from_be_bytes(&bytes);
+        assert_eq!(n.0[0], u64::from_be_bytes([248, 249, 250, 251, 252, 253, 254, 255]));
+        assert_eq!(n.0[31], u64::from_be_bytes([0, 1, 2, 3, 4, 5, 6, 7]));
+        assert_eq!(n.to_be_bytes(), bytes);
+    }
 
     #[test]
     fn n0_times_n_is_minus_one() {

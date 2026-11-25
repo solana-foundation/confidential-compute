@@ -68,6 +68,8 @@ pub enum SdkError {
     /// Raw 1,184-byte reports do not fit in a 1,232-byte legacy packet.
     #[error("serialized transaction is {len} bytes and exceeds the 1232-byte packet limit")]
     PacketTooLarge { len: usize },
+    #[error("instruction data is {actual} bytes, expected {expected}")]
+    InstructionDataLengthMismatch { expected: usize, actual: usize },
 }
 
 pub(crate) fn ensure_packet_fits(tx: &Transaction) -> Result<(), SdkError> {

@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Synthetic P-384 certificate builders for `register_vcek` tests.
 //!
 //! Moved verbatim out of the `processor::tests` module alongside

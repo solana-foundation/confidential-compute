@@ -72,6 +72,8 @@ impl SignatureVerifier for InstructionIntrospectionVerifier {
 }
 
 #[cfg(test)]
+// Test-only fixture builders. SDLC 3.2.1 covers program code, not tests.
+#[allow(clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
     use solana_program::pubkey::Pubkey;

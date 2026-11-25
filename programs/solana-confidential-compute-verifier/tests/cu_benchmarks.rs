@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Compute Unit (CU) Benchmarking Suite for Solana Confidential Compute Verifier SBF Program.
 //!
 //! @spec SCC-PERF-001 SCC-PERF-002 SCC-PERF-003

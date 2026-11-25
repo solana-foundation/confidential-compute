@@ -11,7 +11,7 @@ use solana_sdk::hash::hashv;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
 
-use crate::backend_policy::{derive_backend_policy_pda, NVIDIA_SOURCE};
+use crate::backend_policy::{backend_policy_pda, NVIDIA_SOURCE};
 use crate::builder::{
     compute_commitment, derive_policy_registry_pda, derive_signer_pda, ensure_ix_packet_fits, SdkError,
 };
@@ -122,8 +122,7 @@ pub fn build_verify_nvidia_attestation_ix_for_program(
     } else {
         AccountMeta::new_readonly(MODE_B_ATTESTED_SIGNER_PLACEHOLDER, false)
     };
-    let backend =
-        derive_backend_policy_pda(program_id, NVIDIA_SOURCE).expect("NVIDIA source 4 is a supported backend").0;
+    let backend = backend_policy_pda(program_id, NVIDIA_SOURCE).0;
     let mut data = Vec::with_capacity(VERIFY_NVIDIA_ATTESTATION_LEN);
     data.extend_from_slice(&VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR);
     data.push(mode);
@@ -192,7 +191,7 @@ mod tests {
         assert_eq!(&ix.data[49..81], &gpu);
         let (nonce, _) = derive_nvidia_nonce_pda(&program_id, &workload, &gpu, &slot_hash);
         let (signer, _) = derive_signer_pda(&program_id, &workload.to_bytes());
-        let backend = derive_backend_policy_pda(&program_id, NVIDIA_SOURCE).unwrap().0;
+        let backend = crate::backend_policy::derive_backend_policy_pda(&program_id, NVIDIA_SOURCE).unwrap().0;
         assert_eq!(ix.accounts[0].pubkey, signer);
         assert!(ix.accounts[0].is_writable);
         assert_eq!(ix.accounts[2].pubkey, nonce);

@@ -1,6 +1,8 @@
 //! On-chain CPI helpers for Solana Confidential Compute consumer programs.
 //!
 //! This crate depends on `solana-program`, `solana-confidential-compute-core`, and `bytemuck`. It does not depend on `solana-sdk`.
+// SDLC 3.2.1: this crate runs on chain, so all arithmetic is checked.
+#![deny(clippy::arithmetic_side_effects)]
 
 pub mod anchor;
 pub mod error;
@@ -497,7 +499,7 @@ fn parse_nitro_payload(payload: &[u8]) -> Result<NitroDocumentView, ProgramError
     loop {
         match remaining {
             Some(0) => break,
-            Some(left) => remaining = Some(left - 1),
+            Some(left) => remaining = Some(left.checked_sub(1).ok_or(ProgramError::InvalidInstructionData)?),
             None if cur.is_break() => {
                 cur.read_break()?;
                 break;
@@ -578,8 +580,7 @@ impl<'a> CborCursor<'a> {
     /// Consumes one CBOR break stop (`0xff`).
     fn read_break(&mut self) -> Result<(), ProgramError> {
         if self.is_break() {
-            self.pos += 1;
-            Ok(())
+            self.skip(1)
         } else {
             Err(ProgramError::InvalidInstructionData)
         }
@@ -647,8 +648,9 @@ impl<'a> CborCursor<'a> {
     }
 
     fn read_initial(&mut self) -> Result<(u8, u8), ProgramError> {
-        let b = self.buf.get(self.pos).ok_or(ProgramError::InvalidInstructionData)?;
-        self.pos += 1;
+        let &[b] = self.read_exact(1)? else {
+            return Err(ProgramError::InvalidInstructionData);
+        };
         Ok((b >> 5, b & 0x1f))
     }
 
@@ -858,6 +860,8 @@ fn assert_attestation_signer_inner(
 }
 
 #[cfg(test)]
+// Test-only fixture builders. SDLC 3.2.1 covers program code, not tests.
+#[allow(clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
 
@@ -988,6 +992,32 @@ mod tests {
         let mut doc = vec![0xd2];
         doc.extend_from_slice(&cbor_array(&[cbor_bstr(&protected), vec![0xa0], cbor_bstr(&payload), cbor_bstr(&sig)]));
         doc
+    }
+
+    /// The pair count bounds the walk, and a truncated map fails closed.
+    #[test]
+    fn nitro_payload_map_count_bounds_the_walk() {
+        let pcrs = cbor_map_int(&[(0, cbor_bstr(&[7u8; 48]))]);
+        let pairs = [("user_data", cbor_bstr(&[9u8; 32])), ("pcrs", pcrs)];
+        let payload = cbor_map_text(&pairs);
+        assert_eq!(payload[0], 0xa2);
+        let view = parse_nitro_payload(&payload).unwrap();
+        assert_eq!(view.user_data, [9u8; 32]);
+        assert_eq!(view.pcr0, [7u8; 48]);
+
+        let mut too_many = payload.clone();
+        too_many[0] = 0xa3;
+        assert_eq!(parse_nitro_payload(&too_many).err(), Some(ProgramError::InvalidInstructionData));
+        let mut too_few = payload.clone();
+        too_few[0] = 0xa1;
+        assert_eq!(parse_nitro_payload(&too_few).err(), Some(ProgramError::InvalidInstructionData));
+
+        let mut indefinite = payload.clone();
+        indefinite[0] = 0xbf;
+        assert_eq!(parse_nitro_payload(&indefinite).err(), Some(ProgramError::InvalidInstructionData));
+        indefinite.push(0xff);
+        assert!(parse_nitro_payload(&indefinite).is_ok());
+        assert_eq!(parse_nitro_payload(&[]).err(), Some(ProgramError::InvalidInstructionData));
     }
 
     /// Indefinite payload map with `public_key: null` (`0xf6`), matching the hardware shape.

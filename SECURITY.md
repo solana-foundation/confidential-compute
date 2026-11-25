@@ -233,6 +233,8 @@ cargo clippy --workspace --all-targets -- -D warnings
 ```
 *Expected result:* 0 warnings, clean compilation.
 
+The workspace denies `clippy::unwrap_used`, `clippy::expect_used`, `clippy::panic`, `clippy::panic_in_result_fn`, `clippy::unreachable`, `clippy::todo` and `clippy::unimplemented` (SDLC 3.2.8). `clippy.toml` allows the first three in `#[cfg(test)]` code, and integration test files allow them at file level. An `expect` is allowed only when a compile-time `const` assertion proves it cannot fail. Mark it with `#[allow(clippy::expect_used)]` and a comment that names the proof. The crates on the onchain path (the verifier, the consumer reference, core, crypto and cpi) also deny `clippy::arithmetic_side_effects` at the crate root (SDLC 3.2.1). A unit test module that builds fixtures with unchecked arithmetic allows it.
+
 ### 5.3 TypeScript Client SDK Suite
 
 ```bash

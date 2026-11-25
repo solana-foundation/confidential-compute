@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Bank proof with a real P-384 signature on a locally generated full-size
 //! SNP report. Preloaded VCEK trust is a test fixture, not vendor/hardware proof.
 //!

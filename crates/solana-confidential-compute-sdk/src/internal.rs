@@ -90,8 +90,8 @@ pub fn build_register_signer_ix_for_program_oversized_with_endorsement(
     let policy_registry = derive_policy_registry_pda(program_id);
     let vcek = derive_vcek_pda(program_id, &chip_id_hash(&view, endorsement_xy)?, view.reported_tcb());
     let (signer_pda, signer_bump) = derive_signer_pda(program_id, &signer_pubkey);
-    let (nonce_pda, nonce_bump) = crate::nonce::derive_used_nonce_pda_for_source(program_id, 1, &signer_pubkey, &nonce)
-        .expect("fixed AMD source");
+    let (nonce_pda, nonce_bump) =
+        crate::nonce::used_nonce_pda(program_id, crate::backend_policy::AMD_SOURCE, &signer_pubkey, &nonce);
 
     let mut data = Vec::with_capacity(VERIFY_AND_REGISTER_IX_LEN);
     data.extend_from_slice(&VERIFY_AND_REGISTER_DISCRIMINATOR);
@@ -101,7 +101,12 @@ pub fn build_register_signer_ix_for_program_oversized_with_endorsement(
     // @spec SCC-SEC-008 SCC-ARCH-001 SCC-SDK-001
     data.push(nonce_bump);
     data.push(signer_bump);
-    assert_eq!(data.len(), VERIFY_AND_REGISTER_IX_LEN);
+    if data.len() != VERIFY_AND_REGISTER_IX_LEN {
+        return Err(SdkError::InstructionDataLengthMismatch {
+            expected: VERIFY_AND_REGISTER_IX_LEN,
+            actual: data.len(),
+        });
+    }
 
     Ok(crate::amd::with_amd_revocation(
         crate::nonce::with_legacy_nonce(
@@ -263,9 +268,12 @@ pub fn build_verify_atomic_with_nonce_ix_oversized_with_endorsement(
     let expected_commitment = view.nonce();
     let policy_registry = derive_policy_registry_pda(program_id);
     let vcek = derive_vcek_pda(program_id, &chip_id_hash(&view, endorsement_xy)?, view.reported_tcb());
-    let (nonce_pda, nonce_bump) =
-        crate::nonce::derive_used_nonce_pda_for_source(program_id, 1, &signer_pubkey, &expected_commitment)
-            .expect("fixed AMD source");
+    let (nonce_pda, nonce_bump) = crate::nonce::used_nonce_pda(
+        program_id,
+        crate::backend_policy::AMD_SOURCE,
+        &signer_pubkey,
+        &expected_commitment,
+    );
 
     let mut data = Vec::with_capacity(VERIFY_ATOMIC_WITH_NONCE_IX_LEN);
     data.extend_from_slice(&VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR);
@@ -275,7 +283,12 @@ pub fn build_verify_atomic_with_nonce_ix_oversized_with_endorsement(
     data.extend_from_slice(&report[..SNP_REPORT_SIZE]);
     // @spec SCC-SEC-008 SCC-ARCH-001 SCC-SDK-001
     data.push(nonce_bump);
-    assert_eq!(data.len(), VERIFY_ATOMIC_WITH_NONCE_IX_LEN);
+    if data.len() != VERIFY_ATOMIC_WITH_NONCE_IX_LEN {
+        return Err(SdkError::InstructionDataLengthMismatch {
+            expected: VERIFY_ATOMIC_WITH_NONCE_IX_LEN,
+            actual: data.len(),
+        });
+    }
 
     Ok(crate::amd::with_amd_revocation(
         crate::nonce::with_legacy_nonce(

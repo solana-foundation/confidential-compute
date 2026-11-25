@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Rent cleanup closes emit `solana-confidential-compute:governance:v1` only after a successful close.
 //! The new-state hash is SHA-256 of the closed account's empty data.
 use borsh::BorshDeserialize;

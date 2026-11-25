@@ -110,6 +110,11 @@ impl VcekAccount {
     }
 }
 
+/// Borrows `N` bytes of account data at `offset`. Short data is `InvalidAccountData`.
+fn array_at<const N: usize>(data: &[u8], offset: usize) -> Result<&[u8; N], ProgramError> {
+    data.get(offset..).and_then(<[u8]>::first_chunk).ok_or(ProgramError::InvalidAccountData)
+}
+
 /// Zero-copy view over a serialized `VcekAccount`.
 /// @spec SCC-ARCH-002
 pub struct VcekAccountView<'a> {
@@ -131,25 +136,23 @@ impl<'a> VcekAccountView<'a> {
         let Ok(now) = u64::try_from(now) else {
             return false;
         };
+        let Ok(valid_until) = self.valid_until_unix() else {
+            return false;
+        };
         self.data[VcekAccount::TRUST_PROFILE_OFFSET..VcekAccount::TRUST_PROFILE_OFFSET + 32]
             == VcekAccount::MILAN_TRUST_PROFILE
             && self.data[VcekAccount::REVOKED_OFFSET] == 0
-            && now
-                < u64::from_le_bytes(
-                    self.data[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::VALID_UNTIL_OFFSET + 8].try_into().unwrap(),
-                )
+            && now < valid_until
     }
 
     /// Authenticated exclusive certificate-chain deadline stored at registration.
-    pub fn valid_until_unix(&self) -> u64 {
-        u64::from_le_bytes(
-            self.data[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::VALID_UNTIL_OFFSET + 8].try_into().unwrap(),
-        )
+    pub fn valid_until_unix(&self) -> Result<u64, ProgramError> {
+        Ok(u64::from_le_bytes(*array_at(self.data, VcekAccount::VALID_UNTIL_OFFSET)?))
     }
 
     #[inline]
-    pub fn public_key_xy(&self) -> &[u8; 96] {
-        self.data[VcekAccount::PUBLIC_KEY_OFFSET..VcekAccount::PUBLIC_KEY_OFFSET + 96].try_into().unwrap()
+    pub fn public_key_xy(&self) -> Result<&'a [u8; 96], ProgramError> {
+        array_at(self.data, VcekAccount::PUBLIC_KEY_OFFSET)
     }
 
     #[inline]
@@ -255,18 +258,14 @@ impl<'a> PolicyRegistryView<'a> {
         if measurement.iter().all(|&b| b == 0) {
             return false;
         }
-        let count_bytes: [u8; 4] = self.data
-            [PolicyRegistry::MEASUREMENT_COUNT_OFFSET..PolicyRegistry::MEASUREMENT_COUNT_OFFSET + 4]
-            .try_into()
-            .unwrap();
-        let count = u32::from_le_bytes(count_bytes).min(8) as usize;
-        for i in 0..count {
-            let start = PolicyRegistry::MEASUREMENTS_OFFSET + i * 48;
-            if &self.data[start..start + 48] == measurement.as_slice() {
-                return true;
-            }
-        }
-        false
+        let Ok(count_bytes) = array_at::<4>(self.data, PolicyRegistry::MEASUREMENT_COUNT_OFFSET) else {
+            return false;
+        };
+        let count = u32::from_le_bytes(*count_bytes).min(8) as usize;
+        let Some(stored) = self.data.get(PolicyRegistry::MEASUREMENTS_OFFSET..) else {
+            return false;
+        };
+        stored.as_chunks::<48>().0.iter().take(count).any(|stored| stored == measurement)
     }
 }
 
@@ -410,6 +409,59 @@ impl GcpTenantPolicy {
             (Some(a), Some(s)) if self.discriminator == Self::DISCRIMINATOR => Ok((a, s)),
             _ => Err(ProgramError::InvalidAccountData),
         }
+    }
+}
+
+#[cfg(test)]
+mod view_reads {
+    use super::*;
+
+    /// `array_at` returns `InvalidAccountData` when the read extends past the
+    /// end of the data, including when the offset overflows.
+    #[test]
+    fn array_at_rejects_short_data_rather_than_panicking() {
+        let data = [1u8, 2, 3, 4, 5];
+        assert_eq!(array_at::<4>(&data, 1), Ok(&[2, 3, 4, 5]));
+        assert_eq!(array_at::<4>(&data, 2), Err(ProgramError::InvalidAccountData));
+        assert_eq!(array_at::<1>(&data, usize::MAX), Err(ProgramError::InvalidAccountData));
+    }
+
+    #[test]
+    fn vcek_view_reads_the_serialized_key_and_deadline() {
+        let mut xy = [0u8; 96];
+        xy.iter_mut().enumerate().for_each(|(i, b)| *b = i as u8);
+        let account = VcekAccount::new([9; 32], 7, xy, 11, 254).with_validity(1_700_000_000);
+        let bytes = borsh::to_vec(&account).unwrap();
+        let view = VcekAccountView::try_from_slice(&bytes).unwrap();
+        assert_eq!(view.public_key_xy(), Ok(&xy));
+        assert_eq!(view.valid_until_unix(), Ok(1_700_000_000));
+        assert_eq!(view.bump(), 254);
+        assert!(view.is_trusted_at_unix(1_699_999_999));
+        assert!(!view.is_trusted_at_unix(1_700_000_000));
+        assert!(!view.is_trusted_at_unix(-1));
+    }
+
+    #[test]
+    fn legacy_measurement_lookup_reads_only_the_counted_entries() {
+        let mut data = vec![0u8; PolicyRegistry::SIZE];
+        data[..8].copy_from_slice(&POLICY_REGISTRY_DISCRIMINATOR);
+        let stored = &mut data[PolicyRegistry::MEASUREMENTS_OFFSET..PolicyRegistry::MEASUREMENTS_OFFSET + 8 * 48];
+        for (i, entry) in stored.as_chunks_mut::<48>().0.iter_mut().enumerate() {
+            entry.fill(i as u8 + 1);
+        }
+        let count_at = PolicyRegistry::MEASUREMENT_COUNT_OFFSET;
+        data[count_at..count_at + 4].copy_from_slice(&3u32.to_le_bytes());
+        let view = PolicyRegistryView::try_from_slice(&data).unwrap();
+        assert!(view.is_measurement_allowed(&[1; 48]));
+        assert!(view.is_measurement_allowed(&[3; 48]));
+        assert!(!view.is_measurement_allowed(&[4; 48]), "entry 4 is past the count");
+        assert!(!view.is_measurement_allowed(&[0; 48]));
+
+        // A count above eight reads at most the eight stored entries.
+        data[count_at..count_at + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+        let view = PolicyRegistryView::try_from_slice(&data).unwrap();
+        assert!(view.is_measurement_allowed(&[8; 48]));
+        assert!(!view.is_measurement_allowed(&[9; 48]));
     }
 }
 

@@ -84,13 +84,22 @@ const BODY_REPORT_DATA: usize = 520;
 
 /// Borrowed view over a validated Intel TDX v4 quote.
 ///
-/// Construction validates the header and every offset this type exposes, so
-/// the accessors cannot panic once a `TdxQuote` exists.
+/// Construction validates the header and borrows every field this type
+/// exposes, so the accessors cannot fail once a `TdxQuote` exists.
 /// @spec SCC-TDX-001
 #[derive(Debug, Clone, Copy)]
 pub struct TdxQuote<'a> {
-    raw: &'a [u8],
-    qe_auth_data_len: usize,
+    isv_signed_region: &'a [u8; ISV_SIGNED_LEN],
+    isv_signature: &'a [u8; 64],
+    attestation_pubkey_xy: &'a [u8; 64],
+    qe_report: &'a [u8; QE_REPORT_LEN],
+    qe_report_signature: &'a [u8; 64],
+    qe_report_data: &'a [u8; 64],
+    qe_auth_data: &'a [u8],
+    mr_td: &'a [u8; 48],
+    mr_config_id: &'a [u8; 48],
+    rtmrs: [&'a [u8; 48]; 4],
+    report_data: &'a [u8; 64],
 }
 
 impl<'a> TdxQuote<'a> {
@@ -136,68 +145,77 @@ impl<'a> TdxQuote<'a> {
             return Err(VerifierError::InvalidInstruction.into());
         }
 
-        Ok(Self { raw, qe_auth_data_len })
+        let body = array_ref::<TD10_BODY_LEN>(raw, QUOTE_HEADER_LEN)?;
+        Ok(Self {
+            isv_signed_region: array_ref(raw, 0)?,
+            isv_signature: array_ref(raw, OFF_ISV_SIGNATURE)?,
+            attestation_pubkey_xy: array_ref(raw, OFF_ATTESTATION_PUBKEY)?,
+            qe_report: array_ref(raw, OFF_QE_REPORT)?,
+            qe_report_signature: array_ref(raw, OFF_QE_REPORT_SIGNATURE)?,
+            qe_report_data: array_ref(raw, OFF_QE_REPORT + QE_REPORT_DATA_OFFSET)?,
+            qe_auth_data: slice(raw, OFF_QE_AUTH_DATA, qe_auth_data_len)?,
+            mr_td: array_ref(body, BODY_MR_TD)?,
+            mr_config_id: array_ref(body, BODY_MR_CONFIG_ID)?,
+            rtmrs: [
+                array_ref(body, BODY_RTMR0)?,
+                array_ref(body, BODY_RTMR0 + RTMR_LEN)?,
+                array_ref(body, BODY_RTMR0 + RTMR_LEN * 2)?,
+                array_ref(body, BODY_RTMR0 + RTMR_LEN * 3)?,
+            ],
+            report_data: array_ref(body, BODY_REPORT_DATA)?,
+        })
     }
 
     /// Bytes covered by the ISV signature: `header || td_report_body`.
     pub fn isv_signed_region(&self) -> &'a [u8] {
-        &self.raw[..ISV_SIGNED_LEN]
+        self.isv_signed_region
     }
 
     /// ECDSA `r || s` produced by the attestation key over the signed region.
     pub fn isv_signature(&self) -> &'a [u8; 64] {
-        array_ref64(self.raw, OFF_ISV_SIGNATURE)
+        self.isv_signature
     }
 
     /// Attestation public key as raw uncompressed `X || Y`, without the
     /// `0x04` SEC1 prefix.
     pub fn attestation_pubkey_xy(&self) -> &'a [u8; 64] {
-        array_ref64(self.raw, OFF_ATTESTATION_PUBKEY)
+        self.attestation_pubkey_xy
     }
 
     /// The QE report. This is the message the PCK leaf key signs.
     pub fn qe_report(&self) -> &'a [u8] {
-        &self.raw[OFF_QE_REPORT..OFF_QE_REPORT + QE_REPORT_LEN]
+        self.qe_report
     }
 
     /// ECDSA `r || s` produced by the PCK leaf key over [`Self::qe_report`].
     pub fn qe_report_signature(&self) -> &'a [u8; 64] {
-        array_ref64(self.raw, OFF_QE_REPORT_SIGNATURE)
+        self.qe_report_signature
     }
 
     /// QE authentication data, length-prefixed in the quote.
     pub fn qe_auth_data(&self) -> &'a [u8] {
-        &self.raw[OFF_QE_AUTH_DATA..OFF_QE_AUTH_DATA + self.qe_auth_data_len]
+        self.qe_auth_data
     }
 
     /// `user_report_data` of the QE report: `SHA-256(att_key || auth_data)`
     /// followed by 32 zero bytes.
     pub fn qe_report_data(&self) -> &'a [u8; 64] {
-        array_ref64(self.raw, OFF_QE_REPORT + QE_REPORT_DATA_OFFSET)
-    }
-
-    fn body(&self) -> &'a [u8] {
-        &self.raw[QUOTE_HEADER_LEN..QUOTE_HEADER_LEN + TD10_BODY_LEN]
+        self.qe_report_data
     }
 
     /// `MRTD` -- the measurement of the Trust Domain's initial contents.
     pub fn mr_td(&self) -> &'a [u8; 48] {
-        array_ref48(self.body(), BODY_MR_TD)
+        self.mr_td
     }
 
     /// `MRCONFIGID`.
     pub fn mr_config_id(&self) -> &'a [u8; 48] {
-        array_ref48(self.body(), BODY_MR_CONFIG_ID)
+        self.mr_config_id
     }
 
     /// The four runtime measurement registers, in order.
     pub fn rtmrs(&self) -> [&'a [u8; 48]; 4] {
-        [
-            array_ref48(self.body(), BODY_RTMR0),
-            array_ref48(self.body(), BODY_RTMR0 + 48),
-            array_ref48(self.body(), BODY_RTMR0 + 96),
-            array_ref48(self.body(), BODY_RTMR0 + 144),
-        ]
+        self.rtmrs
     }
 
     /// The 64-byte `REPORTDATA` the guest asked the hardware to sign.
@@ -205,7 +223,7 @@ impl<'a> TdxQuote<'a> {
     /// This is the only field an enclave controls, and therefore the only
     /// place a workload signer can be bound into hardware evidence.
     pub fn report_data(&self) -> &'a [u8; 64] {
-        array_ref64(self.body(), BODY_REPORT_DATA)
+        self.report_data
     }
 
     /// Verify that the QE report commits to the attestation key.
@@ -399,9 +417,7 @@ pub fn reject_debug_td(body: &[u8]) -> Result<(), ProgramError> {
 ///
 /// @spec SCC-TDX-002
 pub fn td_platform_digest(body: &[u8]) -> Result<[u8; 32], ProgramError> {
-    let field = |offset: usize, len: usize| {
-        body.get(offset..offset + len).ok_or(ProgramError::from(VerifierError::InvalidInstruction))
-    };
+    let field = |offset: usize, len: usize| slice(body, offset, len);
     Ok(solana_program::hash::hashv(&[
         field(BODY_TEE_TCB_SVN, 16)?,
         field(BODY_MR_SEAM, 48)?,
@@ -422,7 +438,8 @@ pub fn td_platform_digest(body: &[u8]) -> Result<[u8; 32], ProgramError> {
 /// precompile validates the point itself.
 pub fn compress_p256(xy: &[u8; 64]) -> [u8; 33] {
     let mut out = [0u8; 33];
-    out[0] = 2 + (xy[63] & 1);
+    // SEC1 prefix: 0x02 for an even Y, 0x03 for an odd Y.
+    out[0] = 0x02 | (xy[63] & 1);
     out[1..].copy_from_slice(&xy[..32]);
     out
 }
@@ -447,18 +464,10 @@ const P256_ORDER: [u8; 32] = [
 /// normalized bytes the client put in the precompile instruction.
 pub fn normalize_low_s(signature: &[u8; 64]) -> [u8; 64] {
     let mut out = *signature;
-    if !is_low_s(&out[32..]) {
-        let mut borrow = 0i16;
-        for i in (0..32).rev() {
-            let diff = i16::from(P256_ORDER[i]) - i16::from(out[32 + i]) - borrow;
-            if diff < 0 {
-                out[32 + i] = (diff + 256) as u8;
-                borrow = 1;
-            } else {
-                out[32 + i] = diff as u8;
-                borrow = 0;
-            }
-        }
+    let mut s = [0u8; 32];
+    s.copy_from_slice(&signature[32..]);
+    if !is_low_s(&s) {
+        out[32..].copy_from_slice(&crate::groth16::sub_be32(&P256_ORDER, &s));
     }
     out
 }
@@ -565,7 +574,8 @@ pub fn extract_secp256r1_verified(
         return Err(VerifierError::InvalidInstruction.into());
     }
 
-    let expected_len = PRECOMPILE_DATA_START + 33 + 64 + message_len;
+    let expected_len =
+        (PRECOMPILE_DATA_START + 33 + 64).checked_add(message_len).ok_or(VerifierError::InvalidInstruction)?;
 
     // The precompile may sit anywhere before this instruction: a caller can
     // legitimately prepend a compute-budget instruction.
@@ -629,14 +639,8 @@ fn array4(buf: &[u8], offset: usize) -> Result<[u8; 4], ProgramError> {
     Ok([s[0], s[1], s[2], s[3]])
 }
 
-// The two helpers below are only reachable from `TdxQuote`, whose constructor
-// has already bounds-checked every offset they are called with.
-fn array_ref48(buf: &[u8], offset: usize) -> &[u8; 48] {
-    buf[offset..offset + 48].try_into().expect("offset validated by TdxQuote::parse")
-}
-
-fn array_ref64(buf: &[u8], offset: usize) -> &[u8; 64] {
-    buf[offset..offset + 64].try_into().expect("offset validated by TdxQuote::parse")
+fn array_ref<const N: usize>(buf: &[u8], offset: usize) -> Result<&[u8; N], ProgramError> {
+    buf.get(offset..).and_then(<[u8]>::first_chunk).ok_or_else(|| VerifierError::InvalidInstruction.into())
 }
 
 #[cfg(test)]
@@ -689,6 +693,70 @@ mod tests {
         let mut one_above = P256_HALF_ORDER;
         one_above[31] += 1;
         assert!(!is_low_s(&one_above));
+    }
+
+    /// A huge `message_len` overflows `PRECOMPILE_DATA_START + 33 + 64 + message_len`.
+    /// The extraction returns `InvalidInstruction`.
+    #[test]
+    fn an_overflowing_message_length_is_rejected_rather_than_panicking() {
+        let key = instructions::ID;
+        let owner = solana_program::sysvar::ID;
+        let mut lamports = 0u64;
+        // The trailing u16 of the Instructions sysvar is the current index: 1.
+        let mut data = vec![0u8, 0, 1, 0];
+        let sysvar = AccountInfo::new(&key, false, false, &mut lamports, &mut data, &owner, false);
+        for message_len in [usize::MAX, usize::MAX - PRECOMPILE_DATA_START] {
+            let result = extract_secp256r1_verified(&sysvar, message_len);
+            let expected = ProgramError::from(VerifierError::InvalidInstruction);
+            assert!(matches!(result, Err(ref err) if *err == expected), "message_len {message_len}");
+        }
+    }
+
+    /// `normalize_low_s` and the groth16 negation share `sub_be32`. Check it
+    /// against an independent 256-bit subtraction built from two `u128` halves.
+    #[test]
+    fn sub_be32_matches_a_u128_reference() {
+        fn reference(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
+            let half = |x: &[u8; 32], hi: bool| {
+                let range = if hi { 0..16 } else { 16..32 };
+                u128::from_be_bytes(x[range].try_into().unwrap())
+            };
+            let (lo, borrow) = half(a, false).overflowing_sub(half(b, false));
+            let hi = half(a, true).wrapping_sub(half(b, true)).wrapping_sub(u128::from(borrow));
+            let mut out = [0u8; 32];
+            out[..16].copy_from_slice(&hi.to_be_bytes());
+            out[16..].copy_from_slice(&lo.to_be_bytes());
+            out
+        }
+        let mut one = [0u8; 32];
+        one[31] = 1;
+        let mut low_borrow = [0u8; 32];
+        low_borrow[16] = 1;
+        let mut cases = vec![
+            ([0u8; 32], [0u8; 32]),
+            ([0u8; 32], one),
+            ([0xFF; 32], [0xFF; 32]),
+            ([0xFF; 32], one),
+            (low_borrow, one),
+            (P256_ORDER, one),
+            (P256_ORDER, P256_HALF_ORDER),
+            (one, P256_ORDER),
+        ];
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        for _ in 0..64 {
+            let mut a = [0u8; 32];
+            let mut b = [0u8; 32];
+            for byte in a.iter_mut().chain(b.iter_mut()) {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                *byte = state.to_le_bytes()[0];
+            }
+            cases.push((a, b));
+        }
+        for (a, b) in cases {
+            assert_eq!(crate::groth16::sub_be32(&a, &b), reference(&a, &b), "a={a:?} b={b:?}");
+        }
     }
 
     #[test]

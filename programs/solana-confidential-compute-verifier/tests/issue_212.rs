@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Regression for #212: reject out-of-capacity policy writes while preserving
 //! legacy global list replacement and the full supported u8 TCB range.
 use borsh::{BorshDeserialize, BorshSerialize};

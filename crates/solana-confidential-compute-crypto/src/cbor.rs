@@ -71,8 +71,7 @@ impl<'a> CborCursor<'a> {
     #[inline]
     pub fn read_break(&mut self) -> Result<(), CryptoError> {
         if self.is_break() {
-            self.pos += 1;
-            Ok(())
+            self.skip(1)
         } else {
             Err(CryptoError::MalformedCbor)
         }
@@ -139,10 +138,9 @@ impl<'a> CborCursor<'a> {
         match self.read_header()? {
             CborHeader::Unsigned(v) => i64::try_from(v).map_err(|_| CryptoError::MalformedCbor),
             CborHeader::Negative(n) => {
-                if n > i64::MAX as u64 {
-                    return Err(CryptoError::MalformedCbor);
-                }
-                Ok(-1 - (n as i64))
+                // RFC 8949 major type 1 encodes the value `-1 - n`.
+                let n = i64::try_from(n).map_err(|_| CryptoError::MalformedCbor)?;
+                (-1i64).checked_sub(n).ok_or(CryptoError::MalformedCbor)
             }
             _ => Err(CryptoError::MalformedCbor),
         }
@@ -186,11 +184,9 @@ impl<'a> CborCursor<'a> {
     }
 
     fn read_initial(&mut self) -> Result<(u8, u8), CryptoError> {
-        if self.pos >= self.buf.len() {
+        let &[b] = self.read_exact(1)? else {
             return Err(CryptoError::MalformedCbor);
-        }
-        let b = self.buf[self.pos];
-        self.pos += 1;
+        };
         Ok((b >> 5, b & 0x1f))
     }
 
@@ -234,10 +230,9 @@ impl<'a> CborCursor<'a> {
     }
 
     fn skip_value_depth(&mut self, remaining_depth: u8) -> Result<(), CryptoError> {
-        if remaining_depth == 0 {
+        let Some(child_depth) = remaining_depth.checked_sub(1) else {
             return Err(CryptoError::MalformedCbor);
-        }
-        let child_depth = remaining_depth - 1;
+        };
         match self.read_header()? {
             CborHeader::Unsigned(_) | CborHeader::Negative(_) | CborHeader::Simple(_) => Ok(()),
             CborHeader::Bytes(len) | CborHeader::Text(len) => self.skip(len),
@@ -423,5 +418,42 @@ mod tests {
         let mut c = CborCursor::new(&buf);
         c.skip_value().unwrap();
         assert!(c.is_empty());
+    }
+
+    /// Major type 1 decodes to `-1 - n`. `n = i64::MAX` gives `i64::MIN`, and a
+    /// larger `n` is malformed.
+    #[test]
+    fn negative_integer_range_ends() {
+        let mut max = vec![0x3b];
+        max.extend_from_slice(&(i64::MAX as u64).to_be_bytes());
+        assert_eq!(CborCursor::new(&max).read_int(), Ok(i64::MIN));
+        let mut over = vec![0x3b];
+        over.extend_from_slice(&(i64::MAX as u64 + 1).to_be_bytes());
+        assert_eq!(CborCursor::new(&over).read_int(), Err(CryptoError::MalformedCbor));
+        assert_eq!(CborCursor::new(&[0x20]).read_int(), Ok(-1));
+        assert_eq!(CborCursor::new(&[0x37]).read_int(), Ok(-24));
+    }
+
+    /// The skip depth limit is eight levels. Eight levels pass and nine fail.
+    #[test]
+    fn skip_depth_limit_is_eight_levels() {
+        let nested = |arrays: usize| {
+            let mut out = vec![0x81; arrays];
+            out.push(0x00);
+            out
+        };
+        let seven = nested(7);
+        let mut ok = CborCursor::new(&seven);
+        assert_eq!(ok.skip_value(), Ok(()));
+        assert!(ok.is_empty());
+        assert_eq!(CborCursor::new(&nested(8)).skip_value(), Err(CryptoError::MalformedCbor));
+    }
+
+    #[test]
+    fn read_break_and_initial_byte_fail_closed_at_the_end() {
+        let mut cur = CborCursor::new(&[0xff]);
+        assert_eq!(cur.read_break(), Ok(()));
+        assert_eq!(cur.read_break(), Err(CryptoError::MalformedCbor));
+        assert_eq!(cur.read_header(), Err(CryptoError::MalformedCbor));
     }
 }

@@ -22,7 +22,9 @@ pub fn hash_action_parts<'a>(
     // ordered byte segments is bit-identical to streaming them through `Hasher`,
     // so the committed digest is unchanged.
     let count_le = (count as u32).to_le_bytes();
-    let len_le = ((discriminator.len() + payload.len()) as u32).to_le_bytes();
+    // A slice holds at most `isize::MAX` bytes, so this sum is at most
+    // `usize::MAX - 1` and the saturation never applies.
+    let len_le = (discriminator.len().saturating_add(payload.len()) as u32).to_le_bytes();
     let mut flag_bytes: Vec<[u8; 2]> = Vec::new();
     let mut segments: Vec<&[u8]> = Vec::new();
     let collected: Vec<(&Pubkey, bool, bool)> = accounts.collect();

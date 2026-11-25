@@ -31,7 +31,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
 use solana_sdk::transaction::VersionedTransaction;
 
-use crate::backend_policy::derive_backend_policy_pda;
+use crate::backend_policy::backend_policy_pda;
 
 /// Backend policy source and nonce seed tag for Intel TDX.
 /// @spec SCC-TDX-001
@@ -124,6 +124,8 @@ pub enum TdxError {
     Compile(String),
     #[error("serialized v1 transaction is {len} bytes and exceeds the {max}-byte limit")]
     TransactionTooLarge { len: usize, max: usize },
+    #[error("secp256r1 message must be at most {max} bytes, got {len}")]
+    PrecompileMessageTooLong { len: usize, max: usize },
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +170,7 @@ pub fn derive_attested_signer_pda(program_id: &Pubkey, signer: &Pubkey) -> (Pubk
 
 /// Source-5 backend policy, which holds the PCK, QE, platform and GPU allowlists.
 pub fn derive_tdx_backend_policy_pda(program_id: &Pubkey) -> Pubkey {
-    derive_backend_policy_pda(program_id, TDX_SOURCE).expect("source 5 is a supported backend").0
+    backend_policy_pda(program_id, TDX_SOURCE).0
 }
 
 /// `SHA-256(subject || quote_body_digest || slot_hash || challenge_nonce)`.
@@ -263,8 +265,13 @@ pub fn normalize_low_s(signature: &[u8; 64]) -> [u8; 64] {
 /// other form.
 ///
 /// @spec SCC-TDX-001
-pub fn build_secp256r1_verify_ix(compressed_pubkey: &[u8; 33], signature: &[u8; 64], message: &[u8]) -> Instruction {
-    let message_size = u16::try_from(message.len()).expect("TDX messages are 384 or 632 bytes");
+pub fn build_secp256r1_verify_ix(
+    compressed_pubkey: &[u8; 33],
+    signature: &[u8; 64],
+    message: &[u8],
+) -> Result<Instruction, TdxError> {
+    let message_size = u16::try_from(message.len())
+        .map_err(|_| TdxError::PrecompileMessageTooLong { len: message.len(), max: usize::from(u16::MAX) })?;
     let mut data = Vec::with_capacity(SECP256R1_PRECOMPILE_OVERHEAD + message.len());
     data.push(1); // num_signatures
     data.push(0); // padding
@@ -278,7 +285,7 @@ pub fn build_secp256r1_verify_ix(compressed_pubkey: &[u8; 33], signature: &[u8; 
     data.extend_from_slice(compressed_pubkey);
     data.extend_from_slice(&normalize_low_s(signature));
     data.extend_from_slice(message);
-    Instruction { program_id: solana_sdk_ids::secp256r1_program::ID, accounts: vec![], data }
+    Ok(Instruction { program_id: solana_sdk_ids::secp256r1_program::ID, accounts: vec![], data })
 }
 
 // ---------------------------------------------------------------------------
@@ -586,7 +593,7 @@ pub fn build_tdx_enrolment_instructions_for_program(
     let attestation_pubkey = compress_p256(enrolment.attestation_pubkey_xy);
 
     Ok(vec![
-        build_secp256r1_verify_ix(pck_pubkey, enrolment.qe_report_signature, qe_report),
+        build_secp256r1_verify_ix(pck_pubkey, enrolment.qe_report_signature, qe_report)?,
         build_verify_tdx_qe_report_ix_for_program(
             program_id,
             &enrolment.payer,
@@ -596,7 +603,7 @@ pub fn build_tdx_enrolment_instructions_for_program(
             enrolment.model_digest,
             enrolment.qe_auth_data,
         )?,
-        build_secp256r1_verify_ix(&attestation_pubkey, enrolment.isv_signature, isv_signed),
+        build_secp256r1_verify_ix(&attestation_pubkey, enrolment.isv_signature, isv_signed)?,
         build_verify_tdx_quote_ix_for_program(
             program_id,
             &enrolment.payer,
@@ -686,6 +693,20 @@ pub fn build_tdx_enrolment_tx(
 mod tests {
     use super::*;
     use solana_confidential_compute_verifier::payload as vix;
+
+    /// The precompile message size is a `u16`. A longer message returns
+    /// `PrecompileMessageTooLong`.
+    #[test]
+    fn secp256r1_builder_rejects_a_message_longer_than_u16() {
+        let message = vec![0u8; usize::from(u16::MAX) + 1];
+        assert_eq!(
+            build_secp256r1_verify_ix(&[2; 33], &[1; 64], &message),
+            Err(TdxError::PrecompileMessageTooLong { len: message.len(), max: usize::from(u16::MAX) })
+        );
+        let fits = vec![0u8; usize::from(u16::MAX)];
+        let ix = build_secp256r1_verify_ix(&[2; 33], &[1; 64], &fits).unwrap();
+        assert_eq!(&ix.data[12..14], &u16::MAX.to_le_bytes());
+    }
     use solana_confidential_compute_verifier::state::{ChallengeAccount, TdxSessionAccount};
     use solana_confidential_compute_verifier::tdx as vtdx;
 
@@ -950,7 +971,7 @@ mod tests {
     fn precompile_instructions_use_the_layout_the_program_pins() {
         let f = fixture();
 
-        let qe_ix = build_secp256r1_verify_ix(&f.pck, &f.qe_sig, &f.qe_report);
+        let qe_ix = build_secp256r1_verify_ix(&f.pck, &f.qe_sig, &f.qe_report).unwrap();
         assert_eq!(qe_ix.program_id, vtdx::SECP256R1_PROGRAM_ID);
         assert!(qe_ix.accounts.is_empty());
         assert_eq!(qe_ix.data.len(), QE_PRECOMPILE_IX_LEN);
@@ -969,7 +990,7 @@ mod tests {
         assert_eq!(&qe_ix.data[49..113], &normalize_low_s(&f.qe_sig)[..]);
         assert_eq!(&qe_ix.data[113..], &f.qe_report[..]);
 
-        let quote_ix = build_secp256r1_verify_ix(&compress_p256(&f.att_xy), &f.isv_sig, &f.isv_signed);
+        let quote_ix = build_secp256r1_verify_ix(&compress_p256(&f.att_xy), &f.isv_sig, &f.isv_signed).unwrap();
         assert_eq!(quote_ix.data.len(), QUOTE_PRECOMPILE_IX_LEN);
         assert_eq!(quote_ix.data.len(), 745);
         assert_eq!(&quote_ix.data[113..], &f.isv_signed[..]);

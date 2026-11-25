@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::program_stubs::{set_syscall_stubs, SyscallStubs};
 use solana_program::{account_info::AccountInfo, pubkey::Pubkey};

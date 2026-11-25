@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Regressions for PR #325's unauthenticated NVIDIA authority creation.
 //! These are attacker inputs, not NVIDIA hardware evidence.
 //! Proof-backed packets are covered below.

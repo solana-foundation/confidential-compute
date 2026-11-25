@@ -271,10 +271,10 @@ pub fn parse_vcek_identity(vcek_cert_der: &[u8]) -> Result<VcekIdentity, CryptoE
 /// AMD 57230 Table 9, little-endian `TCB_VERSION`:
 /// `.1` boot loader, `.2` TEE, `.4`–`.7` reserved, `.3` SNP, `.8` microcode.
 fn spl_component_index(oid: &[u8]) -> Option<usize> {
-    if oid.len() != OID_SPL_PREFIX.len() + 1 || !oid.starts_with(OID_SPL_PREFIX) {
+    let &[component] = oid.strip_prefix(OID_SPL_PREFIX)? else {
         return None;
-    }
-    match oid[oid.len() - 1] {
+    };
+    match component {
         1 => Some(0),
         2 => Some(1),
         4 => Some(2),
@@ -413,7 +413,8 @@ fn der_integer_u64(content: &[u8]) -> Result<u64, CryptoError> {
         return Err(CryptoError::MalformedCertificate);
     }
     let mut be = [0u8; 8];
-    be[8 - digits.len()..].copy_from_slice(digits);
+    let start = be.len().checked_sub(digits.len()).ok_or(CryptoError::MalformedCertificate)?;
+    be[start..].copy_from_slice(digits);
     Ok(u64::from_be_bytes(be))
 }
 
@@ -680,10 +681,9 @@ fn contains_be_coded_vlek(value: &[u8], width: usize) -> bool {
         return false;
     }
     value.windows(need).any(|window| {
-        VLEK_MARKER.iter().enumerate().all(|(index, byte)| {
-            let start = index * width;
-            let unit = &window[start..start + width];
-            unit[..width - 1].iter().all(|&b| b == 0) && unit[width - 1] == *byte
+        window.chunks_exact(width).zip(VLEK_MARKER.iter()).all(|(unit, byte)| match unit.split_last() {
+            Some((last, high)) => high.iter().all(|&b| b == 0) && last == byte,
+            None => false,
         })
     })
 }
@@ -814,16 +814,20 @@ fn i2osp_48(int_bytes: &[u8]) -> Result<[u8; 48], CryptoError> {
     } else if int_bytes[0] >= 0x80 {
         return Err(CryptoError::InvalidP384Signature);
     }
-    let mut start = 0;
-    while start + 1 < int_bytes.len() && int_bytes[start] == 0 {
-        start += 1;
+    // Drop leading zero bytes, but keep at least one byte.
+    let mut int_bytes = int_bytes;
+    while let [0, rest @ ..] = int_bytes {
+        if rest.is_empty() {
+            break;
+        }
+        int_bytes = rest;
     }
-    let int_bytes = &int_bytes[start..];
     if int_bytes.is_empty() || int_bytes.len() > 48 {
         return Err(CryptoError::InvalidP384Signature);
     }
     let mut out = [0u8; 48];
-    out[48 - int_bytes.len()..].copy_from_slice(int_bytes);
+    let start = out.len().checked_sub(int_bytes.len()).ok_or(CryptoError::InvalidP384Signature)?;
+    out[start..].copy_from_slice(int_bytes);
     Ok(out)
 }
 
@@ -838,32 +842,25 @@ impl<'a> DerCursor<'a> {
     }
 
     fn read_tag_len(&mut self) -> Result<(u8, usize), CryptoError> {
-        if self.pos >= self.buf.len() {
+        let &[tag, first] = self.take(2)? else {
             return Err(CryptoError::MalformedCertificate);
-        }
-        let tag = self.buf[self.pos];
-        self.pos += 1;
-        if self.pos >= self.buf.len() {
-            return Err(CryptoError::MalformedCertificate);
-        }
-        let first = self.buf[self.pos];
-        self.pos += 1;
+        };
         let len = if first < 0x80 {
             first as usize
         } else {
             let n = (first & 0x7f) as usize;
             // Reject indefinite form (n == 0) and non-minimal long-form lengths.
-            if n == 0 || n > 3 || self.pos + n > self.buf.len() {
+            if n == 0 || n > 3 {
                 return Err(CryptoError::MalformedCertificate);
             }
+            let digits = self.take(n)?;
             // Reject leading zeros in long-form length encoding
-            if self.buf[self.pos] == 0x00 {
+            if digits.first() == Some(&0x00) {
                 return Err(CryptoError::MalformedCertificate);
             }
             let mut parsed = 0usize;
-            for _ in 0..n {
-                parsed = (parsed << 8) | (self.buf[self.pos] as usize);
-                self.pos += 1;
+            for &digit in digits {
+                parsed = (parsed << 8) | (digit as usize);
             }
             if parsed < 0x80 {
                 return Err(CryptoError::MalformedCertificate);
@@ -877,27 +874,36 @@ impl<'a> DerCursor<'a> {
         Ok((tag, len))
     }
 
+    /// Consumes the next `len` bytes. Fails when fewer than `len` bytes remain.
+    fn take(&mut self, len: usize) -> Result<&'a [u8], CryptoError> {
+        let end = self.pos.checked_add(len).ok_or(CryptoError::MalformedCertificate)?;
+        let value = self.buf.get(self.pos..end).ok_or(CryptoError::MalformedCertificate)?;
+        self.pos = end;
+        Ok(value)
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.pos >= self.buf.len()
     }
 
     pub(crate) fn read_tlv(&mut self) -> Result<(u8, &'a [u8]), CryptoError> {
         let (tag, len) = self.read_tag_len()?;
-        let value = &self.buf[self.pos..self.pos + len];
-        self.pos += len;
+        let value = self.take(len)?;
         Ok((tag, value))
     }
 
     fn read_tlv_full(&mut self) -> Result<(u8, &'a [u8], &'a [u8]), CryptoError> {
         let start = self.pos;
         let (tag, len) = self.read_tag_len()?;
-        let value = &self.buf[self.pos..self.pos + len];
-        self.pos += len;
-        Ok((tag, &self.buf[start..self.pos], value))
+        let value = self.take(len)?;
+        let full = self.buf.get(start..self.pos).ok_or(CryptoError::MalformedCertificate)?;
+        Ok((tag, full, value))
     }
 }
 
 #[cfg(test)]
+// Test-only fixture builders. SDLC 3.2.1 covers program code, not tests.
+#[allow(clippy::arithmetic_side_effects)]
 pub(crate) mod tests {
     use super::*;
     use p384::ecdsa::signature::hazmat::PrehashSigner;
@@ -1279,6 +1285,94 @@ pub(crate) mod tests {
         let cert = include_bytes!("../../../fixtures/vcek_milan.der");
         let identity = parse_vcek_identity(cert).expect("Milan VCEK identity");
         assert!(!identity.subject_is_vlek);
+    }
+
+    /// Each DER length form returns the expected value, and truncated input
+    /// fails closed.
+    #[test]
+    fn der_lengths_keep_their_boundaries() {
+        let ok = |der: &[u8]| {
+            let mut cursor = DerCursor::new(der);
+            cursor.read_tlv().map(|(tag, value)| (tag, value.len()))
+        };
+        let mut long_short = vec![0x04, 0x81, 0x80];
+        long_short.extend([0u8; 0x80]);
+        assert_eq!(ok(&long_short), Ok((0x04, 0x80)));
+        let mut long_two = vec![0x04, 0x82, 0x01, 0x00];
+        long_two.extend([0u8; 0x100]);
+        assert_eq!(ok(&long_two), Ok((0x04, 0x100)));
+        assert_eq!(ok(&[0x04, 0x00]), Ok((0x04, 0)));
+        assert_eq!(ok(&[0x04, 0x01, 0xAA]), Ok((0x04, 1)));
+
+        for bad in [
+            &[][..],
+            &[0x04],
+            &[0x04, 0x01],
+            &[0x04, 0x80],
+            &[0x04, 0x81],
+            &[0x04, 0x81, 0x7f],
+            &[0x04, 0x82, 0x01],
+            &[0x04, 0x84, 0x01, 0x00, 0x00, 0x00],
+            &[0x04, 0x81, 0x80, 0x00],
+        ] {
+            assert_eq!(ok(bad), Err(CryptoError::MalformedCertificate), "{bad:02x?}");
+        }
+
+        let mut cursor = DerCursor::new(&[0x30, 0x02, 0x05, 0x00, 0x04, 0x00]);
+        let (tag, full, value) = cursor.read_tlv_full().unwrap();
+        assert_eq!((tag, full, value), (0x30, &[0x30, 0x02, 0x05, 0x00][..], &[0x05, 0x00][..]));
+        assert!(!cursor.is_empty());
+    }
+
+    #[test]
+    fn i2osp_48_strips_leading_zeros_and_right_aligns() {
+        let mut expected = [0u8; 48];
+        expected[47] = 0x01;
+        assert_eq!(i2osp_48(&[0x01]), Ok(expected));
+        expected[46] = 0x00;
+        expected[47] = 0x80;
+        assert_eq!(i2osp_48(&[0x00, 0x80]), Ok(expected));
+        let mut full = [0x7f; 48];
+        assert_eq!(i2osp_48(&full), Ok(full));
+        full[0] = 0x80;
+        let mut padded = vec![0x00];
+        padded.extend_from_slice(&full);
+        assert_eq!(i2osp_48(&padded), Ok(full));
+        let mut too_long = vec![0x01];
+        too_long.extend_from_slice(&full);
+        assert_eq!(i2osp_48(&too_long), Err(CryptoError::InvalidP384Signature));
+        assert_eq!(i2osp_48(&[]), Err(CryptoError::InvalidP384Signature));
+        assert_eq!(i2osp_48(&[0x00]), Err(CryptoError::InvalidP384Signature));
+    }
+
+    #[test]
+    fn spl_component_index_requires_one_byte_after_the_prefix() {
+        let oid = |last: &[u8]| [OID_SPL_PREFIX, last].concat();
+        let expected = [(1, 0), (2, 1), (4, 2), (5, 3), (6, 4), (7, 5), (3, 6), (8, 7)];
+        for (component, index) in expected {
+            assert_eq!(spl_component_index(&oid(&[component])), Some(index));
+        }
+        assert_eq!(spl_component_index(&oid(&[9])), None);
+        assert_eq!(spl_component_index(&oid(&[])), None);
+        assert_eq!(spl_component_index(&oid(&[1, 1])), None);
+        assert_eq!(spl_component_index(&[]), None);
+    }
+
+    #[test]
+    fn coded_vlek_marker_matches_each_width() {
+        let encode = |width: usize| {
+            VLEK_MARKER.iter().flat_map(|b| core::iter::repeat_n(0u8, width - 1).chain([*b])).collect::<Vec<u8>>()
+        };
+        assert!(contains_be_coded_vlek(&encode(2), 2));
+        assert!(contains_be_coded_vlek(&encode(4), 4));
+        let mut wrong_high = encode(2);
+        wrong_high[0] = 1;
+        assert!(!contains_be_coded_vlek(&wrong_high, 2));
+        let mut wrong_low = encode(4);
+        wrong_low[3] ^= 0x20;
+        assert!(!contains_be_coded_vlek(&wrong_low, 4));
+        assert!(!contains_be_coded_vlek(&encode(2), 4));
+        assert!(!contains_be_coded_vlek(&[], 0));
     }
 
     #[test]

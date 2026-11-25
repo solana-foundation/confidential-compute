@@ -211,12 +211,11 @@ fn extract_pck_pubkey(raw: &[u8], cert_data_start: usize, sig_data_end: usize) -
         .position(|window| window == P256_SPKI_PREFIX)
         .ok_or_else(|| bad("leaf certificate carries no uncompressed P-256 public key"))?;
     let point_start = offset + P256_SPKI_PREFIX.len();
-    let xy: [u8; 64] = leaf_der
-        .get(point_start..point_start + 64)
-        .ok_or_else(|| bad("leaf certificate public key is truncated"))?
-        .try_into()
-        .expect("64-byte slice");
-    Ok(compress_p256(&xy))
+    let xy: &[u8; 64] = leaf_der
+        .get(point_start..)
+        .and_then(<[u8]>::first_chunk)
+        .ok_or_else(|| bad("leaf certificate public key is truncated"))?;
+    Ok(compress_p256(xy))
 }
 
 /// DER bytes of the first certificate in a PEM chain. That is the leaf.
@@ -301,16 +300,22 @@ pub fn decode_challenge_account(data: &[u8]) -> Result<ChallengeRecord, SidecarE
             "challenge account discriminator does not match ChallengeAccount".to_string(),
         ));
     }
+    let u64_at = |offset: usize| {
+        data.get(offset..)
+            .and_then(<[u8]>::first_chunk)
+            .map(|bytes| u64::from_le_bytes(*bytes))
+            .ok_or_else(|| SidecarError::OnchainError("challenge account is truncated".to_string()))
+    };
     let mut slot_hash = [0u8; 32];
     slot_hash.copy_from_slice(&data[17..49]);
     let mut nonce = [0u8; 32];
     nonce.copy_from_slice(&data[49..81]);
     Ok(ChallengeRecord {
         source: data[8],
-        challenge_slot: u64::from_le_bytes(data[9..17].try_into().expect("8 bytes")),
+        challenge_slot: u64_at(9)?,
         slot_hash,
         nonce,
-        expires_slot: u64::from_le_bytes(data[81..89].try_into().expect("8 bytes")),
+        expires_slot: u64_at(81)?,
         bump: data[89],
     })
 }

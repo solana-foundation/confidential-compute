@@ -324,12 +324,12 @@ impl<'a> SliceSrc<'a> {
 
 impl Pull for SliceSrc<'_> {
     fn pull(&mut self) -> Result<Option<u8>, CryptoError> {
-        if self.pos >= self.data.len() {
-            Ok(None)
-        } else {
-            let b = self.data[self.pos];
-            self.pos += 1;
-            Ok(Some(b))
+        match self.data.get(self.pos) {
+            None => Ok(None),
+            Some(&b) => {
+                self.pos = self.pos.checked_add(1).ok_or(CryptoError::MalformedJwt)?;
+                Ok(Some(b))
+            }
         }
     }
 }
@@ -386,18 +386,20 @@ fn parse_json<R: Pull>(src: R, out: &mut GoogleClaims<'_>) -> Result<(), CryptoE
 
     loop {
         skip_ws(&mut r)?;
-        if sp == 0 {
+        // `top` is the index of the innermost open container. The parse ends
+        // when the outermost object closes.
+        let Some(top) = sp.checked_sub(1) else {
             if r.peek()?.is_some() {
                 return Err(CryptoError::MalformedJwt);
             }
             return Ok(());
-        }
-        let ctx = stack[(sp - 1) as usize];
+        };
+        let ctx = stack[top as usize];
         match ctx {
             CTX_OBJ_KEY | CTX_OBJ_NEED_KEY => match r.peek()?.ok_or(CryptoError::MalformedJwt)? {
                 b'}' if ctx == CTX_OBJ_KEY => {
                     let _ = r.read()?;
-                    sp -= 1;
+                    sp = top;
                 }
                 b'"' => {
                     let _ = r.read()?;
@@ -430,14 +432,14 @@ fn parse_json<R: Pull>(src: R, out: &mut GoogleClaims<'_>) -> Result<(), CryptoE
                 _ => return Err(CryptoError::MalformedJwt),
             },
             CTX_OBJ_COMMA => match r.read_req()? {
-                b',' => stack[(sp - 1) as usize] = CTX_OBJ_NEED_KEY,
-                b'}' => sp -= 1,
+                b',' => stack[top as usize] = CTX_OBJ_NEED_KEY,
+                b'}' => sp = top,
                 _ => return Err(CryptoError::MalformedJwt),
             },
             CTX_ARR_VAL | CTX_ARR_NEED_VAL => match r.peek()?.ok_or(CryptoError::MalformedJwt)? {
                 b']' if ctx == CTX_ARR_VAL => {
                     let _ = r.read()?;
-                    sp -= 1;
+                    sp = top;
                 }
                 _ => {
                     let previous_sp = sp;
@@ -448,8 +450,8 @@ fn parse_json<R: Pull>(src: R, out: &mut GoogleClaims<'_>) -> Result<(), CryptoE
                 }
             },
             CTX_ARR_COMMA => match r.read_req()? {
-                b',' => stack[(sp - 1) as usize] = CTX_ARR_NEED_VAL,
-                b']' => sp -= 1,
+                b',' => stack[top as usize] = CTX_ARR_NEED_VAL,
+                b']' => sp = top,
                 _ => return Err(CryptoError::MalformedJwt),
             },
             _ => return Err(CryptoError::MalformedJwt),
@@ -473,7 +475,7 @@ fn parse_value<R: Pull>(
                 return Err(CryptoError::MalformedJwt);
             }
             stack[*sp as usize] = CTX_OBJ_KEY;
-            *sp += 1;
+            *sp = sp.checked_add(1).ok_or(CryptoError::MalformedJwt)?;
         }
         b'[' if key_id == SEEN_EAT_NONCE || key_id == SEEN_IMAGE_DIGEST => {
             let _ = r.read()?;
@@ -491,7 +493,7 @@ fn parse_value<R: Pull>(
                 return Err(CryptoError::MalformedJwt);
             }
             stack[*sp as usize] = CTX_ARR_VAL;
-            *sp += 1;
+            *sp = sp.checked_add(1).ok_or(CryptoError::MalformedJwt)?;
         }
         b'"' => {
             let _ = r.read()?;
@@ -529,12 +531,13 @@ fn parse_value<R: Pull>(
 }
 
 fn finish_parent_value(stack: &mut [u8; MAX_DEPTH as usize], sp: u8) {
-    if sp == 0 {
+    let Some(top) = sp.checked_sub(1) else {
         return;
-    }
-    match stack[(sp - 1) as usize] {
-        CTX_OBJ_KEY | CTX_OBJ_NEED_KEY => stack[(sp - 1) as usize] = CTX_OBJ_COMMA,
-        CTX_ARR_VAL | CTX_ARR_NEED_VAL => stack[(sp - 1) as usize] = CTX_ARR_COMMA,
+    };
+    let ctx = &mut stack[top as usize];
+    match *ctx {
+        CTX_OBJ_KEY | CTX_OBJ_NEED_KEY => *ctx = CTX_OBJ_COMMA,
+        CTX_ARR_VAL | CTX_ARR_NEED_VAL => *ctx = CTX_ARR_COMMA,
         _ => {}
     }
 }
@@ -561,12 +564,10 @@ fn parse_key<R: Pull>(r: &mut Reader<R>) -> Result<u16, CryptoError> {
         if b == b'\\' || b < 0x20 {
             return Err(CryptoError::MalformedJwt);
         }
-        if len < key.len() {
-            key[len] = b;
-            len += 1;
-        } else {
-            len += 1;
+        if let Some(slot) = key.get_mut(len) {
+            *slot = b;
         }
+        len = len.checked_add(1).ok_or(CryptoError::MalformedJwt)?;
     }
     if len > key.len() {
         return Ok(0);
@@ -658,11 +659,7 @@ fn read_string<R: Pull>(r: &mut Reader<R>, dest: &mut [u8]) -> Result<usize, Cry
                 _ => return Err(CryptoError::MalformedJwt),
             };
             if !dest.is_empty() {
-                if len >= dest.len() {
-                    return Err(CryptoError::MalformedJwt);
-                }
-                dest[len] = decoded;
-                len += 1;
+                len = push_byte(dest, len, decoded)?;
             }
             escape = false;
             continue;
@@ -673,15 +670,17 @@ fn read_string<R: Pull>(r: &mut Reader<R>, dest: &mut [u8]) -> Result<usize, Cry
             0..=0x1f => return Err(CryptoError::MalformedJwt),
             _ => {
                 if !dest.is_empty() {
-                    if len >= dest.len() {
-                        return Err(CryptoError::MalformedJwt);
-                    }
-                    dest[len] = b;
-                    len += 1;
+                    len = push_byte(dest, len, b)?;
                 }
             }
         }
     }
+}
+
+/// Writes `b` at `dest[len]` and returns the new length. A full `dest` is an error.
+fn push_byte(dest: &mut [u8], len: usize, b: u8) -> Result<usize, CryptoError> {
+    *dest.get_mut(len).ok_or(CryptoError::MalformedJwt)? = b;
+    len.checked_add(1).ok_or(CryptoError::MalformedJwt)
 }
 
 fn decode_u_escape<R: Pull>(r: &mut Reader<R>) -> Result<u8, CryptoError> {
@@ -723,7 +722,7 @@ fn parse_u64<R: Pull>(r: &mut Reader<R>) -> Result<u64, CryptoError> {
     if !first.is_ascii_digit() {
         return Err(CryptoError::MalformedJwt);
     }
-    let mut n = u64::from(first - b'0');
+    let mut n = u64::from(first.checked_sub(b'0').ok_or(CryptoError::MalformedJwt)?);
     let mut digits = 1u8;
     if first == b'0' {
         if matches!(r.peek()?, Some(b'0'..=b'9')) {
@@ -737,7 +736,7 @@ fn parse_u64<R: Pull>(r: &mut Reader<R>) -> Result<u64, CryptoError> {
                 let _ = r.read()?;
                 n = n
                     .checked_mul(10)
-                    .and_then(|v| v.checked_add(u64::from(b - b'0')))
+                    .and_then(|v| v.checked_add(u64::from(b.checked_sub(b'0')?)))
                     .ok_or(CryptoError::MalformedJwt)?;
                 digits = digits.saturating_add(1);
                 if digits > 20 {
@@ -777,7 +776,7 @@ fn parse_eat_nonce_array<R: Pull>(r: &mut Reader<R>, out: &mut GoogleClaims<'_>)
         let n = read_string(r, &mut out.eat_nonces[index])?;
         accept_eat_nonce_len(n)?;
         out.eat_nonce_lens[index] = n as u8;
-        if index + 1 < MAX_EAT_NONCE_VALUES {
+        if index < MAX_EAT_NONCE_VALUES - 1 {
             skip_ws(r)?;
             if r.read_req()? != b',' {
                 return Err(CryptoError::MalformedJwt);
@@ -811,24 +810,78 @@ fn parse_image_digest_array<R: Pull>(r: &mut Reader<R>, out: &mut GoogleClaims<'
 }
 
 fn parse_image_digest(s: &[u8]) -> Result<[u8; 32], CryptoError> {
-    const PREFIX: &[u8] = b"sha256:";
-    if s.len() != PREFIX.len() + 64 || !s.starts_with(PREFIX) {
+    let hex = s.strip_prefix(b"sha256:").ok_or(CryptoError::MalformedJwt)?;
+    let (pairs, []) = hex.as_chunks::<2>() else {
+        return Err(CryptoError::MalformedJwt);
+    };
+    if pairs.len() != 32 {
         return Err(CryptoError::MalformedJwt);
     }
     let mut out = [0u8; 32];
-    for i in 0..32 {
-        let hi = hex_nibble(s[PREFIX.len() + 2 * i])?;
-        let lo = hex_nibble(s[PREFIX.len() + 2 * i + 1])?;
-        out[i] = (hi << 4) | lo;
+    for (byte, &[hi, lo]) in out.iter_mut().zip(pairs) {
+        *byte = (hex_nibble(hi)? << 4) | hex_nibble(lo)?;
     }
     Ok(out)
 }
 
 fn hex_nibble(c: u8) -> Result<u8, CryptoError> {
-    match c {
-        b'0'..=b'9' => Ok(c - b'0'),
-        b'a'..=b'f' => Ok(c - b'a' + 10),
-        b'A'..=b'F' => Ok(c - b'A' + 10),
-        _ => Err(CryptoError::MalformedJwt),
+    let (first, value_of_first) = match c {
+        b'0'..=b'9' => (b'0', 0),
+        b'a'..=b'f' => (b'a', 10),
+        b'A'..=b'F' => (b'A', 10),
+        _ => return Err(CryptoError::MalformedJwt),
+    };
+    c.checked_sub(first).and_then(|v| v.checked_add(value_of_first)).ok_or(CryptoError::MalformedJwt)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::{format, string::String};
+
+    fn parse(json: &[u8]) -> Result<(), CryptoError> {
+        let mut claims = GoogleClaims::empty(json);
+        parse_json(SliceSrc::new(json), &mut claims)
+    }
+
+    /// The depth limit is eight containers. Unbalanced and malformed containers
+    /// fail closed.
+    #[test]
+    fn nesting_stops_at_eight_containers() {
+        let arrays = |n: usize| format!("{{\"x\":{}0{}}}", "[".repeat(n), "]".repeat(n));
+        assert_eq!(parse(arrays(7).as_bytes()), Ok(()));
+        assert_eq!(parse(arrays(8).as_bytes()), Err(CryptoError::MalformedJwt));
+        let objects = |n: usize| format!("{{{}\"a\":0{}}}", "\"a\":{".repeat(n), "}".repeat(n));
+        assert_eq!(parse(objects(7).as_bytes()), Ok(()));
+        assert_eq!(parse(objects(8).as_bytes()), Err(CryptoError::MalformedJwt));
+        for bad in ["{", "}", "{\"a\":[1,]}", "{\"a\":1,}", "{\"a\":1}}", "[]", "{\"a\":[1}"] {
+            assert_eq!(parse(bad.as_bytes()), Err(CryptoError::MalformedJwt), "{bad}");
+        }
+    }
+
+    #[test]
+    fn long_keys_and_strings_are_bounded() {
+        let long_key = format!("{{\"{}\":1}}", "k".repeat(40));
+        assert_eq!(parse(long_key.as_bytes()), Ok(()));
+        let fits = format!("{{\"sub\":\"{}\"}}", "s".repeat(MAX_SUB));
+        assert_eq!(parse(fits.as_bytes()), Ok(()));
+        let long_sub = format!("{{\"sub\":\"{}\"}}", "s".repeat(MAX_SUB + 1));
+        assert_eq!(parse(long_sub.as_bytes()), Err(CryptoError::MalformedJwt));
+    }
+
+    #[test]
+    fn numbers_and_image_digests_keep_their_bounds() {
+        assert_eq!(parse(b"{\"exp\":18446744073709551615}"), Ok(()));
+        assert_eq!(parse(b"{\"exp\":18446744073709551616}"), Err(CryptoError::MalformedJwt));
+        assert_eq!(parse(b"{\"exp\":01}"), Err(CryptoError::MalformedJwt));
+
+        let hex: String = (0..32).map(|i| format!("{i:02x}")).collect();
+        let digest = parse_image_digest(format!("sha256:{hex}").as_bytes()).unwrap();
+        assert_eq!(digest, core::array::from_fn::<u8, 32, _>(|i| i as u8));
+        assert_eq!(parse_image_digest(format!("sha256:{}", hex.to_uppercase()).as_bytes()), Ok(digest));
+        for bad in [format!("sha256:{}", &hex[1..]), format!("sha256:{hex}0"), format!("sha512:{hex}"), String::new()] {
+            assert_eq!(parse_image_digest(bad.as_bytes()), Err(CryptoError::MalformedJwt), "{bad}");
+        }
+        assert_eq!(parse_image_digest(format!("sha256:{}g", &hex[1..]).as_bytes()), Err(CryptoError::MalformedJwt));
     }
 }

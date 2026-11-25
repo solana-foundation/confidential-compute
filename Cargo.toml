@@ -27,6 +27,16 @@ deprecated = "warn"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
+# SDLC 3.2.8: no unwrap, expect or panic! in production code. clippy.toml
+# allows them in #[cfg(test)] code and #[test] functions.
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+# A function that returns Result reports failure as Err. These macros panic.
+panic_in_result_fn = "deny"
+unreachable = "deny"
+todo = "deny"
+unimplemented = "deny"
 
 [profile.release]
 opt-level = 3

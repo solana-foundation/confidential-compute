@@ -6,7 +6,7 @@ use solana_sdk::{
     hash::Hash,
     pubkey::Pubkey,
     signature::{Keypair, Signature},
-    signer::{SeedDerivable, Signer},
+    signer::Signer,
     transaction::{Transaction, VersionedTransaction},
 };
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -34,21 +34,22 @@ impl EphemeralKeyManager {
         use rand_core::{OsRng, RngCore};
         let mut secret = EphemeralSecret([0u8; 32]);
         OsRng.fill_bytes(&mut secret.0);
-        let keypair = Keypair::from_seed(&secret.0).expect("32-byte seed");
+        let keypair = Keypair::new_from_array(secret.0);
         let pubkey = keypair.pubkey();
         drop(keypair);
         Self { secret, pubkey }
     }
 
-    /// Signs with a temporary `Keypair` built from a reference to the seed.
+    /// Signs with a temporary `Keypair` built from the seed.
     ///
-    /// `Keypair::from_seed` borrows `self.secret`. `ed25519_dalek::SecretKey`
-    /// wipes that keypair copy in `Drop`, including when `op` unwinds.
-    /// `solana_sdk::Keypair` does not implement `Zeroize`. The durable seed
-    /// stays in `self.secret`.
+    /// `Keypair::new_from_array` moves one copy of the seed into the keypair,
+    /// the same copy that `Keypair::from_seed` makes internally, and it cannot
+    /// fail on a 32-byte seed. `ed25519_dalek::SigningKey` wipes that keypair
+    /// copy in `Drop`, including when `op` unwinds. `solana_sdk::Keypair` does
+    /// not implement `Zeroize`. The durable seed stays in `self.secret`.
     /// @spec SCC-SEC-007 SCC-SIDECAR-001
     fn with_signing_key<T>(&self, op: impl FnOnce(&Keypair) -> T) -> T {
-        let keypair = Keypair::from_seed(self.secret.0.as_ref()).expect("ephemeral seed is 32 bytes");
+        let keypair = Keypair::new_from_array(self.secret.0);
         op(&keypair)
     }
 

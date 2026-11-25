@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(unexpected_cfgs)]
+// SDLC 3.2.1: this crate runs on chain, so all arithmetic is checked.
+#![deny(clippy::arithmetic_side_effects)]
 
 //! # Solana Confidential Compute Core
 //!

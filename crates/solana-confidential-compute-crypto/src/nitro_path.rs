@@ -81,7 +81,7 @@ fn profile(der: &[u8]) -> Result<Profile<'_>, CryptoError> {
             return Err(bad());
         }
         seen[count] = oid;
-        count += 1;
+        count = count.checked_add(1).ok_or_else(bad)?;
         let (tag, body) = ext.read_tlv().map_err(|_| bad())?;
         let (critical, value) = if tag == 1 {
             // DER DEFAULT FALSE must be omitted; TRUE is encoded ff.
@@ -134,11 +134,12 @@ fn profile(der: &[u8]) -> Result<Profile<'_>, CryptoError> {
             [0x55, 0x1d, 0x0f] => {
                 let mut value = DerCursor::new(value);
                 let bits = take(&mut value, 3)?;
+                let last = bits.last().copied();
                 if !value.is_empty()
                     || !(2..=3).contains(&bits.len())
                     || bits[0] > 7
-                    || bits[bits.len() - 1] == 0
-                    || bits[bits.len() - 1].trailing_zeros() != u32::from(bits[0])
+                    || last == Some(0)
+                    || last.map(u8::trailing_zeros) != Some(u32::from(bits[0]))
                     || (bits.len() == 3 && (bits[0] != 7 || bits[2] != 0x80))
                 {
                     return Err(bad());

@@ -79,15 +79,15 @@ impl<'a> JwtView<'a> {
             (Some(a), Some(b)) => (a, b),
             _ => return Err(CryptoError::MalformedJwt),
         };
-        if d0 == 0 || d1 == d0 + 1 || d1 + 1 == bytes.len() {
+        let header_b64 = &bytes[..d0];
+        let signing_input = &bytes[..d1];
+        // The parts after each dot. `d0 < d1 < bytes.len()`, so both lookups succeed.
+        let payload_b64 = signing_input.get(d0..).and_then(|s| s.get(1..)).ok_or(CryptoError::MalformedJwt)?;
+        let signature_b64 = bytes.get(d1..).and_then(|s| s.get(1..)).ok_or(CryptoError::MalformedJwt)?;
+        if header_b64.is_empty() || payload_b64.is_empty() || signature_b64.is_empty() {
             return Err(CryptoError::MalformedJwt);
         }
-        Ok(Self {
-            header_b64: &bytes[..d0],
-            payload_b64: &bytes[d0 + 1..d1],
-            signature_b64: &bytes[d1 + 1..],
-            signing_input: &bytes[..d1],
-        })
+        Ok(Self { header_b64, payload_b64, signature_b64, signing_input })
     }
 }
 

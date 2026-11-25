@@ -23,7 +23,13 @@ pub fn derive_backend_policy_pda(program_id: &Pubkey, source: u8) -> Result<(Pub
     if !(1..=5).contains(&source) {
         return Err(BackendPolicyError::InvalidSource);
     }
-    Ok(Pubkey::find_program_address(&[BACKEND_POLICY_SEED, &[source]], program_id))
+    Ok(backend_policy_pda(program_id, source))
+}
+/// Address for a source tag that a builder in this crate passes as a constant
+/// (`AMD_SOURCE`, `NITRO_SOURCE`, `NVIDIA_SOURCE` or `TDX_SOURCE`).
+/// [`derive_backend_policy_pda`] accepts each of them, so this skips its source check.
+pub(crate) fn backend_policy_pda(program_id: &Pubkey, source: u8) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[BACKEND_POLICY_SEED, &[source]], program_id)
 }
 /// An empty list halts new admission for this backend. Set all three backend
 /// lists empty to halt all backends. Existing Mode A signers must be revoked
@@ -59,7 +65,24 @@ pub fn build_set_backend_policy_ix(
 }
 /// Builder-internal source tags are fixed constants, not caller-controlled.
 pub(crate) fn with_backend_policy(mut ix: Instruction, source: u8) -> Instruction {
-    let address = derive_backend_policy_pda(&ix.program_id, source).expect("fixed supported verification backend").0;
+    let address = backend_policy_pda(&ix.program_id, source).0;
     ix.accounts.push(AccountMeta::new_readonly(address, false));
     ix
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The builders call `backend_policy_pda` with their fixed source tags. Each
+    /// tag must pass the public check and give the same address.
+    #[test]
+    fn builder_source_tags_pass_the_public_check() {
+        let program_id = Pubkey::new_unique();
+        for source in [AMD_SOURCE, NITRO_SOURCE, GCP_SOURCE, NVIDIA_SOURCE, crate::tdx::TDX_SOURCE] {
+            assert_eq!(derive_backend_policy_pda(&program_id, source), Ok(backend_policy_pda(&program_id, source)));
+        }
+        assert_eq!(derive_backend_policy_pda(&program_id, 0), Err(BackendPolicyError::InvalidSource));
+        assert_eq!(derive_backend_policy_pda(&program_id, 6), Err(BackendPolicyError::InvalidSource));
+    }
 }

@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Versioned governance events describe successful writes; consumers must also
 //! require transaction success because a later instruction can roll a write back.
 //!

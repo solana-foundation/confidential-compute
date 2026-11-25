@@ -24,7 +24,13 @@ pub fn derive_used_nonce_pda_for_source(
     if ![1, 2].contains(&source) {
         return Err(NonceError::InvalidSource);
     }
-    Ok(Pubkey::find_program_address(&[b"nonce", &[source], signer, nonce], program_id))
+    Ok(used_nonce_pda(program_id, source, signer, nonce))
+}
+/// Address for a source tag that a builder in this crate passes as a constant
+/// (`AMD_SOURCE` or `NITRO_SOURCE`). [`derive_used_nonce_pda_for_source`] accepts
+/// both, so this skips its source check.
+pub(crate) fn used_nonce_pda(program_id: &Pubkey, source: u8, signer: &[u8; 32], nonce: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"nonce", &[source], signer, nonce], program_id)
 }
 /// Canonical pre-upgrade account, required as readonly migration guard.
 pub fn derive_legacy_used_nonce_pda(program_id: &Pubkey, signer: &[u8; 32], nonce: &[u8; 32]) -> (Pubkey, u8) {
@@ -49,4 +55,26 @@ pub fn derive_legacy_google_used_nonce_pda(program_id: &Pubkey, binding: &[u8]) 
 pub(crate) fn with_legacy_nonce(mut ix: Instruction, legacy: Pubkey) -> Instruction {
     ix.accounts.push(AccountMeta::new_readonly(legacy, false));
     ix
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backend_policy::{AMD_SOURCE, NITRO_SOURCE};
+
+    /// The builders call `used_nonce_pda` with `AMD_SOURCE` and `NITRO_SOURCE`.
+    /// Both must pass the public check and give the same address.
+    #[test]
+    fn builder_source_tags_pass_the_public_check() {
+        let program_id = Pubkey::new_unique();
+        // Distinct arbitrary seeds. They are PDA seeds, not key material.
+        let (signer, nonce) = (Pubkey::new_unique().to_bytes(), Pubkey::new_unique().to_bytes());
+        for source in [AMD_SOURCE, NITRO_SOURCE] {
+            assert_eq!(
+                derive_used_nonce_pda_for_source(&program_id, source, &signer, &nonce),
+                Ok(used_nonce_pda(&program_id, source, &signer, &nonce))
+            );
+        }
+        assert_eq!(derive_used_nonce_pda_for_source(&program_id, 3, &signer, &nonce), Err(NonceError::InvalidSource));
+    }
 }

@@ -1008,10 +1008,13 @@ fn build_verify_google_jwt_mode_a_ix(
         &[solana_confidential_compute_cpi::ATTESTED_SIGNER_SEED, workload_signer.as_ref()],
         program_id,
     );
-    let (nonce_pda, _) = solana_confidential_compute_sdk::derive_google_used_nonce_pda(program_id, &raw)
-        .expect("decoded Google ModeA binding");
+    let binding_error = |e: solana_confidential_compute_sdk::NonceError| {
+        SidecarError::AttestationError(format!("Google Mode A binding has no nonce account: {e}"))
+    };
+    let (nonce_pda, _) =
+        solana_confidential_compute_sdk::derive_google_used_nonce_pda(program_id, &raw).map_err(binding_error)?;
     let legacy = solana_confidential_compute_sdk::derive_legacy_google_used_nonce_pda(program_id, &raw)
-        .expect("decoded Google ModeA binding")
+        .map_err(binding_error)?
         .0;
 
     let mut accounts = vec![
@@ -1028,7 +1031,9 @@ fn build_verify_google_jwt_mode_a_ix(
     ];
 
     accounts.push(AccountMeta::new_readonly(
-        solana_confidential_compute_sdk::derive_backend_policy_pda(program_id, 3).expect("fixed GCP backend").0,
+        solana_confidential_compute_sdk::derive_backend_policy_pda(program_id, 3)
+            .map_err(|e| SidecarError::AttestationError(format!("GCP backend policy: {e}")))?
+            .0,
         false,
     ));
     accounts.push(AccountMeta::new_readonly(legacy, false));
@@ -1081,7 +1086,7 @@ fn build_verify_nitro_mode_a_ix(
         &workload_signer.to_bytes(),
         &view.nonce,
     )
-    .expect("fixed Nitro source");
+    .map_err(|e| SidecarError::AttestationError(format!("Nitro nonce account: {e}")))?;
     let legacy = solana_confidential_compute_sdk::derive_legacy_used_nonce_pda(
         program_id,
         &workload_signer.to_bytes(),
@@ -1101,7 +1106,9 @@ fn build_verify_nitro_mode_a_ix(
     ];
 
     accounts.push(AccountMeta::new_readonly(
-        solana_confidential_compute_sdk::derive_backend_policy_pda(program_id, 2).expect("fixed Nitro backend").0,
+        solana_confidential_compute_sdk::derive_backend_policy_pda(program_id, 2)
+            .map_err(|e| SidecarError::AttestationError(format!("Nitro backend policy: {e}")))?
+            .0,
         false,
     ));
     accounts.push(AccountMeta::new_readonly(legacy, false));

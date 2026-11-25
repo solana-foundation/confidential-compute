@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Packet budget for the two Intel TDX transactions.
 //!
 //! The secp256r1 precompile reads its message from instruction data, so the

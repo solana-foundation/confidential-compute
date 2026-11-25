@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! On-chain AWS Nitro Enclaves attestation processor tests.
 //!
 //! @spec SCC-NITRO-006 SCC-NITRO-007 SCC-NITRO-008
