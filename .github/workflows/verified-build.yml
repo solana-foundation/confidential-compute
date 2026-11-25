@@ -65,7 +65,7 @@ jobs:
           {
             echo "## solana-verify executable hash"
             echo
-            echo "Two clean builds from this commit matched. Both used solana-developers/github-actions build-verified v0.2.15 with solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892."
+            echo "Two builds from this commit matched. Each started with an empty target/deploy. Both used solana-developers/github-actions build-verified v0.2.15 with solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892."
             echo
             echo '```'
             echo "$h1"
