@@ -70,6 +70,10 @@ The build uses the Rust toolchain and platform tools inside the pinned image
 The workflow `.github/workflows/verified-build.yml` runs the build twice. It
 cleans `target/deploy` before each run. It fails if the two hashes differ.
 
+CI uses the official `solana-developers/github-actions` actions `setup-all` and
+`build-verified`, version v0.2.15. Each action is pinned by commit. `setup-all`
+installs `solana-verify` 0.5.2. `just verified-build` is the local command.
+
 To compare a deployed program with this build, run:
 
 ```bash

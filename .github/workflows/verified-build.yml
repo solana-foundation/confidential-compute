@@ -18,21 +18,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup
       - name: Install solana-verify
-        run: cargo install solana-verify --locked --version 0.5.2
+        uses: solana-developers/github-actions/setup-all@e6ed2eb93c55eca911dbc711fb08683b42926a28 # v0.2.15
+        with:
+          verify_version: 0.5.2
+      - name: Remove old build output, run 1
+        # The build container runs as root, so its output must be removed with sudo.
+        run: sudo rm -rf target/deploy
       - name: Verified build, run 1
+        uses: solana-developers/github-actions/build-verified@e6ed2eb93c55eca911dbc711fb08683b42926a28 # v0.2.15
+        with:
+          program: solana_confidential_compute_verifier
+          base-image: solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892
+      - name: Hash the executable, run 1
         run: |
           set -euo pipefail
-          # The build container runs as root, so its output must be removed with sudo.
-          sudo rm -rf target/deploy
-          just verified-build 2>&1 | tee verified-build-1.log
+          solana-verify get-executable-hash target/deploy/solana_confidential_compute_verifier.so | tee verified-build-1.log
           tail -n 1 verified-build-1.log > verified-build-1.hash
+      - name: Remove old build output, run 2
+        run: sudo rm -rf target/deploy
       - name: Verified build, run 2
+        uses: solana-developers/github-actions/build-verified@e6ed2eb93c55eca911dbc711fb08683b42926a28 # v0.2.15
+        with:
+          program: solana_confidential_compute_verifier
+          base-image: solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892
+      - name: Hash the executable, run 2
         run: |
           set -euo pipefail
-          sudo rm -rf target/deploy
-          just verified-build 2>&1 | tee verified-build-2.log
+          solana-verify get-executable-hash target/deploy/solana_confidential_compute_verifier.so | tee verified-build-2.log
           tail -n 1 verified-build-2.log > verified-build-2.hash
       - name: Compare executable hashes
         run: |
@@ -52,7 +65,7 @@ jobs:
           {
             echo "## solana-verify executable hash"
             echo
-            echo "Two clean builds from this commit matched in solanafoundation/solana-verifiable-build (digest pinned in justfile)."
+            echo "Two clean builds from this commit matched. Both used solana-developers/github-actions build-verified v0.2.15 with solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892."
             echo
             echo '```'
             echo "$h1"
