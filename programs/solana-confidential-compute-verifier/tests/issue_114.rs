@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Mode B consumer binding and pre-funded PDA allocation.
 //!
 //! MIGRATION (solana 2.2 -> 4.x): the Mode B tests ran the verifier natively via

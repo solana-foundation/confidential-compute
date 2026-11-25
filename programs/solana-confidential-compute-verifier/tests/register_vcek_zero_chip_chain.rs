@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! A synthetic P-384 chain is not an AMD Milan endorsement, even with matching
 //! identity extensions and a correct PDA seed.
 //!

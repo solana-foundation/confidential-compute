@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use solana_confidential_compute_sdk::{hash_compiled_action, validate_compiled_action, ActionCommitmentError};
 use solana_sdk::{
     hash::Hash,

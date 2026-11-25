@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Regression for #213: a native accepting verifier cannot authorize a forged
 //! Nitro workload identity without that workload signing. No SBF/hardware claim.
 #![allow(deprecated)]

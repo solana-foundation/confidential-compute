@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Authentic Milan SNP report and KDS VCEK, checked against the AMD Milan ARK.
 //!
 //! AMD KDS signs the Milan ARK and ASK with RSA-4096 RSASSA-PSS SHA-384.

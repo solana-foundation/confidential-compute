@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Intel TDX enrolment pipeline: challenge, read-back, quote, one v1 packet.
 //!
 //! The submitter used to refuse Intel TDX outright. These tests pin what

@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_confidential_compute_verifier::{payload::*, processor::Processor, state::PolicyRegistry};
 use solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};

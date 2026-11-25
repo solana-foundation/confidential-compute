@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Controlled HTTP/provider/cluster tests; no live chain or hardware proof.
 use reqwest::{Client, StatusCode};
 use serde_json::Value;

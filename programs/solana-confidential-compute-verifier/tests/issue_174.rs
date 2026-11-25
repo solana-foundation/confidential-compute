@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Registration reads the trusted Clock before chain validation (#175).
 //!
 //! MIGRATION (solana 2.2 -> 4.x): this was a native unit test that stubbed the

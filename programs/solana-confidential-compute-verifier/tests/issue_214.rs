@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Regression for #214: initialization authorization prevents policy-denial takeover.
 //! Legacy global list storage remains recoverable; runtime admission uses BackendPolicy.
 #![allow(deprecated)]

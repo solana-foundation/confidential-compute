@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Real signed packets and bank CPI allocation through the staged transport.
 //!
 //! MIGRATION (solana 2.2 -> 4.x): this ran the chain twice, once natively via

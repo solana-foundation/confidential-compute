@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Governance authorization errors must identify the failed condition.
 use borsh::BorshSerialize;
 use solana_confidential_compute_verifier::{error::VerifierError, payload::*, processor::Processor, state::*};

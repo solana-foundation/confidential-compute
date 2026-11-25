@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! On-chain Google Cloud OIDC / JWT processor tests.
 //!
 //! @spec SCC-JWT-001 SCC-JWT-002 SCC-JWT-003 SCC-JWT-005 SCC-JWT-006

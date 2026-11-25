@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Native production-processor regression for authoritative backend admission.
 //! Uses a signed JWT fixture; no automatic global-to-backend policy fixture.
 use borsh::BorshDeserialize;

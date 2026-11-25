@@ -1,3 +1,5 @@
+// Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Native AccountInfo test of authentic Nitro -> minted V2 -> actual CPI checks.
 //! The fixture's public workload key has no private key here: signer flags model
 //! the runtime's signature check, not a real workload-signed hardware transaction.
