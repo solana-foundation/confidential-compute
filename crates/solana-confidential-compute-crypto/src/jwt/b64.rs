@@ -25,32 +25,34 @@ pub fn decode_b64url(input: &[u8], output: &mut [u8]) -> Result<usize, CryptoErr
     }
 
     let mut written = 0usize;
-    let mut i = 0usize;
-    while i + 4 <= src.len() {
-        let n =
-            pack4(decode_char(src[i])?, decode_char(src[i + 1])?, decode_char(src[i + 2])?, decode_char(src[i + 3])?);
-        written = write_bytes(output, written, &[(n >> 16) as u8, (n >> 8) as u8, n as u8], 3)?;
-        i += 4;
+    let (quads, tail) = src.as_chunks::<4>();
+    for &[a, b, c, d] in quads {
+        let n = pack4(decode_char(a)?, decode_char(b)?, decode_char(c)?, decode_char(d)?);
+        written = write_bytes(output, written, &[(n >> 16) as u8, (n >> 8) as u8, n as u8])?;
     }
 
-    let rem = src.len() - i;
-    if rem == 2 {
-        let a = decode_char(src[i])?;
-        let b = decode_char(src[i + 1])?;
-        if b & 0x0f != 0 {
-            return Err(CryptoError::MalformedJwt);
+    match *tail {
+        [a, b] => {
+            let a = decode_char(a)?;
+            let b = decode_char(b)?;
+            if b & 0x0f != 0 {
+                return Err(CryptoError::MalformedJwt);
+            }
+            let n = pack4(a, b, 0, 0);
+            written = write_bytes(output, written, &[(n >> 16) as u8])?;
         }
-        let n = pack4(a, b, 0, 0);
-        written = write_bytes(output, written, &[(n >> 16) as u8], 1)?;
-    } else if rem == 3 {
-        let a = decode_char(src[i])?;
-        let b = decode_char(src[i + 1])?;
-        let c = decode_char(src[i + 2])?;
-        if c & 0x03 != 0 {
-            return Err(CryptoError::MalformedJwt);
+        [a, b, c] => {
+            let a = decode_char(a)?;
+            let b = decode_char(b)?;
+            let c = decode_char(c)?;
+            if c & 0x03 != 0 {
+                return Err(CryptoError::MalformedJwt);
+            }
+            let n = pack4(a, b, c, 0);
+            written = write_bytes(output, written, &[(n >> 16) as u8, (n >> 8) as u8])?;
         }
-        let n = pack4(a, b, c, 0);
-        written = write_bytes(output, written, &[(n >> 16) as u8, (n >> 8) as u8], 2)?;
+        // An empty tail ends the input. A one-byte tail was rejected above.
+        _ => {}
     }
 
     Ok(written)
@@ -68,8 +70,8 @@ pub fn decode_b64url_exact(input: &[u8], output: &mut [u8]) -> Result<(), Crypto
 /// Streaming Base64URL reader with a 3-byte window. Stack footprint is tiny.
 /// @spec SCC-JWT-001
 pub struct B64Decoder<'a> {
+    /// Input that is not decoded yet.
     src: &'a [u8],
-    pos: usize,
     buf: [u8; 3],
     buf_len: u8,
     buf_pos: u8,
@@ -77,92 +79,89 @@ pub struct B64Decoder<'a> {
 
 impl<'a> B64Decoder<'a> {
     pub fn new(src: &'a [u8]) -> Self {
-        let mut end = src.len();
-        while end > 0 && src[end - 1] == b'=' {
-            end -= 1;
+        let mut src = src;
+        while let Some((b'=', rest)) = src.split_last() {
+            src = rest;
         }
-        Self { src: &src[..end], pos: 0, buf: [0; 3], buf_len: 0, buf_pos: 0 }
+        Self { src, buf: [0; 3], buf_len: 0, buf_pos: 0 }
     }
 
     /// Pull the next decoded byte, or `None` at end of input.
     pub fn next_byte(&mut self) -> Result<Option<u8>, CryptoError> {
         if self.buf_pos < self.buf_len {
-            let b = self.buf[self.buf_pos as usize];
-            self.buf_pos += 1;
-            return Ok(Some(b));
+            return self.take_buffered().map(Some);
         }
-        if self.pos >= self.src.len() {
+        if self.src.is_empty() {
             return Ok(None);
         }
         self.refill()?;
         if self.buf_pos < self.buf_len {
-            let b = self.buf[self.buf_pos as usize];
-            self.buf_pos += 1;
-            Ok(Some(b))
+            self.take_buffered().map(Some)
         } else {
             Ok(None)
         }
     }
 
+    fn take_buffered(&mut self) -> Result<u8, CryptoError> {
+        let b = self.buf[self.buf_pos as usize];
+        self.buf_pos = self.buf_pos.checked_add(1).ok_or(CryptoError::MalformedJwt)?;
+        Ok(b)
+    }
+
     fn refill(&mut self) -> Result<(), CryptoError> {
         self.buf_pos = 0;
         self.buf_len = 0;
-        let remain = self.src.len() - self.pos;
-        if remain == 0 {
-            return Ok(());
-        }
-        if remain == 1 {
-            return Err(CryptoError::MalformedJwt);
-        }
-        if remain >= 4 {
-            let n = pack4(
-                decode_char(self.src[self.pos])?,
-                decode_char(self.src[self.pos + 1])?,
-                decode_char(self.src[self.pos + 2])?,
-                decode_char(self.src[self.pos + 3])?,
-            );
-            self.buf = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
-            self.buf_len = 3;
-            self.pos += 4;
-            return Ok(());
-        }
-        if remain == 2 {
-            let a = decode_char(self.src[self.pos])?;
-            let b = decode_char(self.src[self.pos + 1])?;
-            if b & 0x0f != 0 {
-                return Err(CryptoError::MalformedJwt);
+        match *self.src {
+            [] => Ok(()),
+            [_] => Err(CryptoError::MalformedJwt),
+            [a, b] => {
+                let a = decode_char(a)?;
+                let b = decode_char(b)?;
+                if b & 0x0f != 0 {
+                    return Err(CryptoError::MalformedJwt);
+                }
+                let n = pack4(a, b, 0, 0);
+                self.buf[0] = (n >> 16) as u8;
+                self.buf_len = 1;
+                self.src = &[];
+                Ok(())
             }
-            let n = pack4(a, b, 0, 0);
-            self.buf[0] = (n >> 16) as u8;
-            self.buf_len = 1;
-            self.pos += 2;
-            return Ok(());
+            [a, b, c] => {
+                let a = decode_char(a)?;
+                let b = decode_char(b)?;
+                let c = decode_char(c)?;
+                if c & 0x03 != 0 {
+                    return Err(CryptoError::MalformedJwt);
+                }
+                let n = pack4(a, b, c, 0);
+                self.buf[0] = (n >> 16) as u8;
+                self.buf[1] = (n >> 8) as u8;
+                self.buf_len = 2;
+                self.src = &[];
+                Ok(())
+            }
+            [a, b, c, d, ref rest @ ..] => {
+                let n = pack4(decode_char(a)?, decode_char(b)?, decode_char(c)?, decode_char(d)?);
+                self.buf = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
+                self.buf_len = 3;
+                self.src = rest;
+                Ok(())
+            }
         }
-        let a = decode_char(self.src[self.pos])?;
-        let b = decode_char(self.src[self.pos + 1])?;
-        let c = decode_char(self.src[self.pos + 2])?;
-        if c & 0x03 != 0 {
-            return Err(CryptoError::MalformedJwt);
-        }
-        let n = pack4(a, b, c, 0);
-        self.buf[0] = (n >> 16) as u8;
-        self.buf[1] = (n >> 8) as u8;
-        self.buf_len = 2;
-        self.pos += 3;
-        Ok(())
     }
 }
 
 #[inline]
 fn decode_char(c: u8) -> Result<u8, CryptoError> {
-    match c {
-        b'A'..=b'Z' => Ok(c - b'A'),
-        b'a'..=b'z' => Ok(c - b'a' + 26),
-        b'0'..=b'9' => Ok(c - b'0' + 52),
-        b'-' => Ok(62),
-        b'_' => Ok(63),
-        _ => Err(CryptoError::MalformedJwt),
-    }
+    let (first, value_of_first) = match c {
+        b'A'..=b'Z' => (b'A', 0),
+        b'a'..=b'z' => (b'a', 26),
+        b'0'..=b'9' => (b'0', 52),
+        b'-' => return Ok(62),
+        b'_' => return Ok(63),
+        _ => return Err(CryptoError::MalformedJwt),
+    };
+    c.checked_sub(first).and_then(|v| v.checked_add(value_of_first)).ok_or(CryptoError::MalformedJwt)
 }
 
 #[inline]
@@ -170,10 +169,8 @@ fn pack4(a: u8, b: u8, c: u8, d: u8) -> u32 {
     ((a as u32) << 18) | ((b as u32) << 12) | ((c as u32) << 6) | (d as u32)
 }
 
-fn write_bytes(output: &mut [u8], written: usize, bytes: &[u8], count: usize) -> Result<usize, CryptoError> {
-    if written + count > output.len() {
-        return Err(CryptoError::MalformedJwt);
-    }
-    output[written..written + count].copy_from_slice(&bytes[..count]);
-    Ok(written + count)
+fn write_bytes(output: &mut [u8], written: usize, bytes: &[u8]) -> Result<usize, CryptoError> {
+    let end = written.checked_add(bytes.len()).ok_or(CryptoError::MalformedJwt)?;
+    output.get_mut(written..end).ok_or(CryptoError::MalformedJwt)?.copy_from_slice(bytes);
+    Ok(end)
 }

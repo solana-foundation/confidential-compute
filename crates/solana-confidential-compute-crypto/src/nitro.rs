@@ -160,10 +160,10 @@ pub fn parse_attestation_payload(payload: &[u8]) -> Result<NitroAttestationView<
                 break;
             }
         } else {
-            if remaining_entries == 0 {
+            let Some(left) = remaining_entries.checked_sub(1) else {
                 break;
-            }
-            remaining_entries -= 1;
+            };
+            remaining_entries = left;
         }
 
         let key = cur.read_tstr().map_err(|_| CryptoError::InvalidAttestationPayload)?;
@@ -426,15 +426,18 @@ fn parse_x509_time(tag: u8, val: &[u8]) -> Result<u64, CryptoError> {
                 return Err(CryptoError::CertificateChainInvalid);
             }
             let yy = parse_two_digits(&val[0..2])?;
-            let year = if yy >= 50 { 1900 + yy } else { 2000 + yy };
-            (year, &val[2..12])
+            let century = if yy >= 50 { 1900 } else { 2000 };
+            (yy.checked_add(century).ok_or(CryptoError::CertificateChainInvalid)?, &val[2..12])
         }
         0x18 => {
             // GeneralizedTime YYYYMMDDHHMMSSZ
             if val.len() != 15 || val[14] != b'Z' {
                 return Err(CryptoError::CertificateChainInvalid);
             }
-            let year = parse_two_digits(&val[0..2])? * 100 + parse_two_digits(&val[2..4])?;
+            let century = parse_two_digits(&val[0..2])?;
+            let yy = parse_two_digits(&val[2..4])?;
+            let year =
+                century.checked_mul(100).and_then(|c| c.checked_add(yy)).ok_or(CryptoError::CertificateChainInvalid)?;
             (year, &val[4..14])
         }
         _ => return Err(CryptoError::CertificateChainInvalid),
@@ -448,10 +451,15 @@ fn parse_x509_time(tag: u8, val: &[u8]) -> Result<u64, CryptoError> {
 }
 
 fn parse_two_digits(b: &[u8]) -> Result<i32, CryptoError> {
-    if b.len() != 2 || !b[0].is_ascii_digit() || !b[1].is_ascii_digit() {
+    let &[tens, ones] = b else {
         return Err(CryptoError::CertificateChainInvalid);
-    }
-    Ok(((b[0] - b'0') * 10 + (b[1] - b'0')) as i32)
+    };
+    let digit = |c: u8| char::from(c).to_digit(10).ok_or(CryptoError::CertificateChainInvalid);
+    let (tens, ones) = (digit(tens)?, digit(ones)?);
+    tens.checked_mul(10)
+        .and_then(|v| v.checked_add(ones))
+        .and_then(|v| i32::try_from(v).ok())
+        .ok_or(CryptoError::CertificateChainInvalid)
 }
 
 /// Days from civil date to Unix epoch using Howard Hinnant's algorithm.
@@ -479,20 +487,25 @@ fn civil_to_unix(year: i32, month: i32, day: i32, hour: i32, minute: i32, second
     if day > days_in_month {
         return Err(CryptoError::CertificateChainInvalid);
     }
-    let y = if month <= 2 { year - 1 } else { year };
-    let era = if y >= 0 { y } else { y - 399 } / 400;
-    let yoe = (y - era * 400) as u32;
-    let mp = if month > 2 { month - 3 } else { month + 9 } as u32;
-    let doy = (153 * mp + 2) / 5 + day as u32 - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    let days = era as i64 * 146097 + doe as i64 - 719468;
-    let secs = days
-        .checked_mul(86400)
-        .and_then(|s| s.checked_add(hour as i64 * 3600))
-        .and_then(|s| s.checked_add(minute as i64 * 60))
-        .and_then(|s| s.checked_add(second as i64))
+    let secs = days_from_civil(i64::from(year), i64::from(month), i64::from(day))
+        .and_then(|days| days.checked_mul(86400))
+        .and_then(|s| s.checked_add(i64::from(hour).checked_mul(3600)?))
+        .and_then(|s| s.checked_add(i64::from(minute).checked_mul(60)?))
+        .and_then(|s| s.checked_add(i64::from(second)))
         .ok_or(CryptoError::CertificateChainInvalid)?;
     u64::try_from(secs).map_err(|_| CryptoError::CertificateChainInvalid)
+}
+
+/// Days from 1970-01-01 to a valid civil date (Howard Hinnant's `days_from_civil`).
+fn days_from_civil(year: i64, month: i64, day: i64) -> Option<i64> {
+    let y = if month <= 2 { year.checked_sub(1)? } else { year };
+    let era = if y >= 0 { y } else { y.checked_sub(399)? } / 400;
+    let yoe = y.checked_sub(era.checked_mul(400)?)?;
+    let mp = if month > 2 { month.checked_sub(3)? } else { month.checked_add(9)? };
+    let doy = mp.checked_mul(153)?.checked_add(2)? / 5;
+    let doy = doy.checked_add(day)?.checked_sub(1)?;
+    let doe = yoe.checked_mul(365)?.checked_add(yoe / 4)?.checked_sub(yoe / 100)?.checked_add(doy)?;
+    era.checked_mul(146097)?.checked_add(doe)?.checked_sub(719468)
 }
 
 fn sha384(data: &[u8]) -> [u8; 48] {
@@ -561,6 +574,8 @@ pub fn verify_nitro_document<'a>(
 }
 
 #[cfg(test)]
+// Test-only fixture builders. SDLC 3.2.1 covers program code, not tests.
+#[allow(clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
     mod cert_fixture {

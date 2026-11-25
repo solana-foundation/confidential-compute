@@ -130,16 +130,13 @@ fn pss_sha384_consistent(em: &[u8; RSA4096_LEN], message: &[u8]) -> Result<(), C
 }
 
 fn mgf1_sha384(seed: &[u8], out: &mut [u8; DB_LEN]) {
-    let mut offset = 0;
     let mut counter = 0u32;
-    while offset < DB_LEN {
+    for chunk in out.chunks_mut(HASH_LEN) {
         let mut hasher = Sha384::new();
         hasher.update(seed);
         hasher.update(counter.to_be_bytes());
         let block = hasher.finalize();
-        let take = (DB_LEN - offset).min(HASH_LEN);
-        out[offset..offset + take].copy_from_slice(&block[..take]);
-        offset += take;
+        chunk.copy_from_slice(&block[..chunk.len()]);
         counter = counter.wrapping_add(1);
     }
 }
