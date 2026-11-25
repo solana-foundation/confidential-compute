@@ -142,7 +142,7 @@ async function collect() {
                 payer,
                 signer,
                 new Uint8Array(32).fill(5),
-                new Uint8Array(48).fill(6),
+                new Uint8Array(48).fill(0x42),
                 rpt,
                 95,
                 pid,
@@ -155,7 +155,7 @@ async function collect() {
                 payer,
                 signer,
                 new Uint8Array(32),
-                new Uint8Array(48),
+                new Uint8Array(48).fill(0x42),
                 rptXy,
                 0,
                 pid,
@@ -415,8 +415,21 @@ async function collect() {
     );
 }
 
+// Calls whose vector is an error on purpose. Every other call must record a result.
+const EXPECTED_TO_FAIL = new Set([
+    'tx.nitroModeBBadHash',
+    'tx.rawAtomicTooLarge',
+    'tx.rawNitroTooLarge',
+    'tx.rawRegisterTooLarge',
+    'tx.sessionSystemProgram',
+]);
+
 void test('outputs match the vectors recorded before the dependency upgrade', async () => {
     const actual = JSON.parse(JSON.stringify(await collect()));
+    for (const [name, result] of Object.entries(actual)) {
+        const failed = typeof result === 'object' && result !== null && 'err' in result;
+        assert.equal(failed, name.startsWith('err.') || EXPECTED_TO_FAIL.has(name), `${name}: unexpected outcome`);
+    }
     if (process.env.SOLANA_CC_WRITE_FIXTURE === '1') {
         fs.mkdirSync(path.dirname(FIXTURE), { recursive: true });
         fs.writeFileSync(FIXTURE, JSON.stringify(actual, null, 1) + '\n');
