@@ -101,7 +101,12 @@ pub fn build_register_signer_ix_for_program_oversized_with_endorsement(
     // @spec SCC-SEC-008 SCC-ARCH-001 SCC-SDK-001
     data.push(nonce_bump);
     data.push(signer_bump);
-    assert_eq!(data.len(), VERIFY_AND_REGISTER_IX_LEN);
+    if data.len() != VERIFY_AND_REGISTER_IX_LEN {
+        return Err(SdkError::InstructionDataLengthMismatch {
+            expected: VERIFY_AND_REGISTER_IX_LEN,
+            actual: data.len(),
+        });
+    }
 
     Ok(crate::amd::with_amd_revocation(
         crate::nonce::with_legacy_nonce(
@@ -278,7 +283,12 @@ pub fn build_verify_atomic_with_nonce_ix_oversized_with_endorsement(
     data.extend_from_slice(&report[..SNP_REPORT_SIZE]);
     // @spec SCC-SEC-008 SCC-ARCH-001 SCC-SDK-001
     data.push(nonce_bump);
-    assert_eq!(data.len(), VERIFY_ATOMIC_WITH_NONCE_IX_LEN);
+    if data.len() != VERIFY_ATOMIC_WITH_NONCE_IX_LEN {
+        return Err(SdkError::InstructionDataLengthMismatch {
+            expected: VERIFY_ATOMIC_WITH_NONCE_IX_LEN,
+            actual: data.len(),
+        });
+    }
 
     Ok(crate::amd::with_amd_revocation(
         crate::nonce::with_legacy_nonce(
