@@ -693,6 +693,19 @@ pub fn build_tdx_enrolment_tx(
 mod tests {
     use super::*;
     use solana_confidential_compute_verifier::payload as vix;
+
+    /// The precompile message size is a `u16`. A longer message used to panic.
+    #[test]
+    fn secp256r1_builder_rejects_a_message_longer_than_u16() {
+        let message = vec![0u8; usize::from(u16::MAX) + 1];
+        assert_eq!(
+            build_secp256r1_verify_ix(&[2; 33], &[1; 64], &message),
+            Err(TdxError::PrecompileMessageTooLong { len: message.len(), max: usize::from(u16::MAX) })
+        );
+        let fits = vec![0u8; usize::from(u16::MAX)];
+        let ix = build_secp256r1_verify_ix(&[2; 33], &[1; 64], &fits).unwrap();
+        assert_eq!(&ix.data[12..14], &u16::MAX.to_le_bytes());
+    }
     use solana_confidential_compute_verifier::state::{ChallengeAccount, TdxSessionAccount};
     use solana_confidential_compute_verifier::tdx as vtdx;
 

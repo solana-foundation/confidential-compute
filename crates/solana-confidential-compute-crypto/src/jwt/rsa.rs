@@ -316,6 +316,17 @@ fn mont_mul(a: &U2048, b: &U2048, n: &U2048, n0: u64) -> U2048 {
 mod tests {
     use super::*;
 
+    /// Limb 0 is the least significant 8 bytes. The limb conversion now
+    /// uses chunks, not index arithmetic.
+    #[test]
+    fn u2048_limb_order_is_little_endian_over_big_endian_bytes() {
+        let bytes: [u8; RSA2048_LEN] = core::array::from_fn(|i| i as u8);
+        let n = U2048::from_be_bytes(&bytes);
+        assert_eq!(n.0[0], u64::from_be_bytes([248, 249, 250, 251, 252, 253, 254, 255]));
+        assert_eq!(n.0[31], u64::from_be_bytes([0, 1, 2, 3, 4, 5, 6, 7]));
+        assert_eq!(n.to_be_bytes(), bytes);
+    }
+
     #[test]
     fn n0_times_n_is_minus_one() {
         let mut bytes = [0u8; 256];

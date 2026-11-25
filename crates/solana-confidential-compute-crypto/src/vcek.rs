@@ -1287,6 +1287,94 @@ pub(crate) mod tests {
         assert!(!identity.subject_is_vlek);
     }
 
+    /// The DER cursor now consumes bytes through `take`. Each length form
+    /// keeps its old result, and truncated input still fails closed.
+    #[test]
+    fn der_lengths_keep_their_boundaries() {
+        let ok = |der: &[u8]| {
+            let mut cursor = DerCursor::new(der);
+            cursor.read_tlv().map(|(tag, value)| (tag, value.len()))
+        };
+        let mut long_short = vec![0x04, 0x81, 0x80];
+        long_short.extend([0u8; 0x80]);
+        assert_eq!(ok(&long_short), Ok((0x04, 0x80)));
+        let mut long_two = vec![0x04, 0x82, 0x01, 0x00];
+        long_two.extend([0u8; 0x100]);
+        assert_eq!(ok(&long_two), Ok((0x04, 0x100)));
+        assert_eq!(ok(&[0x04, 0x00]), Ok((0x04, 0)));
+        assert_eq!(ok(&[0x04, 0x01, 0xAA]), Ok((0x04, 1)));
+
+        for bad in [
+            &[][..],
+            &[0x04],
+            &[0x04, 0x01],
+            &[0x04, 0x80],
+            &[0x04, 0x81],
+            &[0x04, 0x81, 0x7f],
+            &[0x04, 0x82, 0x01],
+            &[0x04, 0x84, 0x01, 0x00, 0x00, 0x00],
+            &[0x04, 0x81, 0x80, 0x00],
+        ] {
+            assert_eq!(ok(bad), Err(CryptoError::MalformedCertificate), "{bad:02x?}");
+        }
+
+        let mut cursor = DerCursor::new(&[0x30, 0x02, 0x05, 0x00, 0x04, 0x00]);
+        let (tag, full, value) = cursor.read_tlv_full().unwrap();
+        assert_eq!((tag, full, value), (0x30, &[0x30, 0x02, 0x05, 0x00][..], &[0x05, 0x00][..]));
+        assert!(!cursor.is_empty());
+    }
+
+    #[test]
+    fn i2osp_48_strips_leading_zeros_and_right_aligns() {
+        let mut expected = [0u8; 48];
+        expected[47] = 0x01;
+        assert_eq!(i2osp_48(&[0x01]), Ok(expected));
+        expected[46] = 0x00;
+        expected[47] = 0x80;
+        assert_eq!(i2osp_48(&[0x00, 0x80]), Ok(expected));
+        let mut full = [0x7f; 48];
+        assert_eq!(i2osp_48(&full), Ok(full));
+        full[0] = 0x80;
+        let mut padded = vec![0x00];
+        padded.extend_from_slice(&full);
+        assert_eq!(i2osp_48(&padded), Ok(full));
+        let mut too_long = vec![0x01];
+        too_long.extend_from_slice(&full);
+        assert_eq!(i2osp_48(&too_long), Err(CryptoError::InvalidP384Signature));
+        assert_eq!(i2osp_48(&[]), Err(CryptoError::InvalidP384Signature));
+        assert_eq!(i2osp_48(&[0x00]), Err(CryptoError::InvalidP384Signature));
+    }
+
+    #[test]
+    fn spl_component_index_requires_one_byte_after_the_prefix() {
+        let oid = |last: &[u8]| [OID_SPL_PREFIX, last].concat();
+        let expected = [(1, 0), (2, 1), (4, 2), (5, 3), (6, 4), (7, 5), (3, 6), (8, 7)];
+        for (component, index) in expected {
+            assert_eq!(spl_component_index(&oid(&[component])), Some(index));
+        }
+        assert_eq!(spl_component_index(&oid(&[9])), None);
+        assert_eq!(spl_component_index(&oid(&[])), None);
+        assert_eq!(spl_component_index(&oid(&[1, 1])), None);
+        assert_eq!(spl_component_index(&[]), None);
+    }
+
+    #[test]
+    fn coded_vlek_marker_matches_each_width() {
+        let encode = |width: usize| {
+            VLEK_MARKER.iter().flat_map(|b| core::iter::repeat_n(0u8, width - 1).chain([*b])).collect::<Vec<u8>>()
+        };
+        assert!(contains_be_coded_vlek(&encode(2), 2));
+        assert!(contains_be_coded_vlek(&encode(4), 4));
+        let mut wrong_high = encode(2);
+        wrong_high[0] = 1;
+        assert!(!contains_be_coded_vlek(&wrong_high, 2));
+        let mut wrong_low = encode(4);
+        wrong_low[3] ^= 0x20;
+        assert!(!contains_be_coded_vlek(&wrong_low, 4));
+        assert!(!contains_be_coded_vlek(&encode(2), 4));
+        assert!(!contains_be_coded_vlek(&[], 0));
+    }
+
     #[test]
     fn non_minimal_der_length_leading_zero_is_rejected() {
         // Tag 0x30, length 2 bytes (0x82) with leading zero: [0x30, 0x82, 0x00, 0x05, ...]

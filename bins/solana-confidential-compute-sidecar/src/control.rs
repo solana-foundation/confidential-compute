@@ -115,6 +115,17 @@ impl IntoResponse for EnrollmentRejection {
 mod tests {
     use super::*;
 
+    /// `Default` no longer calls `new(None, 300).expect(..)`. It must build the
+    /// same disabled control with the same interval.
+    #[test]
+    fn default_matches_new_with_no_token() {
+        let default = EnrollmentControl::default();
+        let built = EnrollmentControl::new(None, DEFAULT_MIN_INTERVAL_SECS).unwrap();
+        assert!(default.token.is_none() && built.token.is_none());
+        assert_eq!(default.min_interval, built.min_interval);
+        assert_eq!(default.min_interval, Duration::from_secs(300));
+    }
+
     #[tokio::test]
     async fn cooldown_expires_and_rejected_auth_does_not_consume_it() {
         let token = "0123456789abcdef0123456789abcdef";

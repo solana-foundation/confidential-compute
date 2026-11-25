@@ -976,4 +976,30 @@ mod tests {
         assert!(parse_x509_time(0x18, b"21000229000000Z").is_err());
         assert!(parse_x509_time(0x18, b"20000229000000Z").is_ok());
     }
+
+    /// `days_from_civil` and the two-digit parser now use checked arithmetic.
+    /// Known Unix times pin the result.
+    #[test]
+    fn certificate_times_match_known_unix_times() {
+        let cases: [(u8, &[u8], u64); 8] = [
+            (0x17, b"700101000000Z", 0),
+            (0x17, b"000101000000Z", 946_684_800),
+            (0x17, b"240229123456Z", 1_709_210_096),
+            (0x17, b"491231235959Z", 2_524_607_999),
+            (0x18, b"19700101000000Z", 0),
+            (0x18, b"20000301000000Z", 951_868_800),
+            (0x18, b"21060207062815Z", 4_294_967_295),
+            (0x18, b"99991231235959Z", 253_402_300_799),
+        ];
+        for (tag, value, unix) in cases {
+            assert_eq!(parse_x509_time(tag, value), Ok(unix), "{}", core::str::from_utf8(value).unwrap());
+        }
+        // Before 1970 does not fit a u64 Unix time.
+        for (tag, value) in [(0x17, &b"500101000000Z"[..]), (0x18, b"19691231235959Z"), (0x18, b"00000101000000Z")] {
+            assert_eq!(parse_x509_time(tag, value), Err(CryptoError::CertificateChainInvalid));
+        }
+        for bad in [&b"2a0101000000Z"[..], b"24010100000aZ", b"+40101000000Z", b"2401010000000"] {
+            assert_eq!(parse_x509_time(0x17, bad), Err(CryptoError::CertificateChainInvalid));
+        }
+    }
 }

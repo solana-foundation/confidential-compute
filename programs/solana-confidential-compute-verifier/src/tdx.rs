@@ -695,6 +695,70 @@ mod tests {
         assert!(!is_low_s(&one_above));
     }
 
+    /// `PRECOMPILE_DATA_START + 33 + 64 + message_len` used to overflow and
+    /// panic for a huge `message_len`. It now fails closed.
+    #[test]
+    fn an_overflowing_message_length_is_rejected_rather_than_panicking() {
+        let key = instructions::ID;
+        let owner = solana_program::sysvar::ID;
+        let mut lamports = 0u64;
+        // The trailing u16 of the Instructions sysvar is the current index: 1.
+        let mut data = vec![0u8, 0, 1, 0];
+        let sysvar = AccountInfo::new(&key, false, false, &mut lamports, &mut data, &owner, false);
+        for message_len in [usize::MAX, usize::MAX - PRECOMPILE_DATA_START] {
+            let result = extract_secp256r1_verified(&sysvar, message_len);
+            let expected = ProgramError::from(VerifierError::InvalidInstruction);
+            assert!(matches!(result, Err(ref err) if *err == expected), "message_len {message_len}");
+        }
+    }
+
+    /// `normalize_low_s` and the groth16 negation share `sub_be32`. Check it
+    /// against an independent 256-bit subtraction built from two `u128` halves.
+    #[test]
+    fn sub_be32_matches_a_u128_reference() {
+        fn reference(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
+            let half = |x: &[u8; 32], hi: bool| {
+                let range = if hi { 0..16 } else { 16..32 };
+                u128::from_be_bytes(x[range].try_into().unwrap())
+            };
+            let (lo, borrow) = half(a, false).overflowing_sub(half(b, false));
+            let hi = half(a, true).wrapping_sub(half(b, true)).wrapping_sub(u128::from(borrow));
+            let mut out = [0u8; 32];
+            out[..16].copy_from_slice(&hi.to_be_bytes());
+            out[16..].copy_from_slice(&lo.to_be_bytes());
+            out
+        }
+        let mut one = [0u8; 32];
+        one[31] = 1;
+        let mut low_borrow = [0u8; 32];
+        low_borrow[16] = 1;
+        let mut cases = vec![
+            ([0u8; 32], [0u8; 32]),
+            ([0u8; 32], one),
+            ([0xFF; 32], [0xFF; 32]),
+            ([0xFF; 32], one),
+            (low_borrow, one),
+            (P256_ORDER, one),
+            (P256_ORDER, P256_HALF_ORDER),
+            (one, P256_ORDER),
+        ];
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        for _ in 0..64 {
+            let mut a = [0u8; 32];
+            let mut b = [0u8; 32];
+            for byte in a.iter_mut().chain(b.iter_mut()) {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                *byte = state.to_le_bytes()[0];
+            }
+            cases.push((a, b));
+        }
+        for (a, b) in cases {
+            assert_eq!(crate::groth16::sub_be32(&a, &b), reference(&a, &b), "a={a:?} b={b:?}");
+        }
+    }
+
     #[test]
     fn a_truncated_quote_is_rejected_rather_than_panicking() {
         for len in 0..OFF_QE_AUTH_DATA {

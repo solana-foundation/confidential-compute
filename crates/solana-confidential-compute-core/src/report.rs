@@ -329,6 +329,44 @@ impl ReportData {
 mod tests {
     use super::*;
 
+    /// Pins every fixed-offset getter to its AMD Table 141 offset.
+    #[test]
+    fn each_getter_reads_its_documented_offset() {
+        let mut raw = [0u8; SNP_REPORT_SIZE];
+        for (i, byte) in raw.iter_mut().enumerate() {
+            *byte = (i % 251) as u8;
+        }
+        // Zero padding so that the r and s parsers accept the fields.
+        raw[0x2D0..0x2E8].fill(0);
+        raw[0x318..0x330].fill(0);
+        let view = SnpReportView::from_array(&raw);
+        let le_u32 = |at: usize| u32::from_le_bytes(raw[at..at + 4].try_into().unwrap());
+        let le_u64 = |at: usize| u64::from_le_bytes(raw[at..at + 8].try_into().unwrap());
+
+        assert_eq!(view.version(), le_u32(0x00));
+        assert_eq!(view.guest_svn(), le_u32(0x04));
+        assert_eq!(view.policy(), le_u64(0x08));
+        assert_eq!(view.vmpl(), le_u32(0x30));
+        assert_eq!(view.signature_algo(), le_u32(0x34));
+        assert_eq!(view.current_tcb(), le_u64(0x38));
+        assert_eq!(view.flags(), le_u32(0x48));
+        assert_eq!(view.report_data().as_slice(), &raw[0x50..0x90]);
+        assert_eq!(view.nonce().as_slice(), &raw[0x70..0x90]);
+        assert_eq!(view.host_data().as_slice(), &raw[0xC0..0xE0]);
+        assert_eq!(view.report_id().as_slice(), &raw[0x140..0x160]);
+        assert_eq!(view.reported_tcb(), le_u64(0x180));
+        assert_eq!(view.chip_id().as_slice(), &raw[0x1A0..0x1E0]);
+        assert_eq!(view.signed_body().as_slice(), &raw[..0x2A0]);
+        assert_eq!(view.signature_raw().as_slice(), &raw[0x2A0..0x4A0]);
+
+        let mut r_be = raw[0x2A0..0x2D0].to_vec();
+        r_be.reverse();
+        assert_eq!(view.signature_r_be().unwrap().as_slice(), r_be.as_slice());
+        let mut s_be = raw[0x2E8..0x318].to_vec();
+        s_be.reverse();
+        assert_eq!(view.signature_s_be().unwrap().as_slice(), s_be.as_slice());
+    }
+
     fn valid_guest_policy() -> u64 {
         GUEST_POLICY_RESERVED_MUST_BE_ONE
     }

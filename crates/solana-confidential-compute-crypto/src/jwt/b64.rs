@@ -174,3 +174,70 @@ fn write_bytes(output: &mut [u8], written: usize, bytes: &[u8]) -> Result<usize,
     output.get_mut(written..end).ok_or(CryptoError::MalformedJwt)?.copy_from_slice(bytes);
     Ok(end)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec::Vec;
+
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+    fn encode(bytes: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        for chunk in bytes.chunks(3) {
+            let mut block = [0u8; 3];
+            block[..chunk.len()].copy_from_slice(chunk);
+            let n = (u32::from(block[0]) << 16) | (u32::from(block[1]) << 8) | u32::from(block[2]);
+            let sextets = [n >> 18, n >> 12, n >> 6, n].map(|v| ALPHABET[(v & 0x3f) as usize]);
+            out.extend_from_slice(&sextets[..=chunk.len()]);
+        }
+        out
+    }
+
+    fn stream(input: &[u8]) -> Result<Vec<u8>, CryptoError> {
+        let mut decoder = B64Decoder::new(input);
+        let mut out = Vec::new();
+        while let Some(b) = decoder.next_byte()? {
+            out.push(b);
+        }
+        Ok(out)
+    }
+
+    /// The slice decoder and the streaming decoder were rewritten without
+    /// index arithmetic. Both must round-trip every tail length.
+    #[test]
+    fn both_decoders_round_trip_every_length() {
+        for len in 0..=40usize {
+            let bytes: Vec<u8> = (0..len).map(|i| (i * 37 % 256) as u8).collect();
+            let encoded = encode(&bytes);
+            let mut out = [0u8; 64];
+            let n = decode_b64url(&encoded, &mut out).unwrap();
+            assert_eq!(&out[..n], bytes.as_slice(), "slice decoder, length {len}");
+            assert_eq!(stream(&encoded).unwrap(), bytes, "stream decoder, length {len}");
+
+            let mut padded = encoded.clone();
+            padded.extend_from_slice(b"==");
+            assert_eq!(stream(&padded).unwrap(), bytes, "padded stream, length {len}");
+            let n = decode_b64url(&padded, &mut out).unwrap();
+            assert_eq!(&out[..n], bytes.as_slice(), "padded slice, length {len}");
+        }
+    }
+
+    #[test]
+    fn both_decoders_reject_the_same_malformed_input() {
+        for bad in [&b"A"[..], b"AAAAA", b"AB", b"ABC", b"A+AA", b"AA/A", b"AA A", b"AA=A"] {
+            let mut out = [0u8; 8];
+            assert!(decode_b64url(bad, &mut out).is_err(), "slice decoder accepted {bad:?}");
+            assert!(stream(bad).is_err(), "stream decoder accepted {bad:?}");
+        }
+    }
+
+    #[test]
+    fn slice_decoder_rejects_a_short_output_buffer() {
+        let mut out = [0u8; 2];
+        assert_eq!(decode_b64url(b"AAAA", &mut out), Err(CryptoError::MalformedJwt));
+        assert_eq!(decode_b64url(b"AAA", &mut out), Ok(2));
+        let mut out = [0u8; 3];
+        assert_eq!(decode_b64url_exact(b"AAA", &mut out), Err(CryptoError::MalformedJwt));
+    }
+}

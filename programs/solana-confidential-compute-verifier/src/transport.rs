@@ -188,3 +188,22 @@ impl Processor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The header readers used to slice and unwrap. Short data now fails
+    /// closed with `InvalidInstructionData`.
+    #[test]
+    fn header_reads_reject_short_data_rather_than_panicking() {
+        let args = [7u8; 44];
+        assert_eq!(u32_at(&args, 32), Ok(0x0707_0707));
+        assert_eq!(u64_at(&args, 36), Ok(0x0707_0707_0707_0707));
+        assert_eq!(u32_at(&args, 41), Err(ProgramError::InvalidInstructionData));
+        assert_eq!(u64_at(&args, 37), Err(ProgramError::InvalidInstructionData));
+        assert_eq!(u32_at(&args, 45), Err(ProgramError::InvalidInstructionData));
+        assert_eq!(u64_at(&args, usize::MAX), Err(ProgramError::InvalidInstructionData));
+        assert_eq!(u32_at(&[], 0), Err(ProgramError::InvalidInstructionData));
+    }
+}

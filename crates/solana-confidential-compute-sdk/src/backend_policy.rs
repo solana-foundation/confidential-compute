@@ -69,3 +69,20 @@ pub(crate) fn with_backend_policy(mut ix: Instruction, source: u8) -> Instructio
     ix.accounts.push(AccountMeta::new_readonly(address, false));
     ix
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The builders call `backend_policy_pda` with their fixed source tags. Each
+    /// tag must pass the public check and give the same address.
+    #[test]
+    fn builder_source_tags_pass_the_public_check() {
+        let program_id = Pubkey::new_unique();
+        for source in [AMD_SOURCE, NITRO_SOURCE, GCP_SOURCE, NVIDIA_SOURCE, crate::tdx::TDX_SOURCE] {
+            assert_eq!(derive_backend_policy_pda(&program_id, source), Ok(backend_policy_pda(&program_id, source)));
+        }
+        assert_eq!(derive_backend_policy_pda(&program_id, 0), Err(BackendPolicyError::InvalidSource));
+        assert_eq!(derive_backend_policy_pda(&program_id, 6), Err(BackendPolicyError::InvalidSource));
+    }
+}

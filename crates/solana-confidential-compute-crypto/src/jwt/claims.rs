@@ -833,3 +833,55 @@ fn hex_nibble(c: u8) -> Result<u8, CryptoError> {
     };
     c.checked_sub(first).and_then(|v| v.checked_add(value_of_first)).ok_or(CryptoError::MalformedJwt)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::{format, string::String};
+
+    fn parse(json: &[u8]) -> Result<(), CryptoError> {
+        let mut claims = GoogleClaims::empty(json);
+        parse_json(SliceSrc::new(json), &mut claims)
+    }
+
+    /// The container stack pointer now moves with `checked_add` and
+    /// `checked_sub`. The depth limit stays at eight containers.
+    #[test]
+    fn nesting_stops_at_eight_containers() {
+        let arrays = |n: usize| format!("{{\"x\":{}0{}}}", "[".repeat(n), "]".repeat(n));
+        assert_eq!(parse(arrays(7).as_bytes()), Ok(()));
+        assert_eq!(parse(arrays(8).as_bytes()), Err(CryptoError::MalformedJwt));
+        let objects = |n: usize| format!("{{{}\"a\":0{}}}", "\"a\":{".repeat(n), "}".repeat(n));
+        assert_eq!(parse(objects(7).as_bytes()), Ok(()));
+        assert_eq!(parse(objects(8).as_bytes()), Err(CryptoError::MalformedJwt));
+        for bad in ["{", "}", "{\"a\":[1,]}", "{\"a\":1,}", "{\"a\":1}}", "[]", "{\"a\":[1}"] {
+            assert_eq!(parse(bad.as_bytes()), Err(CryptoError::MalformedJwt), "{bad}");
+        }
+    }
+
+    #[test]
+    fn long_keys_and_strings_are_bounded() {
+        let long_key = format!("{{\"{}\":1}}", "k".repeat(40));
+        assert_eq!(parse(long_key.as_bytes()), Ok(()));
+        let fits = format!("{{\"sub\":\"{}\"}}", "s".repeat(MAX_SUB));
+        assert_eq!(parse(fits.as_bytes()), Ok(()));
+        let long_sub = format!("{{\"sub\":\"{}\"}}", "s".repeat(MAX_SUB + 1));
+        assert_eq!(parse(long_sub.as_bytes()), Err(CryptoError::MalformedJwt));
+    }
+
+    #[test]
+    fn numbers_and_image_digests_keep_their_bounds() {
+        assert_eq!(parse(b"{\"exp\":18446744073709551615}"), Ok(()));
+        assert_eq!(parse(b"{\"exp\":18446744073709551616}"), Err(CryptoError::MalformedJwt));
+        assert_eq!(parse(b"{\"exp\":01}"), Err(CryptoError::MalformedJwt));
+
+        let hex: String = (0..32).map(|i| format!("{i:02x}")).collect();
+        let digest = parse_image_digest(format!("sha256:{hex}").as_bytes()).unwrap();
+        assert_eq!(digest, core::array::from_fn::<u8, 32, _>(|i| i as u8));
+        assert_eq!(parse_image_digest(format!("sha256:{}", hex.to_uppercase()).as_bytes()), Ok(digest));
+        for bad in [format!("sha256:{}", &hex[1..]), format!("sha256:{hex}0"), format!("sha512:{hex}"), String::new()] {
+            assert_eq!(parse_image_digest(bad.as_bytes()), Err(CryptoError::MalformedJwt), "{bad}");
+        }
+        assert_eq!(parse_image_digest(format!("sha256:{}g", &hex[1..]).as_bytes()), Err(CryptoError::MalformedJwt));
+    }
+}

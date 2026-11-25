@@ -56,3 +56,24 @@ pub(crate) fn with_legacy_nonce(mut ix: Instruction, legacy: Pubkey) -> Instruct
     ix.accounts.push(AccountMeta::new_readonly(legacy, false));
     ix
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backend_policy::{AMD_SOURCE, NITRO_SOURCE};
+
+    /// The builders call `used_nonce_pda` with `AMD_SOURCE` and `NITRO_SOURCE`.
+    /// Both must pass the public check and give the same address.
+    #[test]
+    fn builder_source_tags_pass_the_public_check() {
+        let program_id = Pubkey::new_unique();
+        let (signer, nonce) = ([1u8; 32], [2u8; 32]);
+        for source in [AMD_SOURCE, NITRO_SOURCE] {
+            assert_eq!(
+                derive_used_nonce_pda_for_source(&program_id, source, &signer, &nonce),
+                Ok(used_nonce_pda(&program_id, source, &signer, &nonce))
+            );
+        }
+        assert_eq!(derive_used_nonce_pda_for_source(&program_id, 3, &signer, &nonce), Err(NonceError::InvalidSource));
+    }
+}

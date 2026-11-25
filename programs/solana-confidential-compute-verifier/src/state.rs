@@ -413,6 +413,59 @@ impl GcpTenantPolicy {
 }
 
 #[cfg(test)]
+mod view_reads {
+    use super::*;
+
+    /// The view getters used to slice and unwrap. They now read through
+    /// `array_at`, which fails closed on short data.
+    #[test]
+    fn array_at_rejects_short_data_rather_than_panicking() {
+        let data = [1u8, 2, 3, 4, 5];
+        assert_eq!(array_at::<4>(&data, 1), Ok(&[2, 3, 4, 5]));
+        assert_eq!(array_at::<4>(&data, 2), Err(ProgramError::InvalidAccountData));
+        assert_eq!(array_at::<1>(&data, usize::MAX), Err(ProgramError::InvalidAccountData));
+    }
+
+    #[test]
+    fn vcek_view_reads_the_serialized_key_and_deadline() {
+        let mut xy = [0u8; 96];
+        xy.iter_mut().enumerate().for_each(|(i, b)| *b = i as u8);
+        let account = VcekAccount::new([9; 32], 7, xy, 11, 254).with_validity(1_700_000_000);
+        let bytes = borsh::to_vec(&account).unwrap();
+        let view = VcekAccountView::try_from_slice(&bytes).unwrap();
+        assert_eq!(view.public_key_xy(), Ok(&xy));
+        assert_eq!(view.valid_until_unix(), Ok(1_700_000_000));
+        assert_eq!(view.bump(), 254);
+        assert!(view.is_trusted_at_unix(1_699_999_999));
+        assert!(!view.is_trusted_at_unix(1_700_000_000));
+        assert!(!view.is_trusted_at_unix(-1));
+    }
+
+    #[test]
+    fn legacy_measurement_lookup_reads_only_the_counted_entries() {
+        let mut data = vec![0u8; PolicyRegistry::SIZE];
+        data[..8].copy_from_slice(&POLICY_REGISTRY_DISCRIMINATOR);
+        let stored = &mut data[PolicyRegistry::MEASUREMENTS_OFFSET..PolicyRegistry::MEASUREMENTS_OFFSET + 8 * 48];
+        for (i, entry) in stored.as_chunks_mut::<48>().0.iter_mut().enumerate() {
+            entry.fill(i as u8 + 1);
+        }
+        let count_at = PolicyRegistry::MEASUREMENT_COUNT_OFFSET;
+        data[count_at..count_at + 4].copy_from_slice(&3u32.to_le_bytes());
+        let view = PolicyRegistryView::try_from_slice(&data).unwrap();
+        assert!(view.is_measurement_allowed(&[1; 48]));
+        assert!(view.is_measurement_allowed(&[3; 48]));
+        assert!(!view.is_measurement_allowed(&[4; 48]), "entry 4 is past the count");
+        assert!(!view.is_measurement_allowed(&[0; 48]));
+
+        // A count above eight reads at most the eight stored entries.
+        data[count_at..count_at + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+        let view = PolicyRegistryView::try_from_slice(&data).unwrap();
+        assert!(view.is_measurement_allowed(&[8; 48]));
+        assert!(!view.is_measurement_allowed(&[9; 48]));
+    }
+}
+
+#[cfg(test)]
 mod issue_185 {
     use super::*;
     #[test]

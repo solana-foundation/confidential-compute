@@ -419,4 +419,42 @@ mod tests {
         c.skip_value().unwrap();
         assert!(c.is_empty());
     }
+
+    /// Major type 1 now decodes `-1 - n` with `checked_sub`. The range ends
+    /// stay the same.
+    #[test]
+    fn negative_integer_range_ends() {
+        let mut max = vec![0x3b];
+        max.extend_from_slice(&(i64::MAX as u64).to_be_bytes());
+        assert_eq!(CborCursor::new(&max).read_int(), Ok(i64::MIN));
+        let mut over = vec![0x3b];
+        over.extend_from_slice(&(i64::MAX as u64 + 1).to_be_bytes());
+        assert_eq!(CborCursor::new(&over).read_int(), Err(CryptoError::MalformedCbor));
+        assert_eq!(CborCursor::new(&[0x20]).read_int(), Ok(-1));
+        assert_eq!(CborCursor::new(&[0x37]).read_int(), Ok(-24));
+    }
+
+    /// The skip depth now counts down with `checked_sub`. Eight levels pass
+    /// and nine fail.
+    #[test]
+    fn skip_depth_limit_is_eight_levels() {
+        let nested = |arrays: usize| {
+            let mut out = vec![0x81; arrays];
+            out.push(0x00);
+            out
+        };
+        let seven = nested(7);
+        let mut ok = CborCursor::new(&seven);
+        assert_eq!(ok.skip_value(), Ok(()));
+        assert!(ok.is_empty());
+        assert_eq!(CborCursor::new(&nested(8)).skip_value(), Err(CryptoError::MalformedCbor));
+    }
+
+    #[test]
+    fn read_break_and_initial_byte_fail_closed_at_the_end() {
+        let mut cur = CborCursor::new(&[0xff]);
+        assert_eq!(cur.read_break(), Ok(()));
+        assert_eq!(cur.read_break(), Err(CryptoError::MalformedCbor));
+        assert_eq!(cur.read_header(), Err(CryptoError::MalformedCbor));
+    }
 }

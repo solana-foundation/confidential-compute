@@ -994,6 +994,34 @@ mod tests {
         doc
     }
 
+    /// The definite-map countdown and the break read now use checked
+    /// arithmetic. The pair count still bounds the walk, and a truncated
+    /// map still fails closed.
+    #[test]
+    fn nitro_payload_map_count_bounds_the_walk() {
+        let pcrs = cbor_map_int(&[(0, cbor_bstr(&[7u8; 48]))]);
+        let pairs = [("user_data", cbor_bstr(&[9u8; 32])), ("pcrs", pcrs)];
+        let payload = cbor_map_text(&pairs);
+        assert_eq!(payload[0], 0xa2);
+        let view = parse_nitro_payload(&payload).unwrap();
+        assert_eq!(view.user_data, [9u8; 32]);
+        assert_eq!(view.pcr0, [7u8; 48]);
+
+        let mut too_many = payload.clone();
+        too_many[0] = 0xa3;
+        assert_eq!(parse_nitro_payload(&too_many).err(), Some(ProgramError::InvalidInstructionData));
+        let mut too_few = payload.clone();
+        too_few[0] = 0xa1;
+        assert_eq!(parse_nitro_payload(&too_few).err(), Some(ProgramError::InvalidInstructionData));
+
+        let mut indefinite = payload.clone();
+        indefinite[0] = 0xbf;
+        assert_eq!(parse_nitro_payload(&indefinite).err(), Some(ProgramError::InvalidInstructionData));
+        indefinite.push(0xff);
+        assert!(parse_nitro_payload(&indefinite).is_ok());
+        assert_eq!(parse_nitro_payload(&[]).err(), Some(ProgramError::InvalidInstructionData));
+    }
+
     /// Indefinite payload map with `public_key: null` (`0xf6`), matching the hardware shape.
     fn encode_indefinite_nitro_document(signer: [u8; 32], measurement: [u8; 48]) -> Vec<u8> {
         let pcrs = cbor_map_int(&[

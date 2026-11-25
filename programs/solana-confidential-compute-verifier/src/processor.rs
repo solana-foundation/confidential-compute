@@ -3077,6 +3077,30 @@ mod tests {
         assert!(res.is_ok());
     }
 
+    /// The SlotHashes walk now uses 40-byte chunks. A partial trailing entry
+    /// is still ignored, and an entry count larger than the data does not
+    /// read past the end.
+    #[test]
+    fn test_slot_hash_walk_ignores_a_partial_trailing_entry() {
+        let slot_hashes_key = slot_hashes::ID;
+        let mut lamports = 0u64;
+        let mut data = vec![0u8; 8 + 40 + 39];
+        data[0..8].copy_from_slice(&u64::MAX.to_le_bytes());
+        data[8..16].copy_from_slice(&100u64.to_le_bytes());
+        data[16..48].copy_from_slice(&[0xAA; 32]);
+        data[48..56].copy_from_slice(&101u64.to_le_bytes());
+        data[56..87].fill(0xBB);
+
+        let owner = solana_program::sysvar::ID;
+        let acc = AccountInfo::new(&slot_hashes_key, false, false, &mut lamports, &mut data, &owner, false);
+
+        assert_eq!(super::Processor::load_slot_hash(&acc, 100, 120), Ok([0xAA; 32]));
+        assert_eq!(
+            super::Processor::load_slot_hash(&acc, 101, 120),
+            Err(ProgramError::from(VerifierError::StaleNonce))
+        );
+    }
+
     #[test]
     fn test_verify_recent_slot_hash_stale() {
         let slot_hashes_key = slot_hashes::ID;
