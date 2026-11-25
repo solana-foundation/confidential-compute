@@ -58,7 +58,7 @@ clause. For these changes, update SECURITY.md, the spec catalog and the crate RE
 
 ## Conventions
 
-- Do not use `unwrap`, `expect` or `panic!` outside tests.
+- Do not use `unwrap`, `expect` or `panic!` outside tests. An `expect` is allowed only when a compile-time `const` assertion proves it cannot fail. Mark it with `#[allow(clippy::expect_used)]` and a comment that names the proof.
 - Use checked arithmetic in program code.
 - Before you use an account, examine its owner, signer flag, writable flag, PDA address and
   discriminator.
