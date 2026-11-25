@@ -73,7 +73,6 @@ async function collect() {
     };
     for (const name of Object.keys(sdk).filter(n => n.endsWith('_DISCRIMINATOR'))) out.constants[name] = hex(sdk[name]);
 
-    // PDAs: default program id and an explicit one.
     for (const [label, p] of Object.entries({ default: undefined, pid })) {
         out[`pda.${label}`] = {
             amdRevocation: pda(sdk.deriveAmdRevocationPda(chip, p)),
@@ -92,13 +91,11 @@ async function collect() {
             vcek: pda(sdk.deriveVcekPda(chip, 0x0102030405060708n, p)),
         };
     }
-    // Many seeds: bump search must agree for 64 distinct signers.
     out.pdaMany = Array.from({ length: 64 }, (_, i) => {
         const s = new web3.PublicKey(Uint8Array.from({ length: 32 }, (_, j) => (i * 7 + j * 13 + 1) & 0xff));
         return pda(sdk.deriveSignerPda(s, pid));
     });
 
-    // Hashes.
     const metas = [pk(10), pk(20)].map(pubkey => ({ isSigner: false, isWritable: false, pubkey }));
     const actionHash = sdk.hashAction(
         Uint8Array.of(1, 2, 3, 4, 5, 6, 7, 8),
@@ -110,7 +107,6 @@ async function collect() {
         commitment: hex(sdk.computeCommitment(new Uint8Array(32).fill(0x42), actionHash, pk(30))),
     };
 
-    // Instruction builders.
     const m48 = new Uint8Array(48).fill(7);
     await rec('ix.setBackendPolicy', () =>
         [1, 2, 3, 4, 5].map(s => ixJson(sdk.buildSetBackendPolicyIx(authority, payer, s, [m48], pid))),
@@ -209,7 +205,6 @@ async function collect() {
         );
     }
 
-    // Transactions.
     const consumerIx = new web3.TransactionInstruction({
         data: Buffer.from([1, 2, 3]),
         keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
@@ -342,7 +337,6 @@ async function collect() {
         return await sdk.buildSessionActionTx(kp.publicKey, kp, ix, blockhash);
     });
 
-    // Error behaviour at public exports (sync throws, recorded by message).
     await rec('err.vcekLen', () => sdk.deriveVcekPda(new Uint8Array(31), 1n));
     await rec('err.nonceSource', () => sdk.deriveUsedNoncePdaForSource(3, signer, nonce));
     await rec('err.nonceLen', () => sdk.deriveLegacyUsedNoncePda(signer, new Uint8Array(31)));
@@ -383,7 +377,6 @@ async function collect() {
     await rec('err.parseShort', () => sdk.parseAttestedSignerAccount(new Uint8Array(10)));
     await rec('err.parseDisc', () => sdk.parseAttestedSignerAccount(new Uint8Array(154)));
 
-    // Account parser.
     const acct = Buffer.alloc(154);
     Buffer.from(sdk.ATTESTED_SIGNER_DISCRIMINATOR).copy(acct);
     acct.fill(1, 8, 40);
