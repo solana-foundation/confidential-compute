@@ -282,14 +282,14 @@ async function main() {
         initData.set(EXPECTED_MEASUREMENT, 144);
 
         const initIx = new TransactionInstruction({
-            programId: SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
-            keys: [
-                { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-                { pubkey: policyRegistryPda, isSigner: false, isWritable: true },
-                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-                { pubkey: programDataPda, isSigner: false, isWritable: false },
-            ],
             data: Buffer.from(initData),
+            keys: [
+                { isSigner: true, isWritable: true, pubkey: payer.publicKey },
+                { isSigner: false, isWritable: true, pubkey: policyRegistryPda },
+                { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
+                { isSigner: false, isWritable: false, pubkey: programDataPda },
+            ],
+            programId: SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
         });
 
         const tx = new Transaction().add(initIx);
@@ -323,15 +323,15 @@ async function main() {
     const consumerData = new Uint8Array([1, 0xab, 0xcd]);
 
     const consumerIx = new TransactionInstruction({
-        programId: CONSUMER_PROGRAM_ID,
+        data: Buffer.from(consumerData),
         keys: [
             {
-                pubkey: new PublicKey('Sysvar1nstructions1111111111111111111111111'),
                 isSigner: false,
                 isWritable: false,
+                pubkey: new PublicKey('Sysvar1nstructions1111111111111111111111111'),
             },
         ],
-        data: Buffer.from(consumerData),
+        programId: CONSUMER_PROGRAM_ID,
     });
 
     const { blockhash } = await connection.getLatestBlockhash();
@@ -468,7 +468,7 @@ async function main() {
         skipPreflight: true,
     });
     await connection.confirmTransaction(
-        { signature: sig, blockhash: nitroBlockhash, lastValidBlockHeight },
+        { blockhash: nitroBlockhash, lastValidBlockHeight, signature: sig },
         'confirmed',
     );
     const landed = await connection.getTransaction(sig, {

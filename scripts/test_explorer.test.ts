@@ -27,12 +27,12 @@ describe('SolanaExplorer URL Generator', () => {
     });
 
     test('supports custom cluster option', () => {
-        const custom = new SolanaExplorer({ provider: 'orb', cluster: 'testnet' });
+        const custom = new SolanaExplorer({ cluster: 'testnet', provider: 'orb' });
         expect(custom.tx(sampleTx)).toBe(`https://orbmarkets.io/tx/${sampleTx}?cluster=testnet`);
     });
 
     test('supports fallback to Solana Explorer', () => {
-        const solExplorer = new SolanaExplorer({ provider: 'solana', cluster: 'devnet' });
+        const solExplorer = new SolanaExplorer({ cluster: 'devnet', provider: 'solana' });
         expect(solExplorer.tx(sampleTx)).toBe(`https://explorer.solana.com/tx/${sampleTx}?cluster=devnet`);
     });
 });

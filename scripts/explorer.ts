@@ -68,5 +68,5 @@ export class SolanaExplorer {
 }
 
 export const defaultExplorer = new SolanaExplorer();
-export const orbDevnet = new SolanaExplorer({ provider: 'orb', cluster: 'devnet' });
-export const orbMainnet = new SolanaExplorer({ provider: 'orb', cluster: 'mainnet-beta' });
+export const orbDevnet = new SolanaExplorer({ cluster: 'devnet', provider: 'orb' });
+export const orbMainnet = new SolanaExplorer({ cluster: 'mainnet-beta', provider: 'orb' });
