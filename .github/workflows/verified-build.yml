@@ -24,13 +24,14 @@ jobs:
       - name: Verified build, run 1
         run: |
           set -euo pipefail
-          rm -rf target/deploy
+          # The build container runs as root, so its output must be removed with sudo.
+          sudo rm -rf target/deploy
           just verified-build 2>&1 | tee verified-build-1.log
           tail -n 1 verified-build-1.log > verified-build-1.hash
       - name: Verified build, run 2
         run: |
           set -euo pipefail
-          rm -rf target/deploy
+          sudo rm -rf target/deploy
           just verified-build 2>&1 | tee verified-build-2.log
           tail -n 1 verified-build-2.log > verified-build-2.hash
       - name: Compare executable hashes
