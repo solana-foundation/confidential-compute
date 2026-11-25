@@ -25,7 +25,7 @@ The [Terraform and manual demo guide](deploy/gcp/README.md) describes an optiona
 | Repository | [solana-foundation/confidential-compute](https://github.com/solana-foundation/confidential-compute) |
 | Documentation portal | Local Astro Starlight portal ([docs-site/README.md](docs-site/README.md)) |
 | Integrator quickstart | [15-minute quickstart](docs-site/src/content/docs/integration/quickstart.md) · [GLOSSARY.md](GLOSSARY.md) |
-| Release | tag `v1.0.0` |
+| Release | None. Pre-release software, crate version `0.1.0`. |
 | Crate version | `0.1.0` (`Cargo.toml` `[workspace.package]`) |
 | License | [Apache-2.0](LICENSE) |
 | Runtime target | SBPFv3 (`e_flags = 0x3`, SIMD-0178 / SIMD-0500) |
@@ -233,7 +233,7 @@ bash scripts/build-sbpfv3.sh --verify
 
 The script compiles `programs/solana-confidential-compute-verifier/Cargo.toml` only. A build that passes prints `e_flags=0x3` for `target/deploy/solana_confidential_compute_verifier.so`.
 
-The `v1.0.0` Devnet verifier ELF is 673,784 bytes. The earlier Gate 4 artifact was 618,288 bytes, `e_machine = EM_BPF (0xf7)`. The `v1.0.0` consumer ELF is 127,744 bytes, `e_machine = 0x107`, `e_flags = 0x0`. That consumer header is not SBPFv3. A buyer who redeploys a consumer program compiles it with `cargo-build-sbf --arch v3`.
+The Devnet verifier ELF in the grant closeout deployment is 673,784 bytes. The earlier Gate 4 artifact was 618,288 bytes, `e_machine = EM_BPF (0xf7)`. The consumer ELF in the grant closeout deployment is 127,744 bytes, `e_machine = 0x107`, `e_flags = 0x0`. That consumer header is not SBPFv3. A buyer who redeploys a consumer program compiles it with `cargo-build-sbf --arch v3`.
 
 `@spec SCC-PERF-001` and `@spec SCC-PERF-002` name the verifier compute paths. Section 6.2 lists the measured compute units. The deploy note records a 0 compute-unit runtime delta versus SBPFv0 and an ELF that is 5–15 percent smaller. The ELF omits the dynamic symbol table.
 
@@ -488,7 +488,7 @@ Further operator notes are in [docs/hardware-testing-runbook.md](docs/hardware-t
 
 ## 6. Devnet deployment and benchmarks
 
-The cluster is Solana Devnet. The release is `v1.0.0`. The upgrade authority is `BNiGJpc6zkmkk7Jir1ggRfyxFy2fwjMmt2BUDUEg4eCG`. The program data account is `EWShgrBQhkQiTmGTrYm9DuWvUPKRcsbECqXJuGa1BFcX`.
+The cluster is Solana Devnet. This section records the grant closeout deployment. The upgrade authority is `BNiGJpc6zkmkk7Jir1ggRfyxFy2fwjMmt2BUDUEg4eCG`. The program data account is `EWShgrBQhkQiTmGTrYm9DuWvUPKRcsbECqXJuGa1BFcX`.
 
 | Component | Address | Status |
 | :--- | :--- | :--- |
@@ -501,19 +501,19 @@ The cluster is Solana Devnet. The release is `v1.0.0`. The upgrade authority is 
 
 | Event | Signature | Slot | Result |
 | :--- | :--- | ---: | :--- |
-| `v1.0.0` `verify_nitro_attestation` Mode A (`mode = 0`) | [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet) | Devnet | Fail-closed `Custom(2)` on a 522-byte synthetic COSE document. The parsing path consumed 8,122 compute units. |
+| Grant closeout deployment `verify_nitro_attestation` Mode A (`mode = 0`) | [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet) | Devnet | Fail-closed `Custom(2)` on a 522-byte synthetic COSE document. The parsing path consumed 8,122 compute units. |
 | Earlier Gate 4 SBPFv3 upgrade of `solana-confidential-compute-verifier` | [`29h4C33wGxiFTSyvfay3pwUBc1MDCU3AcvYzZJwuCcZFtDR6hzk7Lg57LAr18Bem5Fd9okxmP3pCPRZxGPm5tDf7`](https://explorer.solana.com/tx/29h4C33wGxiFTSyvfay3pwUBc1MDCU3AcvYzZJwuCcZFtDR6hzk7Lg57LAr18Bem5Fd9okxmP3pCPRZxGPm5tDf7?cluster=devnet) | 503,550,668 | Finalized. That artifact was 618,288 bytes. |
 | Earlier Gate 4 `verify_nitro_attestation` Mode A | [`S3GWXy9PMFSpxX5LHVWBYZFY4oqokL3Kg5HZvWwXkqxucBn3JKLjw5JowZPwCbeWaXNeDm7a6UVCsR97LGWzkr9`](https://explorer.solana.com/tx/S3GWXy9PMFSpxX5LHVWBYZFY4oqokL3Kg5HZvWwXkqxucBn3JKLjw5JowZPwCbeWaXNeDm7a6UVCsR97LGWzkr9?cluster=devnet) | 503,550,778 | `Custom(2)`. The instruction consumed 7,829 compute units. |
 
-The Gate 4 source is [docs/milestones/gate-4-verification.md](docs/milestones/gate-4-verification.md). The 7,829 compute-unit log line in that report is the `S3GWXy9…` transaction. The `v1.0.0` measurement is `2iEc1e…`.
+The Gate 4 source is [docs/milestones/gate-4-verification.md](docs/milestones/gate-4-verification.md). The 7,829 compute-unit log line in that report is the `S3GWXy9…` transaction. The grant closeout measurement is `2iEc1e…`.
 
 ### 6.2 Compute units
 
-The `v1.0.0` Devnet sample is Nitro Mode A `verify_nitro_attestation` on a 522-byte synthetic COSE Sign1 document. The instruction parsed the document. It aborted at certificate validation. It returned `Custom(2)` (`VerifierError::VerificationFailed`). It did not register a signer. It did not submit the 4,526-byte hardware document.
+The Devnet sample in the grant closeout deployment is Nitro Mode A `verify_nitro_attestation` on a 522-byte synthetic COSE Sign1 document. The instruction parsed the document. It aborted at certificate validation. It returned `Custom(2)` (`VerifierError::VerificationFailed`). It did not register a signer. It did not submit the 4,526-byte hardware document.
 
 | Measurement | Instruction | Compute units | Condition |
 | :--- | :--- | ---: | :--- |
-| `v1.0.0` Devnet parsing path | `verify_nitro_attestation` Mode A | 8,122 | Signature `2iEc1e…buuH`. 522-byte synthetic COSE document. `Custom(2)`. `@spec SCC-PERF-001` |
+| Grant closeout deployment Devnet parsing path | `verify_nitro_attestation` Mode A | 8,122 | Signature `2iEc1e…buuH`. 522-byte synthetic COSE document. `Custom(2)`. `@spec SCC-PERF-001` |
 | Gate 4 Devnet instruction | `verify_nitro_attestation` Mode A | 7,829 | Earlier record. It ended with `custom program error: 0x2`. |
 | Gate 4 Devnet transaction | same Gate 4 transaction, plus the compute-budget instruction | 7,979 | Gate 4 §3.2. |
 | Policy init | `init_policy_registry` | 7,435 | Devnet. Gate 3 §3.1. |

@@ -1,6 +1,6 @@
 # Solana Confidential Compute — Milestone Gate 3 Verification Report
 
-> Historical V1 evidence: the 146-byte attested-signer layout and measurements in this report describe the recorded release, not the current integration contract. Current V2 uses `attested_signer_v2`, 154 bytes, and slot plus Unix expiry; see [the V2 account contract](../../crates/solana-confidential-compute-cpi/README.md#2-mode-a-account). Historical CU results do not prove V2 runtime performance.
+> Historical V1 evidence: the 146-byte attested-signer layout and measurements in this report describe the grant closeout deployment, not the current integration contract. Current V2 uses `attested_signer_v2`, 154 bytes, and slot plus Unix expiry; see [the V2 account contract](../../crates/solana-confidential-compute-cpi/README.md#2-mode-a-account). Historical CU results do not prove V2 runtime performance.
 
 
 Architecture map: [docs/high-level-design.md](../high-level-design.md).
@@ -15,7 +15,7 @@ Architecture map: [docs/high-level-design.md](../high-level-design.md).
 
 ---
 
-## 0. Tag `v1.0.0`
+## 0. Grant closeout deployment
 
 The sections below are the Gate 3 record. Current Devnet bytes:
 
@@ -28,7 +28,7 @@ The sections below are the Gate 3 record. Current Devnet bytes:
 
 Mode A `execute_session_action` stays at or under 1,500 CU. The §3.2 sample consumed **355 CU** on a rejected call. Mode B `execute_atomic_action` stays at or under 2,500 CU. The §4 row “≈ 1,950 CU” is the Gate 3 program-test note. `programs/solana-confidential-compute-consumer-reference/tests/consumer_tests.rs` asserts the ceilings and does not encode 1,950.
 
-TypeScript tests on this tag: **17 passed** (7 in `sdks/typescript/test/packet.test.cjs`, 10 in `sdks/typescript/test/nitro.test.cjs`). The §6.2 paste is a `tsc` log from Gate 3.
+TypeScript tests at the grant closeout deployment: **17 passed** (7 in `sdks/typescript/test/packet.test.cjs`, 10 in `sdks/typescript/test/nitro.test.cjs`). The §6.2 paste is a `tsc` log from Gate 3.
 
 `DefaultVerifier` on Solana, without `mock-crypto`, is `SolanaDefaultVerifier`. `Groth16SyscallVerifier` is not the default. §5 describes the packet limit, which still holds. It does not describe the deployed verifier backend.
 
@@ -44,7 +44,7 @@ All acceptance criteria for Gate 3 have been implemented, audited, tested, and v
 1. **Anchor zero-copy adapters (`crates/solana-confidential-compute-cpi`):** `AttestedSignerAccount` is a `bytemuck::Pod` of 146 bytes, alignment 1.
 2. **Reference consumer (`programs/solana-confidential-compute-consumer-reference`):** Mode A session check and Mode B introspection with `require_nonce == true`.
 3. **Client SDKs (`crates/solana-confidential-compute-sdk` and `sdks/typescript`):** Instruction builders, PDA derivation, and the 1,232-byte packet check.
-4. **Devnet:** Both programs are deployed. The v1.0.0 ELF headers are in §0. The Gate 3 sentence that both ELFs have `e_flags = 0x3` does not describe the consumer account now.
+4. **Devnet:** Both programs are deployed. The grant closeout deployment ELF headers are in §0. The Gate 3 sentence that both ELFs have `e_flags = 0x3` does not describe the consumer account now.
 
 ---
 
@@ -101,7 +101,7 @@ All acceptance criteria for Gate 3 have been implemented, audited, tested, and v
 | | **Fail-Closed Memory Alignment (`@spec SCC-ANCHOR-001`):** `AttestedSignerAccount` is 146 bytes with align-1 `bytemuck::Pod` to prevent BPF unaligned memory traps on fields at offsets 121, 129, 137. | Compile-time assertions: `size_of == 146`, `align_of == 1`. | **VERIFIED** |
 | | **SBPFv3 conformance (`@spec SCC-DEPLOY-001`):** `scripts/build-sbpfv3.sh` builds `solana-confidential-compute-verifier` with `--arch v3` and static Murmur3-32 syscalls. | Verifier ELF on Devnet: `e_flags = 0x3`. The consumer ELF is `e_flags = 0x0`. See §0. | **VERIFIED** for the verifier |
 | **2. Ease of Use** | **$\le 3$ Lines of Integration:** Downstream Anchor/native consumers verify Mode A in 2 lines and Mode B in 3 lines. | `programs/solana-confidential-compute-consumer-reference/src/lib.rs`. | **VERIFIED** |
-| | **Client builders (`@spec SCC-SDK-001`, `002`):** Instruction construction in the Rust and TypeScript SDKs. | Gate 3 capture cited `builder_tests.rs` as 9/9. Tag `v1.0.0` TypeScript suite is 17 tests. | **VERIFIED** |
+| | **Client builders (`@spec SCC-SDK-001`, `002`):** Instruction construction in the Rust and TypeScript SDKs. | Gate 3 capture cited `builder_tests.rs` as 9/9. The grant closeout deployment TypeScript suite is 17 tests. | **VERIFIED** |
 | **3. Compute Units (CUs)** | **Mode A Consumer Check:** $\le 1,500$ CUs (`@spec SCC-CONSUMER-001`). | Measured live on Devnet: **355 CUs** (76% headroom). | **VERIFIED** |
 | | **Mode B Consumer Check:** $\le 2,500$ CUs (`@spec SCC-CONSUMER-002`). | Measured under `solana-program-test`: **$\approx 1,950$ CUs** (22% headroom). | **VERIFIED** |
 | | **Policy Registry Init:** $\le 15,000$ CUs (`@spec SCC-PERF-001`). | Measured live on Devnet: **7,435 CUs** (50% headroom). | **VERIFIED** |
@@ -116,7 +116,7 @@ During live Devnet integration testing, an essential network protocol constraint
    Solana transactions enforce an IPv6 MTU packet ceiling of **1,232 bytes** (`PACKET_DATA_SIZE = 1232`).
 2. **Raw Hardware Report vs Wire Limit:**  
    An uncompressed AMD SEV-SNP report is **1,184 bytes**. Packing the raw report alongside `VerifyAtomicHeader` (72 bytes) and discriminator (8 bytes) produces **1,264 bytes of instruction data alone**, exceeding the 1,232-byte wire MTU.
-3. **v1.0.0 on-chain backend:**  
+3. **Grant closeout deployment on-chain backend:**  
    Public SDK builders return `PacketTooLarge` for a raw 1,184-byte report. The deployed Solana build sets `DefaultVerifier` to `SolanaDefaultVerifier` (instruction introspection). `Groth16SyscallVerifier` in `programs/solana-confidential-compute-verifier/src/groth16.rs` is not that default. [`docs/research/production-crypto-strategy.md`](../research/production-crypto-strategy.md) remains the research note for a Groth16 wrapper. It is not the Devnet entrypoint.
 
 ---
@@ -125,7 +125,7 @@ During live Devnet integration testing, an essential network protocol constraint
 
 ### 6.1 Rust test log (Gate 3 capture)
 
-The paste is the Gate 3 log. It is not the v1.0.0 workspace total.
+The paste is the Gate 3 log. It is not the grant closeout deployment workspace total.
 ```
 $ cargo test -p teton-verifier -p teton-consumer-reference -p teton-sdk
 
@@ -183,7 +183,7 @@ test result: ok. 25 passed; 0 failed
 
 ### 6.2 TypeScript SDK
 
-Gate 3 recorded a clean `tsc` run. Tag `v1.0.0` runs `npm test` in `sdks/typescript` and reports 17 passed tests: 7 in `sdks/typescript/test/packet.test.cjs` and 10 in `sdks/typescript/test/nitro.test.cjs`.
+Gate 3 recorded a clean `tsc` run. At the grant closeout deployment, `npm test` runs in `sdks/typescript` and reports 17 passed tests: 7 in `sdks/typescript/test/packet.test.cjs` and 10 in `sdks/typescript/test/nitro.test.cjs`.
 ```
 $ cd sdks/typescript && npm run build
 > @solana/confidential-compute@0.1.0 build

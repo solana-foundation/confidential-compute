@@ -1,6 +1,6 @@
 # Hardware enclave testing runbook
 
-Commands for a new AMD SEV-SNP guest and a new AWS Nitro Enclaves host. Tag `v1.0.0`.
+Commands for a new AMD SEV-SNP guest and a new AWS Nitro Enclaves host.
 
 The CLI subcommands are `prove` and `verify`. `prove` prints `transaction_base64` and `transaction_hex`. It does not submit a transaction. `--dry-run false` returns an error.
 
@@ -72,7 +72,6 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 git clone https://github.com/solana-foundation/confidential-compute.git
 cd confidential-compute
-git checkout v1.0.0
 ```
 
 ### 2.4 Ioctl
@@ -170,7 +169,6 @@ sudo systemctl enable --now nitro-enclaves-allocator.service
 sudo systemctl enable --now docker.service
 git clone https://github.com/solana-foundation/confidential-compute.git
 cd confidential-compute
-git checkout v1.0.0
 bash scripts/run_nitro_hardware_probe.sh
 ```
 
@@ -194,7 +192,7 @@ Recorded PCR0, PCR1, and PCR2 for image `nitro-probe` are in the root `README.md
 NODE_PATH=sdks/typescript/node_modules bun scripts/smoke_test_devnet.ts
 ```
 
-Recorded v1.0.0 transaction: [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet).
+Recorded grant closeout transaction: [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet).
 
 | Field | Value |
 | :--- | :--- |

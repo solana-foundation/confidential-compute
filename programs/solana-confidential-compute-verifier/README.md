@@ -224,7 +224,7 @@ Devnet `PolicyRegistry` PDA: `2FX8HZqEXr7x8kHzkhy4KPUuViVt9M6xqhFTB12jaDUf`.
 
 The processor requires `rest.len() == header + doc_len`. `MAX_NITRO_DOCUMENT_LEN` is **8192**. The on-chain chain accepts `cabundle[0]` only when its key equals `AWS_NITRO_ROOT_CA_PUBKEY_XY`. `PolicyRegistry.ark_pubkey_xy` is not a Nitro trust anchor. PCR0 must be non-zero and present in the Nitro `BackendPolicy` (source 2).
 
-A 4,526-byte hardware document plus the header does not fit in a 1,232-byte packet. The v1.0.0 Devnet smoke transaction [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet) landed at slot 505,980,579. The parsing path consumed 8,122 compute units. The verifier then returned `custom program error: 0x2` (`VerificationFailed`). Transaction meta `computeUnitsConsumed` is 8,272. The Phase 7.3 sample was a 522-byte document. That instruction consumed 7,829 compute units and returned the same custom error.
+A 4,526-byte hardware document plus the header does not fit in a 1,232-byte packet. The grant closeout Devnet smoke transaction [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet) landed at slot 505,980,579. The parsing path consumed 8,122 compute units. The verifier then returned `custom program error: 0x2` (`VerificationFailed`). Transaction meta `computeUnitsConsumed` is 8,272. The Phase 7.3 sample was a 522-byte document. That instruction consumed 7,829 compute units and returned the same custom error.
 
 ---
 
@@ -282,7 +282,7 @@ A DCAP quote is signed with ECDSA P-256. Solana checks P-256 with the native `se
 | `verify_tdx_quote` | 21 | 40,000–70,000 CU | Attestation-key signature over the TD body, platform digest, `REPORTDATA`, challenge. Writes the Mode A signer. |
 | Both steps | 20 then 21 | about 75,000 CU | Sum of the bands is 52,000–92,000 CU. Under the 200,000 default limit. |
 
-The bands are the assertions in [`tests/tdx_compute_units.rs`](tests/tdx_compute_units.rs) on the transaction's `compute_units_consumed`. That test is `#[ignore]` until an SBF artifact is supplied. They are not a Devnet sample. The deployed `v1.0.0` ELF at the Devnet address predates these handlers. Deploy this source before calling them.
+The bands are the assertions in [`tests/tdx_compute_units.rs`](tests/tdx_compute_units.rs) on the transaction's `compute_units_consumed`. That test is `#[ignore]` until an SBF artifact is supplied. They are not a Devnet sample. The grant closeout deployment ELF at the Devnet address predates these handlers. Deploy this source before calling them.
 
 Order of work:
 

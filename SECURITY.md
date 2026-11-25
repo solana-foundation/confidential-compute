@@ -27,7 +27,7 @@ This specification is prepared for independent third-party security audits, gran
 | `solana-confidential-compute-verifier` | `EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh` | Solana Devnet |
 | `solana-confidential-compute-consumer-reference` | `A5cSGHXvQmAejZSVu3D1HwMuaVBJnrt2khz7GVy4cUZZ` | Solana Devnet |
 
-Release `v1.0.0` is git tag `v1.0.0`.
+This software has no release. The crate version is `0.1.0`. The grant closeout deployment is the Devnet deployment that this document records.
 
 | Program | ELF | Deployment slot | Size |
 | :--- | :--- | ---: | ---: |
@@ -289,7 +289,7 @@ Genuine hardware attestation captures and reproducible runbooks:
 
 ## 8. Auditor Scope & Runtime Limitations
 
-This section separates the recorded `v1.0.0` deployment evidence from controls present in current source. Source and native tests do not establish that these controls were deployed or validated on real SBF or hardware.
+This section separates the recorded grant closeout deployment evidence from controls present in current source. Source and native tests do not establish that these controls were deployed or validated on real SBF or hardware.
 
 ### 8.1 On-chain signature backend
 
@@ -320,7 +320,7 @@ The Devnet `solana-confidential-compute-consumer-reference` account at slot **50
 
 ### 8.4 Residual risks
 
-This subsection describes the `v1.0.0` handoff. At that tag Mode B wrote a 17-byte `UsedNonceAccount` PDA (`@spec SCC-SEC-005`) with no close instruction, so the account is a permanent tombstone. Those legacy records stay permanent on current `main`: `close_stale_nonce` refuses them because they carry no refund provenance. A second submission of the same nonce returns `VerifierError::NonceAlreadyUsed` (custom error 5) while the account exists.
+This subsection describes the grant closeout deployment handoff. At that deployment Mode B wrote a 17-byte `UsedNonceAccount` PDA (`@spec SCC-SEC-005`) with no close instruction, so the account is a permanent tombstone. Those legacy records stay permanent on current `main`: `close_stale_nonce` refuses them because they carry no refund provenance. A second submission of the same nonce returns `VerifierError::NonceAlreadyUsed` (custom error 5) while the account exists.
 
 Since upstream PR #258, new nonce records are 49 bytes and store the signing payer. Anyone may call `close_stale_nonce` (accounts: nonce writable, recorded payer writable, Clock sysvar; no payload, no signer). It closes the record and moves all of its lamports to the recorded payer once `clock.slot - record.slot > 150`. Earlier calls fail with `VerifierError::UnauthorizedPolicy`; a legacy record or a different refund account fails with `VerifierError::InvalidAccountAddress`. After closure, the same nonce is older than the 150-slot `SlotHashes` window and fails with `VerifierError::StaleNonce` instead of `NonceAlreadyUsed`. Both `close_stale_nonce` and `close_attested_signer` call `close_governance_account` and emit `solana-confidential-compute:governance:v1` after successful closure. The fields are domain, operation, actor, closed account, SHA-256(old account bytes), SHA-256(empty data). The actor is the recorded refund account for permissionless nonce cleanup, or the signing workload key for signer cleanup. Failed closes emit no close event. Indexers must require **transaction success**: later instructions can roll back an earlier close while execution logs remain. See [`processor.rs`](programs/solana-confidential-compute-verifier/src/processor.rs) and native log assertions in [`close_governance_events.rs`](programs/solana-confidential-compute-verifier/tests/close_governance_events.rs).
 

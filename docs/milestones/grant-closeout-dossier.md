@@ -1,13 +1,13 @@
 # Solana Confidential Compute — Milestone 4 Final Grant Closeout Dossier
 
-> Historical V1 evidence: the 146-byte attested-signer layout and measurements in this report describe the recorded release, not the current integration contract. Current V2 uses `attested_signer_v2`, 154 bytes, and slot plus Unix expiry; see [the V2 account contract](../../crates/solana-confidential-compute-cpi/README.md#2-mode-a-account). Historical CU results do not prove V2 runtime performance.
+> Historical V1 evidence: the 146-byte attested-signer layout and measurements in this report describe the grant closeout deployment, not the current integration contract. Current V2 uses `attested_signer_v2`, 154 bytes, and slot plus Unix expiry; see [the V2 account contract](../../crates/solana-confidential-compute-cpi/README.md#2-mode-a-account). Historical CU results do not prove V2 runtime performance.
 
 
 Solana Foundation Grant Closeout Dossier — Milestone 4 Complete Deliverables.
 
 - **Target Repository:** [solana-foundation/confidential-compute](https://github.com/solana-foundation/confidential-compute)
 - **Documentation Portal:** Local Astro Starlight site ([`docs-site/README.md`](../../docs-site/README.md))
-- **Release Version:** tag `v1.0.0`
+- **Release Version:** none. Pre-release software, crate version `0.1.0`.
 - **Closeout anchor:** `@spec GRANT-M4-001`. This dossier is the grant closeout narrative. The root [README.md](../../README.md) is the repository documentation.
 - **Solana Runtime Target:** SBPFv3 (SIMD-0171 / SIMD-0177 / SIMD-0500)
 - **Status:** **DELIVERED & VERIFIED ON HARDWARE**
@@ -18,7 +18,7 @@ Solana Foundation Grant Closeout Dossier — Milestone 4 Complete Deliverables.
 
 Solana Confidential Compute verifies hardware attestation reports on Solana.
 
-The system parses and validates genuine hardware attestation reports directly inside the Solana Virtual Machine (SVM). Verified hardware platforms in this release are Google Cloud confidential VMs (AMD SEV-SNP) and AWS Nitro Enclaves:
+The system parses and validates genuine hardware attestation reports directly inside the Solana Virtual Machine (SVM). Verified hardware platforms in the grant closeout deployment are Google Cloud confidential VMs (AMD SEV-SNP) and AWS Nitro Enclaves:
 
 On-chain signature verification routes through a fail-closed introspection backend with actual SBF compute/stack feasibility unverified in the current issue validation; see [SECURITY.md](../../SECURITY.md#8-auditor-scope--runtime-limitations) §8 for measured packet limits and research directions. Complete P-384 and RSA-4096 certificate hierarchies are verified offline against vendor root CAs in host tooling and hardware fixture suites (`solana-confidential-compute-crypto`, `solana-confidential-compute-cli`).
 
@@ -81,7 +81,7 @@ Solana Confidential Compute enables protocols to choose the optimal trade-off be
 
 ## 4. Live On-Chain Deployments & Verified Addresses
 
-Release `v1.0.0` is on Solana Devnet. The verifier ELF is SBPFv3 (`e_flags = 0x3`). The consumer ELF is `e_machine = 0x107`, `e_flags = 0x0`.
+The grant closeout deployment is on Solana Devnet. The verifier ELF is SBPFv3 (`e_flags = 0x3`). The consumer ELF is `e_machine = 0x107`, `e_flags = 0x0`.
 
 | Component                      | Network | Address / PDA                                                                                                                                     | ELF                                                     | Deployment Slot |
 | :----------------------------- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------ | --------------: |
@@ -168,7 +168,7 @@ bash scripts/build-sbpfv3.sh
 bash scripts/build-sbpfv3.sh --verify
 ```
 
-The artifact is `target/deploy/solana_confidential_compute_verifier.so`. The `v1.0.0` Devnet copy of that program is 673,784 bytes.
+The artifact is `target/deploy/solana_confidential_compute_verifier.so`. The Devnet copy of that program in the grant closeout deployment is 673,784 bytes.
 
 Build the reference consumer with the same architecture and the platform-tools pin from the script (`v1.56`):
 
@@ -177,7 +177,7 @@ cargo-build-sbf --arch v3 --tools-version v1.56 \
   --manifest-path programs/solana-confidential-compute-consumer-reference/Cargo.toml
 ```
 
-The artifact is `target/deploy/solana_confidential_compute_consumer_reference.so`. The `v1.0.0` Devnet copy is 127,744 bytes, `e_machine = 0x107`, `e_flags = 0x0`. That header is not SBPFv3. A buyer redeployment compiles the consumer with `--arch v3`, as in the command above.
+The artifact is `target/deploy/solana_confidential_compute_consumer_reference.so`. The Devnet copy in the grant closeout deployment is 127,744 bytes, `e_machine = 0x107`, `e_flags = 0x0`. That header is not SBPFv3. A buyer redeployment compiles the consumer with `--arch v3`, as in the command above.
 
 ### 7.2 Deploy through governance or Squads
 
