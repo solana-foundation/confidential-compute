@@ -6,7 +6,7 @@
  * Keep this entrypoint free of RPC calls, key loading and transaction submission.
  */
 console.error(
-  "NVIDIA demo unavailable: authenticated evidence/proof enrollment is not implemented. " +
-    "The legacy measurement-only instruction is disabled (NvidiaAttestationUnavailable, custom 18).",
+    'NVIDIA demo unavailable: authenticated evidence/proof enrollment is not implemented. ' +
+        'The legacy measurement-only instruction is disabled (NvidiaAttestationUnavailable, custom 18).',
 );
 process.exitCode = 1;
