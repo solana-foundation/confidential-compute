@@ -10,14 +10,14 @@ Architecture map: [docs/high-level-design.md](../high-level-design.md).
 
 ---
 
-## 0. Tag `v1.0.0`
+## 0. Grant closeout deployment
 
-The sections below are the Gate 1 record. These facts match the tag:
+The sections below are the Gate 1 record. These facts match the grant closeout deployment:
 
 - Subcommands are `prove` and `verify`. `prove` prints a dry-run transaction. It does not submit. `--dry-run false` returns an error.
 - `SNP_GET_REPORT` is `0xC0205300` (`_IOWR('S', 0x00, 32)`). The ioctl argument is 32 bytes. `SnpReportReq` is 96 bytes. The value `0xC0485301` is not this ioctl.
 - `SnpReportView` is `crates/solana-confidential-compute-core/src/report.rs`. `verify_report_locally` calls `SnpReportView::validate_security_invariants` before the P-384 check.
-- The test log in §5.1 is the Gate 1 capture. It is not a transcript of `cargo test -p solana-confidential-compute-cli` on this tag.
+- The test log in §5.1 is the Gate 1 capture. It is not a transcript of `cargo test -p solana-confidential-compute-cli`.
 
 ---
 
@@ -126,7 +126,7 @@ All design decisions cite internal research documents within the `confidential-c
 
 ### 5.1 Automated Test Execution
 
-The log below is the Gate 1 capture. Tag `v1.0.0` keeps these checks and adds more tests in the same package. Re-run `cargo test -p solana-confidential-compute-cli` on that tag. Do not treat the counts in the paste as the current total.
+The log below is the Gate 1 capture. The grant closeout deployment keeps these checks and adds more tests in the same package. Re-run `cargo test -p solana-confidential-compute-cli`. Do not treat the counts in the paste as the current total.
 
 ```
 $ cargo test -p teton-cli

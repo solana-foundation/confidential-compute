@@ -9,7 +9,7 @@ Architecture map: [docs/high-level-design.md](../high-level-design.md).
 
 ---
 
-## 0. Tag `v1.0.0`
+## 0. Grant closeout deployment
 
 Phase 7.3 telemetry in §3 is the slot 503,550,668 deploy (618,288 bytes) and transaction `S3GWXy9…` (7,829 CUs). That ELF is not the program-data account now.
 
@@ -20,9 +20,9 @@ Phase 7.3 telemetry in §3 is the slot 503,550,668 deploy (618,288 bytes) and tr
 
 `scripts/build-sbpfv3.sh` builds the verifier only. The consumer header is not SBPFv3.
 
-v1.0.0 smoke transaction: [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet). Slot 505,980,579. The parsing path consumed 8,122 compute units. The verifier then returned `custom program error: 0x2` (`VerificationFailed`). Transaction meta `computeUnitsConsumed` is 8,272.
+Grant closeout deployment smoke transaction: [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet). Slot 505,980,579. The parsing path consumed 8,122 compute units. The verifier then returned `custom program error: 0x2` (`VerificationFailed`). Transaction meta `computeUnitsConsumed` is 8,272.
 
-TypeScript package on this tag: **17 passed** tests. 7 in `sdks/typescript/test/packet.test.cjs`. 10 in `sdks/typescript/test/nitro.test.cjs`. The “13/13” line in §6.2 is the Gate 4 capture.
+TypeScript package at the grant closeout deployment: **17 passed** tests. 7 in `sdks/typescript/test/packet.test.cjs`. 10 in `sdks/typescript/test/nitro.test.cjs`. The “13/13” line in §6.2 is the Gate 4 capture.
 
 On Solana, without `mock-crypto`, `DefaultVerifier` is `SolanaDefaultVerifier`. `scripts/build-sbpfv3.sh` does not enable `mock-crypto`. `DirectCryptoVerifier` is the host default. `Groth16SyscallVerifier` is not the default.
 
@@ -36,7 +36,7 @@ The Mode A consumer check consumed 355 compute units on Devnet (`@spec SCC-CONSU
 
 Phase 7.3 of Gate 4 is **SATISFIED** for the capture in §3.
 
-`solana-confidential-compute-verifier` compiles as an SBPFv3 ELF (`e_flags = 0x3`, SIMD-0500) through `scripts/build-sbpfv3.sh`. The program id on Devnet is `EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh`. The bytes in the program-data account at tag `v1.0.0` are in §0. `scripts/smoke_test_devnet.ts` packs `verify_nitro_attestation` Mode A, rejects an oversized document against the 1,232-byte packet cap, and submits a synthetic COSE Sign1 document.
+`solana-confidential-compute-verifier` compiles as an SBPFv3 ELF (`e_flags = 0x3`, SIMD-0500) through `scripts/build-sbpfv3.sh`. The program id on Devnet is `EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh`. The bytes in the program-data account at the grant closeout deployment are in §0. `scripts/smoke_test_devnet.ts` packs `verify_nitro_attestation` Mode A, rejects an oversized document against the 1,232-byte packet cap, and submits a synthetic COSE Sign1 document.
 
 The Phase 7.3 instruction aborted with `VerifierError::VerificationFailed` (`Custom(2)`). That instruction consumed 7,829 compute units. The later smoke transaction in §0 failed closed with the same custom error. That parsing path consumed 8,122 compute units. `@spec SCC-PERF-001`.
 
@@ -76,7 +76,7 @@ This subsection is the slot 503,550,668 capture. It is not the current program-d
 
 ### 3.2 Phase 7.3 Nitro Mode A fail-closed gate
 
-This subsection is transaction `S3GWXy9…` at slot 503,550,778. The v1.0.0 smoke transaction is in §0.
+This subsection is transaction `S3GWXy9…` at slot 503,550,778. The grant closeout smoke transaction is in §0.
 
 - **Transaction Signature:** [`S3GWXy9PMFSpxX5LHVWBYZFY4oqokL3Kg5HZvWwXkqxucBn3JKLjw5JowZPwCbeWaXNeDm7a6UVCsR97LGWzkr9`](https://explorer.solana.com/tx/S3GWXy9PMFSpxX5LHVWBYZFY4oqokL3Kg5HZvWwXkqxucBn3JKLjw5JowZPwCbeWaXNeDm7a6UVCsR97LGWzkr9?cluster=devnet)
 - **Slot:** 503,550,778
@@ -99,7 +99,7 @@ This subsection is transaction `S3GWXy9…` at slot 503,550,778. The v1.0.0 smok
 
 The Phase 7.3 capture recorded a 4,096-byte Nitro document at 4,518 bytes and a raw Mode B report at 1,704 bytes. Both threw `PacketTooLargeError` and were not submitted.
 
-Tag `v1.0.0` harness `scripts/smoke_test_devnet.ts` rejects a document of `MAX_NITRO_DOCUMENT_LEN` (8,192 bytes) and a raw 1,184-byte Mode B report with `PacketTooLargeError`. It does not submit either one. It does not pin the 4,518 or 1,704 integers.
+The grant closeout deployment harness `scripts/smoke_test_devnet.ts` rejects a document of `MAX_NITRO_DOCUMENT_LEN` (8,192 bytes) and a raw 1,184-byte Mode B report with `PacketTooLargeError`. It does not submit either one. It does not pin the 4,518 or 1,704 integers.
 
 ---
 
@@ -109,9 +109,9 @@ Tag `v1.0.0` harness `scripts/smoke_test_devnet.ts` rejects a document of `MAX_N
 | :--- | :--- | :--- | :--- |
 | **1. Security (Zero Compromise)** | **SBPFv3 Conformance (`@spec SCC-DEPLOY-001`):** Compile with `cargo-build-sbf --arch v3` and static Murmur3-32 syscall hashes (SIMD-0178 / SIMD-0500). | `scripts/build-sbpfv3.sh --self-test` and `--verify`. ELF `Flags: 0x3`. | **VERIFIED** |
 | | **Nitro instruction dispatch (`@spec SCC-NITRO-008`):** Mode A `verify_nitro_attestation` registers only after COSE parse, PCR0 allowlist, nonce freshness, and chain verification. | Live Devnet tx `S3GWXy9…` aborted at chain verification (`Custom(2)`) with Mode A account order. | **VERIFIED** (fail-closed) |
-| | **Legacy packet cap:** Standard builders reject payloads above 1,232 bytes. Oversized packers stay off the live cluster. | Phase 7.3 capture: 4,096-byte document → `PacketTooLargeError` (4,518 bytes). v1.0.0 harness rejects 8,192 bytes and a raw Mode B report. | **VERIFIED** |
-| **2. Ease of Use** | **TypeScript builders:** `buildVerifyNitroAttestationIx` / `Tx` and quarantined `*Oversized` packers. | Gate 4 capture was 13 tests. Tag `v1.0.0` has 17 tests (7 packet, 10 nitro). | **VERIFIED** |
-| **3. Compute Units (CUs)** | **Nitro Mode A parsing path (`@spec SCC-PERF-001`):** | Phase 7.3: **7,829** instruction CUs and **7,979** transaction CUs. v1.0.0 smoke: **8,122** CUs. Transaction meta 8,272. | **VERIFIED** |
+| | **Legacy packet cap:** Standard builders reject payloads above 1,232 bytes. Oversized packers stay off the live cluster. | Phase 7.3 capture: 4,096-byte document → `PacketTooLargeError` (4,518 bytes). The grant closeout deployment harness rejects 8,192 bytes and a raw Mode B report. | **VERIFIED** |
+| **2. Ease of Use** | **TypeScript builders:** `buildVerifyNitroAttestationIx` / `Tx` and quarantined `*Oversized` packers. | Gate 4 capture was 13 tests. The grant closeout deployment has 17 tests (7 packet, 10 nitro). | **VERIFIED** |
+| **3. Compute Units (CUs)** | **Nitro Mode A parsing path (`@spec SCC-PERF-001`):** | Phase 7.3: **7,829** instruction CUs and **7,979** transaction CUs. Grant closeout smoke: **8,122** CUs. Transaction meta 8,272. | **VERIFIED** |
 
 ---
 
@@ -141,7 +141,7 @@ The log above is the Phase 7.3 capture (618,288 bytes). A later Devnet upgrade w
 $ cargo test --workspace
 ```
 
-The Gate 4 host run recorded `nitro_tests` (7/7), JWT processor tests (11/11), sidecar (21 library + 6 integration), and Rust SDK builder tests noted then as 9/9. Those integers are the capture. They are not the v1.0.0 totals. `test_cu_benchmarks_live_sbf` in `programs/solana-confidential-compute-verifier/tests/cu_benchmarks.rs` is `#[ignore]`. A manual run returns when `target/deploy/solana_confidential_compute_verifier.so` is absent, and when ELF byte 48 is `0x3`.
+The Gate 4 host run recorded `nitro_tests` (7/7), JWT processor tests (11/11), sidecar (21 library + 6 integration), and Rust SDK builder tests noted then as 9/9. Those integers are the capture. They are not the grant closeout deployment totals. `test_cu_benchmarks_live_sbf` in `programs/solana-confidential-compute-verifier/tests/cu_benchmarks.rs` is `#[ignore]`. A manual run returns when `target/deploy/solana_confidential_compute_verifier.so` is absent, and when ELF byte 48 is `0x3`.
 
 ### 6.2 TypeScript SDK
 
@@ -149,7 +149,7 @@ The Gate 4 host run recorded `nitro_tests` (7/7), JWT processor tests (11/11), s
 $ cd sdks/typescript && npm test
 ```
 
-The Gate 4 capture reported 13 tests. Tag `v1.0.0` has 17 tests in `sdks/typescript/test/packet.test.cjs` (7) and `sdks/typescript/test/nitro.test.cjs` (10). `npm test` runs `tsc` and then `node --test` on those files. `scripts/tsconfig.json` typechecks `scripts/smoke_test_devnet.ts`.
+The Gate 4 capture reported 13 tests. The grant closeout deployment has 17 tests in `sdks/typescript/test/packet.test.cjs` (7) and `sdks/typescript/test/nitro.test.cjs` (10). `npm test` runs `tsc` and then `node --test` on those files. `scripts/tsconfig.json` typechecks `scripts/smoke_test_devnet.ts`.
 
 ### 6.3 Devnet Smoke Harness
 
@@ -187,4 +187,4 @@ The broader Gate 4 milestone still includes:
 
 ## 9. Final Sign-Off
 
-Phase 7.3 of Gate 4 is complete. `solana-confidential-compute-verifier` is an SBPFv3 program on Solana Devnet. `verify_nitro_attestation` Mode A is live and fail-closed. The Phase 7.3 instruction consumed 7,829 compute units. The v1.0.0 parsing path consumed 8,122 compute units.
+Phase 7.3 of Gate 4 is complete. `solana-confidential-compute-verifier` is an SBPFv3 program on Solana Devnet. `verify_nitro_attestation` Mode A is live and fail-closed. The Phase 7.3 instruction consumed 7,829 compute units. The grant closeout deployment parsing path consumed 8,122 compute units.

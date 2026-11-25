@@ -2,7 +2,7 @@
 
 Solana Confidential Compute for the Solana Foundation. This guide shows what shipped, how to repeat the hardware checks, which Devnet transactions exist, and how the buyer deploys a separate copy.
 
-Release `v1.0.0` is git tag `v1.0.0`.
+This software has no release. The crate version is `0.1.0`. The grant closeout deployment is the Devnet deployment that this document records.
 
 The root [README.md](../../README.md) is the repository documentation. This guide is the walkthrough. `@spec GRANT-M4-001` names the closeout narrative in [../milestones/grant-closeout-dossier.md](../milestones/grant-closeout-dossier.md). All technical measurements, ELF sizes (673,784-byte verifier, 127,744-byte consumer), deployment slots, and commands are 100% harmonized between this guide and the closeout dossier. 4,552 bytes is the NSM wire response payload. 4,526 bytes is the embedded COSE document at offset 26.
 
@@ -124,7 +124,7 @@ Contract baseline in the roadmap: four months, nine components. That table is th
 
 | Piece | Value |
 | :--- | :--- |
-| Release | tag `v1.0.0` |
+| Release | None. Pre-release software, crate version `0.1.0`. |
 | Verifier | `EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh` |
 | Verifier ELF | SBPFv3, `e_flags = 0x3`, 673,784 bytes, slot 505,980,419 |
 | Reference consumer | `A5cSGHXvQmAejZSVu3D1HwMuaVBJnrt2khz7GVy4cUZZ` |
@@ -406,7 +406,7 @@ The grant deliverables establish verification across three distinct, verifiable 
 
 ### 7.2 Devnet Account & Deployment Ledger
 
-Cluster: Devnet. Release `v1.0.0`.
+Cluster: Devnet. Grant closeout deployment.
 
 | Program | Slot | ELF |
 | :--- | ---: | :--- |

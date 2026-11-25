@@ -1,6 +1,6 @@
 # Scripts
 
-Build gate, Nitro probe, and Devnet smoke harness. Tag `v1.0.0`.
+Build gate, Nitro probe, and Devnet smoke harness.
 
 | Script | Role |
 | :--- | :--- |
@@ -98,4 +98,4 @@ The harness does four checks:
 3. Reject an 8,192-byte Nitro document locally against the 1,232-byte packet cap.
 4. Submit `verify_nitro_attestation` Mode A (`mode = 0`) with `SetComputeUnitLimit(550000)`. A landed `Custom(2)` is a successful fail-closed run. Compute must stay at or under 550,000 CU.
 
-Recorded v1.0.0 signature: [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet). Slot 505,980,579. Verifier log: `consumed 8122 of 549850 compute units`, then `custom program error: 0x2`. Transaction meta: 8,272 CU.
+Recorded grant closeout signature: [`2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH`](https://explorer.solana.com/tx/2iEc1eAmyfu2QzgGjSuSEbCs28egC2z8rn9WLgcjbAZZ1mqmFbdNDhWoXHHZQSwkWHvS4W9ZZRURctnEkEQgbuuH?cluster=devnet). Slot 505,980,579. Verifier log: `consumed 8122 of 549850 compute units`, then `custom program error: 0x2`. Transaction meta: 8,272 CU.

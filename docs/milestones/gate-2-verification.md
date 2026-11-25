@@ -9,14 +9,14 @@ Architecture map: [docs/high-level-design.md](../high-level-design.md).
 
 ---
 
-## 0. Tag `v1.0.0`
+## 0. Grant closeout deployment
 
 The sections below are the Gate 2 record. Current code differs from that record in these ways:
 
 - `verify_atomic` returns `VerifierError::NonceRequired` (custom 16). It does not verify a report and it does not write an account. `programs/solana-confidential-compute-verifier/src/processor.rs` `process_verify_atomic`.
-- The live Mode B instruction is `verify_atomic_with_nonce`. It writes a 49-byte `UsedNonceAccount` that records the payer for `close_stale_nonce` refunds (upstream PR #258). At `v1.0.0` the record was 17 bytes and permanent.
+- The live Mode B instruction is `verify_atomic_with_nonce`. It writes a 49-byte `UsedNonceAccount` that records the payer for `close_stale_nonce` refunds (upstream PR #258). At the grant closeout deployment the record was 17 bytes and permanent.
 - The CU harness is `programs/solana-confidential-compute-verifier/tests/cu_benchmarks.rs`. `test_cu_benchmarks_live_sbf` is `#[ignore]`. It prints measured CUs and asserts ceilings of 15,000 and 550,000. It does not encode the integers in §4. A manual run returns when `target/deploy/solana_confidential_compute_verifier.so` is absent, and when ELF byte 48 is `0x3`.
-- §4 and §5.1 of this Gate 2 capture do not use the same Mode A integer (67,234 and 64,234) or the same nonce-bound integer (61,138 and 62,638). Neither pair is a v1.0.0 constant.
+- §4 and §5.1 of this Gate 2 capture do not use the same Mode A integer (67,234 and 64,234) or the same nonce-bound integer (61,138 and 62,638). Neither pair is a constant of the grant closeout deployment.
 - On `target_os = "solana"` without `mock-crypto`, `DefaultVerifier` is `SolanaDefaultVerifier`. `Groth16SyscallVerifier` is not the default. The Groth16 notes in §5.2 are the Gate 2 research track.
 
 The reference consumer stays at or under 1,500 CU (Mode A) and 2,500 CU (Mode B). Those ceilings are enforced in `programs/solana-confidential-compute-consumer-reference`.
@@ -29,7 +29,7 @@ Milestone Gate 2 of the Solana Foundation Grant is **SATISFIED** for the capture
 
 The on-chain verifier program (`solana-confidential-compute-verifier`) compiles to Solana SBF bytecode (`solana_confidential_compute_verifier.so`). It parses 1,184-byte AMD SEV-SNP attestation reports and enforces silicon security policies. The Gate 2 harness executed **Mode A (`verify_and_register`)** and the Mode B instructions under `solana-program-test` with `--features mock-crypto`. Both measured paths stayed under the **550,000 CU** ceiling in that capture.
 
-At tag `v1.0.0`, stateless `verify_atomic` is fail-closed. See §0.
+At the grant closeout deployment, stateless `verify_atomic` is fail-closed. See §0.
 
 ### Key Terminology
 - **SBF:** Solana Bytecode Format. The virtual machine instruction format used to execute smart contracts on Solana.
@@ -39,11 +39,11 @@ At tag `v1.0.0`, stateless `verify_atomic` is fail-closed. See §0.
 - **VCEK:** Versioned Chip Endorsement Key. A physical hardware certificate signed by AMD that authenticates a genuine AMD processor.
 - **NIST P-384:** The cryptographic elliptic curve used by AMD silicon to sign attestation reports.
 - **Mode A (Stateful):** Writes an attested public key to an on-chain account for ongoing signing sessions.
-- **Mode B (nonce-bound atomic):** Binds attestation to an action hash in one transaction. At tag `v1.0.0` the live instruction is `verify_atomic_with_nonce`. It writes a 17-byte `UsedNonceAccount`. `verify_atomic` returns `NonceRequired`.
+- **Mode B (nonce-bound atomic):** Binds attestation to an action hash in one transaction. At the grant closeout deployment the live instruction is `verify_atomic_with_nonce`. It writes a 17-byte `UsedNonceAccount`. `verify_atomic` returns `NonceRequired`.
 
 | Gate | Target Milestone | Acceptance Criteria | Status |
 | :--- | :--- | :--- | :--- |
-| **Gate 2** | End of Month 2 | Solana test environment validates the AMD VCEK account path and executes Mode A `verify_and_register` and Mode B under a 550,000 CU ceiling. At tag `v1.0.0` the live Mode B instruction is `verify_atomic_with_nonce`. | **SATISFIED** |
+| **Gate 2** | End of Month 2 | Solana test environment validates the AMD VCEK account path and executes Mode A `verify_and_register` and Mode B under a 550,000 CU ceiling. At the grant closeout deployment the live Mode B instruction is `verify_atomic_with_nonce`. | **SATISFIED** |
 
 ---
 
@@ -55,7 +55,7 @@ This milestone delivers the core on-chain components:
    - **`init_policy_registry`:** Singleton administrative registry storing the AMD Root Key (`ARK`), minimum hardware TCB versions, and the workload binary measurement allowlist.
    - **`register_vcek` (Stage 1):** Caches validated physical host VCEK certificates into on-chain `VcekAccount` PDAs.
    - **`verify_and_register` (Stage 2 Mode A):** Stateful session registration allocating `AttestedSignerAccount` and `UsedNonceAccount` PDAs.
-   - **`verify_atomic` (rejected Mode B):** At tag `v1.0.0` this instruction returns `NonceRequired` and writes nothing. The Gate 2 capture below measured the earlier body.
+   - **`verify_atomic` (rejected Mode B):** At the grant closeout deployment this instruction returns `NonceRequired` and writes nothing. The Gate 2 capture below measured the earlier body.
    - **`verify_atomic_with_nonce` (live Mode B):** Nonce-bound atomic attestation. It records consumption in a 17-byte `UsedNonceAccount` PDA.
 2. **`solana-confidential-compute-core`:** Zero-copy parser for 1,184-byte AMD reports (`SnpReportView`), security policy gates, and `VerifyAtomicHeader` structures.
 3. **`solana-confidential-compute-cpi`:** On-chain consumer helper `assert_attestation_atomic` that enables downstream Solana programs to introspect and verify preceding Solana Confidential Compute instructions in the same transaction. `solana-confidential-compute-sdk` re-exports these types for off-chain callers.
@@ -66,7 +66,7 @@ This milestone delivers the core on-chain components:
 
 ### 3.1 Mode B architectural rationale
 
-At tag `v1.0.0`, the live instruction is `verify_atomic_with_nonce`. The zero-write `verify_atomic` path in this section is the Gate 2 design. That instruction now returns `NonceRequired`. The CU integers in the diagram are the Gate 2 capture, not constants in `cu_benchmarks.rs`.
+At the grant closeout deployment, the live instruction is `verify_atomic_with_nonce`. The zero-write `verify_atomic` path in this section is the Gate 2 design. That instruction now returns `NonceRequired`. The CU integers in the diagram are the Gate 2 capture, not constants in `cu_benchmarks.rs`.
 
 The initial grant proposal only specified stateful registration (Mode A). Mode A works well for high-frequency oracles. However, it creates three distinct drawbacks for discrete, institutional operations (such as NAV attestations or liquidation triggers):
 - **Rent Inefficiency:** Requires funding and locking Solana rent lamports for each signer account and nonce account.
@@ -127,7 +127,7 @@ To ensure smooth developer adoption and prevent security exploits in downstream 
 
 ## 4. Gate 2 SBF compute-unit capture
 
-The `solana-program-test` harness executed `programs/solana-confidential-compute-verifier/tests/cu_benchmarks.rs` against `solana_confidential_compute_verifier.so`. The log is the Gate 2 capture. Tag `v1.0.0` asserts ceilings only. See §0.
+The `solana-program-test` harness executed `programs/solana-confidential-compute-verifier/tests/cu_benchmarks.rs` against `solana_confidential_compute_verifier.so`. The log is the Gate 2 capture. At the grant closeout deployment the harness asserts ceilings only. See §0.
 
 ### Benchmark Execution Log (Captured Telemetry)
 
@@ -180,7 +180,7 @@ Under `--features mock-crypto`, the benchmark executes the entire validation and
 
 ### 5.2 Software P-384 constraints and the Gate 2 research note
 
-At tag `v1.0.0`, the Solana `DefaultVerifier` is `SolanaDefaultVerifier`. `Groth16SyscallVerifier` is not wired as that default. The two options below are the Gate 2 research note.
+At the grant closeout deployment, the Solana `DefaultVerifier` is `SolanaDefaultVerifier`. `Groth16SyscallVerifier` is not wired as that default. The two options below are the Gate 2 research note.
 
 A pure-software P-384 check exceeds the 1,400,000 CU transaction limit (estimated ~46,000,000 CUs on a 64-bit VM without hardware 128-bit multipliers).
 
@@ -218,7 +218,7 @@ All architectural patterns cite internal research documents in `confidential-com
 
 ### 7.1 Automated unit and integration tests
 
-The log below is the Gate 2 capture (12 library tests plus the CU benchmark). Tag `v1.0.0` has a larger `solana-confidential-compute-verifier` suite. The paste is not the current total. `test_cu_benchmarks_live_sbf` is `#[ignore]`.
+The log below is the Gate 2 capture (12 library tests plus the CU benchmark). The grant closeout deployment has a larger `solana-confidential-compute-verifier` suite. The paste is not the current total. `test_cu_benchmarks_live_sbf` is `#[ignore]`.
 
 ```
 $ cargo test -p teton-verifier
@@ -266,4 +266,4 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 | Zero-copy account views (`VcekAccountView`, `PolicyRegistryView`) | `../../programs/solana-confidential-compute-verifier/src/state.rs` | `@spec SCC-ARCH-002` |
 | SlotHashes sysvar linear scan & age validation | `../../programs/solana-confidential-compute-verifier/src/processor.rs` | `@spec SCC-VERIFY-001` |
 | Hardware security policy validation (Debug/SMT/TCB/VMPL) | `../../crates/solana-confidential-compute-core/src/report.rs`, `../../programs/solana-confidential-compute-verifier/src/processor.rs` | `@spec SCC-SEC-001` |
-| Live SBF compute unit benchmark suite | `../../programs/solana-confidential-compute-verifier/tests/cu_benchmarks.rs` | `@spec SCC-PERF-001`–`003`. v1.0.0 asserts ceilings. It does not pin the §4 integers. |
+| Live SBF compute unit benchmark suite | `../../programs/solana-confidential-compute-verifier/tests/cu_benchmarks.rs` | `@spec SCC-PERF-001`–`003`. The grant closeout deployment asserts ceilings. It does not pin the §4 integers. |
