@@ -31,8 +31,14 @@ pub fn is_transport(tag: &[u8]) -> bool {
 fn invalid() -> ProgramError {
     ProgramError::InvalidInstructionData
 }
-fn u32_at(data: &[u8], offset: usize) -> usize {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize
+fn array_at<const N: usize>(data: &[u8], offset: usize) -> Result<&[u8; N], ProgramError> {
+    data.get(offset..).and_then(<[u8]>::first_chunk).ok_or_else(invalid)
+}
+fn u32_at(data: &[u8], offset: usize) -> Result<usize, ProgramError> {
+    Ok(u32::from_le_bytes(*array_at(data, offset)?) as usize)
+}
+fn u64_at(data: &[u8], offset: usize) -> Result<u64, ProgramError> {
+    Ok(u64::from_le_bytes(*array_at(data, offset)?))
 }
 fn allowed(payload: &[u8]) -> bool {
     payload.starts_with(&VERIFY_AND_REGISTER_DISCRIMINATOR)
@@ -63,10 +69,13 @@ impl Processor {
             if rest.len() != 44 {
                 return Err(invalid());
             }
-            let length = u32_at(rest, 32);
-            let expiry = u64::from_le_bytes(rest[36..44].try_into().unwrap());
+            let length = u32_at(rest, 32)?;
+            let expiry = u64_at(rest, 36)?;
             let now = Clock::get()?.slot;
-            if !(8..=MAX_PAYLOAD).contains(&length) || expiry <= now || expiry - now > MAX_LIFETIME_SLOTS {
+            if !(8..=MAX_PAYLOAD).contains(&length)
+                || expiry <= now
+                || expiry.checked_sub(now).is_none_or(|lifetime| lifetime > MAX_LIFETIME_SLOTS)
+            {
                 return Err(invalid());
             }
             let (expected, bump) =
@@ -84,7 +93,7 @@ impl Processor {
                 remaining.first(),
                 program_id,
                 &[SEED, authority.key.as_ref(), &rest[..32], &[bump]],
-                HEADER + length,
+                HEADER.checked_add(length).ok_or_else(invalid)?,
             )?;
             let mut data = stage.try_borrow_mut_data()?;
             data[..8].copy_from_slice(MAGIC);
@@ -105,9 +114,9 @@ impl Processor {
         if stage.key != &expected {
             return Err(ProgramError::InvalidSeeds);
         }
-        let length = u32_at(&data, 80);
-        let written = u32_at(&data, 84);
-        if length > MAX_PAYLOAD || data.len() != HEADER + length || written > length {
+        let length = u32_at(&data, 80)?;
+        let written = u32_at(&data, 84)?;
+        if length > MAX_PAYLOAD || HEADER.checked_add(length) != Some(data.len()) || written > length {
             return Err(invalid());
         }
         if tag == CLOSE {
@@ -121,7 +130,7 @@ impl Processor {
             data.fill(0);
             return Ok(());
         }
-        let expiry = u64::from_le_bytes(data[72..80].try_into().unwrap());
+        let expiry = u64_at(&data, 72)?;
         if Clock::get()?.slot >= expiry {
             return Err(invalid());
         }
@@ -129,12 +138,14 @@ impl Processor {
             if data[88] != 0 || rest.len() <= 4 || rest.len() > 4 + MAX_CHUNK {
                 return Err(invalid());
             }
-            let offset = u32_at(rest, 0);
-            let end = offset.checked_add(rest.len() - 4).ok_or_else(invalid)?;
+            let (offset, chunk) = rest.split_first_chunk::<4>().ok_or_else(invalid)?;
+            let offset = u32::from_le_bytes(*offset) as usize;
+            let end = offset.checked_add(chunk.len()).ok_or_else(invalid)?;
             if offset != written || end > length {
                 return Err(invalid());
             }
-            data[HEADER + offset..HEADER + end].copy_from_slice(&rest[4..]);
+            let payload = data.get_mut(HEADER..).ok_or_else(invalid)?;
+            payload.get_mut(offset..end).ok_or_else(invalid)?.copy_from_slice(chunk);
             data[84..88].copy_from_slice(&(end as u32).to_le_bytes());
             return Ok(());
         }

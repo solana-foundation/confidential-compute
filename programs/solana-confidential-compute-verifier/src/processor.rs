@@ -424,7 +424,7 @@ impl Processor {
             if !vcek.is_trusted_at_unix(clock.unix_timestamp) {
                 return Err(VerifierError::UnauthorizedPolicy.into());
             }
-            let public_key_xy = *vcek.public_key_xy();
+            let public_key_xy = *vcek.public_key_xy()?;
             let vcek_bump_seed = [vcek.bump()];
             // Zero chip id or SIGNING_KEY == 1 derives the VLEK seed from the
             // endorsement public key. @spec SCC-VERIFY-009
@@ -906,7 +906,7 @@ impl Processor {
             bump: expected_signer_bump,
             expires_unix_timestamp: Self::session_unix_deadline(
                 clock.unix_timestamp,
-                Some(VcekAccountView::try_from_slice(&vcek_acc.try_borrow_data()?)?.valid_until_unix()),
+                Some(VcekAccountView::try_from_slice(&vcek_acc.try_borrow_data()?)?.valid_until_unix()?),
             )?,
         };
         Self::write_account_data(attested_signer_acc, &signer_record)?;
@@ -938,16 +938,13 @@ impl Processor {
             return Err(VerifierError::StaleNonce.into());
         }
         let num_entries = u64::from_le_bytes(data[0..8].try_into().map_err(|_| VerifierError::StaleNonce)?) as usize;
-        for i in 0..num_entries.min(150) {
-            let start = 8 + i * 40;
-            let end = start + 40;
-            if data.len() < end {
-                break;
-            }
-            let slot = u64::from_le_bytes(data[start..start + 8].try_into().map_err(|_| VerifierError::StaleNonce)?);
+        // Each entry is `slot: u64 LE || hash: [u8; 32]`. A partial trailing entry is ignored.
+        let (entries, _) = data[8..].as_chunks::<40>();
+        for entry in entries.iter().take(num_entries.min(150)) {
+            let slot = u64::from_le_bytes(entry[..8].try_into().map_err(|_| VerifierError::StaleNonce)?);
             if slot == nonce_slot {
                 let mut hash = [0u8; 32];
-                hash.copy_from_slice(&data[start + 8..end]);
+                hash.copy_from_slice(&entry[8..]);
                 return Ok(hash);
             }
         }
@@ -1205,7 +1202,8 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
         let data = account.try_borrow_data()?;
-        let consumed = u64::from_le_bytes(data.get(8..16).ok_or(ProgramError::InvalidAccountData)?.try_into().unwrap());
+        let consumed =
+            u64::from_le_bytes(*data.get(8..).and_then(<[u8]>::first_chunk).ok_or(ProgramError::InvalidAccountData)?);
         if now.checked_sub(consumed).is_none_or(|age| age <= 150) {
             return Err(VerifierError::NonceAlreadyUsed.into());
         }
@@ -2957,6 +2955,8 @@ impl Processor {
 }
 
 #[cfg(test)]
+// Test-only fixture builders. SDLC 3.2.1 covers program code, not tests.
+#[allow(clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
     use issue_205_fixtures::TestProcessor as Processor;
@@ -4509,6 +4509,8 @@ mod issue_182 {
 }
 
 #[cfg(test)]
+// Test-only fixture builders. SDLC 3.2.1 covers program code, not tests.
+#[allow(clippy::arithmetic_side_effects)]
 mod issue_205_fixtures {
     // Explicit empty canonical legacy nonce fixtures; no production fallback.
     use crate::payload::*;

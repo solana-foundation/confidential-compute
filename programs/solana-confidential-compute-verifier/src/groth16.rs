@@ -147,19 +147,16 @@ fn negate_g1(point: &[u8; G1_UNCOMPRESSED_LEN]) -> [u8; G1_UNCOMPRESSED_LEN] {
 ///
 /// Walks from the least-significant byte. A byte that underflows borrows 1
 /// from the next more-significant byte and adds 256 before subtracting.
-fn sub_be32(minuend: &[u8; 32], subtrahend: &[u8; 32]) -> [u8; 32] {
+pub(crate) fn sub_be32(minuend: &[u8; 32], subtrahend: &[u8; 32]) -> [u8; 32] {
     let mut out = [0u8; 32];
-    let mut borrow = 0u16;
-    for i in (0..32).rev() {
-        let left = minuend[i] as u16;
-        let right = subtrahend[i] as u16 + borrow;
-        if left >= right {
-            out[i] = (left - right) as u8;
-            borrow = 0;
-        } else {
-            out[i] = (left + 256 - right) as u8;
-            borrow = 1;
-        }
+    let mut borrow = false;
+    for ((out, left), right) in out.iter_mut().zip(minuend).zip(subtrahend).rev() {
+        // Wrapping is the intended semantics: each byte is the difference
+        // modulo 256, and the overflow flag is the borrow into the next byte.
+        let (diff, borrow_byte) = left.overflowing_sub(*right);
+        let (diff, borrow_in) = diff.overflowing_sub(u8::from(borrow));
+        *out = diff;
+        borrow = borrow_byte || borrow_in;
     }
     out
 }

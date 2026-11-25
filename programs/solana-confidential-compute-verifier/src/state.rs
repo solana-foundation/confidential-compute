@@ -110,6 +110,11 @@ impl VcekAccount {
     }
 }
 
+/// Borrows `N` bytes of account data at `offset`. Short data is `InvalidAccountData`.
+fn array_at<const N: usize>(data: &[u8], offset: usize) -> Result<&[u8; N], ProgramError> {
+    data.get(offset..).and_then(<[u8]>::first_chunk).ok_or(ProgramError::InvalidAccountData)
+}
+
 /// Zero-copy view over a serialized `VcekAccount`.
 /// @spec SCC-ARCH-002
 pub struct VcekAccountView<'a> {
@@ -131,25 +136,23 @@ impl<'a> VcekAccountView<'a> {
         let Ok(now) = u64::try_from(now) else {
             return false;
         };
+        let Ok(valid_until) = self.valid_until_unix() else {
+            return false;
+        };
         self.data[VcekAccount::TRUST_PROFILE_OFFSET..VcekAccount::TRUST_PROFILE_OFFSET + 32]
             == VcekAccount::MILAN_TRUST_PROFILE
             && self.data[VcekAccount::REVOKED_OFFSET] == 0
-            && now
-                < u64::from_le_bytes(
-                    self.data[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::VALID_UNTIL_OFFSET + 8].try_into().unwrap(),
-                )
+            && now < valid_until
     }
 
     /// Authenticated exclusive certificate-chain deadline stored at registration.
-    pub fn valid_until_unix(&self) -> u64 {
-        u64::from_le_bytes(
-            self.data[VcekAccount::VALID_UNTIL_OFFSET..VcekAccount::VALID_UNTIL_OFFSET + 8].try_into().unwrap(),
-        )
+    pub fn valid_until_unix(&self) -> Result<u64, ProgramError> {
+        Ok(u64::from_le_bytes(*array_at(self.data, VcekAccount::VALID_UNTIL_OFFSET)?))
     }
 
     #[inline]
-    pub fn public_key_xy(&self) -> &[u8; 96] {
-        self.data[VcekAccount::PUBLIC_KEY_OFFSET..VcekAccount::PUBLIC_KEY_OFFSET + 96].try_into().unwrap()
+    pub fn public_key_xy(&self) -> Result<&'a [u8; 96], ProgramError> {
+        array_at(self.data, VcekAccount::PUBLIC_KEY_OFFSET)
     }
 
     #[inline]
@@ -255,18 +258,14 @@ impl<'a> PolicyRegistryView<'a> {
         if measurement.iter().all(|&b| b == 0) {
             return false;
         }
-        let count_bytes: [u8; 4] = self.data
-            [PolicyRegistry::MEASUREMENT_COUNT_OFFSET..PolicyRegistry::MEASUREMENT_COUNT_OFFSET + 4]
-            .try_into()
-            .unwrap();
-        let count = u32::from_le_bytes(count_bytes).min(8) as usize;
-        for i in 0..count {
-            let start = PolicyRegistry::MEASUREMENTS_OFFSET + i * 48;
-            if &self.data[start..start + 48] == measurement.as_slice() {
-                return true;
-            }
-        }
-        false
+        let Ok(count_bytes) = array_at::<4>(self.data, PolicyRegistry::MEASUREMENT_COUNT_OFFSET) else {
+            return false;
+        };
+        let count = u32::from_le_bytes(*count_bytes).min(8) as usize;
+        let Some(stored) = self.data.get(PolicyRegistry::MEASUREMENTS_OFFSET..) else {
+            return false;
+        };
+        stored.as_chunks::<48>().0.iter().take(count).any(|stored| stored == measurement)
     }
 }
 
