@@ -186,7 +186,6 @@ impl TerminateSignal {
     }
 }
 
-/// Why the sidecar stopped waiting for a shutdown signal.
 #[derive(Debug, PartialEq, Eq)]
 enum ShutdownReason {
     CtrlC,
@@ -207,7 +206,6 @@ impl ShutdownReason {
     }
 }
 
-/// Waits for the first of Ctrl+C, SIGTERM or a Ctrl+C handler failure.
 async fn wait_for_shutdown(
     ctrl_c: impl std::future::Future<Output = std::io::Result<()>>,
     terminate: impl std::future::Future<Output = ()>,

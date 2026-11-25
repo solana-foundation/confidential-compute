@@ -70,7 +70,6 @@ pub fn decode_b64url_exact(input: &[u8], output: &mut [u8]) -> Result<(), Crypto
 /// Streaming Base64URL reader with a 3-byte window. Stack footprint is tiny.
 /// @spec SCC-JWT-001
 pub struct B64Decoder<'a> {
-    /// Input that is not decoded yet.
     src: &'a [u8],
     buf: [u8; 3],
     buf_len: u8,
