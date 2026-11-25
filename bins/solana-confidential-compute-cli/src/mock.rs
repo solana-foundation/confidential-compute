@@ -34,7 +34,7 @@ const MOCK_VCEK_PUBLIC_KEY_XY: [u8; 96] = [
 pub fn mock_signing_key() -> Result<SigningKey, CliError> {
     let mut seed = [0u8; 48];
     seed[47] = MOCK_VCEK_SEED_LSB;
-    SigningKey::from_slice(&seed).map_err(|err| CliError::HardwareUnavailable(format!("mock VCEK key: {err}")))
+    SigningKey::from_slice(&seed).map_err(|err| CliError::Mock(format!("mock VCEK key: {err}")))
 }
 
 /// Returns the 96-byte uncompressed mock VCEK public key (X || Y).
@@ -81,7 +81,8 @@ pub fn sign_report_body(report: &mut [u8; SNP_REPORT_SIZE], signing_key: &Signin
     let mut hasher = Sha384::new();
     hasher.update(&report[..SNP_SIGNED_BODY_SIZE]);
     let digest: [u8; 48] = hasher.finalize().into();
-    let (signature, _) = signing_key.sign_prehash(&digest).map_err(|_| CliError::InvalidSignature)?;
+    let (signature, _) =
+        signing_key.sign_prehash(&digest).map_err(|err| CliError::Mock(format!("report body signature: {err}")))?;
     let sig_bytes = signature.to_bytes();
     write_le_scalar(&mut report[0x2A0..0x2E8], &sig_bytes[..48]);
     write_le_scalar(&mut report[0x2E8..0x330], &sig_bytes[48..96]);
@@ -113,6 +114,12 @@ mod tests {
         xy[..48].copy_from_slice(encoded.x().unwrap().as_slice());
         xy[48..].copy_from_slice(encoded.y().unwrap().as_slice());
         assert_eq!(mock_vcek_public_key_xy(), xy);
+    }
+
+    #[test]
+    fn mock_error_keeps_the_underlying_error_text() {
+        let err = CliError::Mock("mock VCEK key: scalar out of range".into());
+        assert_eq!(err.to_string(), "Mock report error: mock VCEK key: scalar out of range");
     }
 
     #[test]

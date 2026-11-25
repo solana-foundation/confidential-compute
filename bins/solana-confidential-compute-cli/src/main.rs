@@ -27,6 +27,9 @@ pub enum CliError {
     HardwareUnavailable(String),
     #[error("Invalid signature")]
     InvalidSignature,
+    /// The local mock report generator failed. It carries the underlying error text.
+    #[error("Mock report error: {0}")]
+    Mock(String),
     #[error("Report error: {0:?}")]
     Report(solana_confidential_compute_core::ConfidentialComputeError),
     #[error("Serialization error: {0}")]
