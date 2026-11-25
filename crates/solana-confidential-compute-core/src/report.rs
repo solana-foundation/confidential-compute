@@ -25,6 +25,18 @@ pub const GUEST_POLICY_MIGRATE_MA: u64 = 1 << 18;
 /// @spec SCC-SEC-001
 pub const GUEST_POLICY_DEBUG: u64 = 1 << 19;
 
+/// Borrows the `N`-byte field at `OFFSET` of a report.
+///
+/// The `const` block stops the build when a field is not inside the report, so
+/// the lookup always finds the field.
+#[inline]
+// Cannot fail: the `const` block proves that `OFFSET + N <= SNP_REPORT_SIZE`.
+#[allow(clippy::expect_used)]
+fn field<const OFFSET: usize, const N: usize>(raw: &[u8; SNP_REPORT_SIZE]) -> &[u8; N] {
+    const { assert!(matches!(OFFSET.checked_add(N), Some(end) if end <= SNP_REPORT_SIZE)) };
+    raw.get(OFFSET..).and_then(<[u8]>::first_chunk).expect("field is inside the report")
+}
+
 /// Zero-copy, zero-heap view over a raw 1,184-byte AMD SEV-SNP attestation report.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SnpReportView<'a> {
@@ -46,19 +58,19 @@ impl<'a> SnpReportView<'a> {
     /// Report format version (0x000..0x004).
     #[inline]
     pub fn version(&self) -> u32 {
-        u32::from_le_bytes(self.raw[0..4].try_into().unwrap())
+        u32::from_le_bytes(*field::<0, 4>(self.raw))
     }
 
     /// Guest Security Version Number (0x004..0x008).
     #[inline]
     pub fn guest_svn(&self) -> u32 {
-        u32::from_le_bytes(self.raw[4..8].try_into().unwrap())
+        u32::from_le_bytes(*field::<4, 4>(self.raw))
     }
 
     /// Guest policy bitmask (0x008..0x010).
     #[inline]
     pub fn policy(&self) -> u64 {
-        u64::from_le_bytes(self.raw[8..16].try_into().unwrap())
+        u64::from_le_bytes(*field::<8, 8>(self.raw))
     }
 
     /// Returns true if SMT is allowed (policy bit 16).
@@ -88,13 +100,13 @@ impl<'a> SnpReportView<'a> {
     /// Virtual Machine Privilege Level (0x030..0x034).
     #[inline]
     pub fn vmpl(&self) -> u32 {
-        u32::from_le_bytes(self.raw[0x30..0x34].try_into().unwrap())
+        u32::from_le_bytes(*field::<0x30, 4>(self.raw))
     }
 
     /// Signature algorithm identifier (0x034..0x038). Must be 1 (ECDSA P-384 with SHA-384).
     #[inline]
     pub fn signature_algo(&self) -> u32 {
-        u32::from_le_bytes(self.raw[0x34..0x38].try_into().unwrap())
+        u32::from_le_bytes(*field::<0x34, 4>(self.raw))
     }
 
     /// FLAGS word at offset `0x048` (AMD Table 141).
@@ -104,7 +116,7 @@ impl<'a> SnpReportView<'a> {
     /// @spec SCC-CORE-001 SCC-VERIFY-009
     #[inline]
     pub fn flags(&self) -> u32 {
-        u32::from_le_bytes(self.raw[0x48..0x4C].try_into().unwrap())
+        u32::from_le_bytes(*field::<0x48, 4>(self.raw))
     }
 
     /// `SIGNING_KEY` from FLAGS bits 4:2. `0` = VCEK, `1` = VLEK, `7` = none.
@@ -118,13 +130,13 @@ impl<'a> SnpReportView<'a> {
     /// Current platform TCB version vector (0x038..0x040).
     #[inline]
     pub fn current_tcb(&self) -> u64 {
-        u64::from_le_bytes(self.raw[0x38..0x40].try_into().unwrap())
+        u64::from_le_bytes(*field::<0x38, 8>(self.raw))
     }
 
     /// Full 64-byte user report data scratchpad (0x050..0x090).
     #[inline]
     pub fn report_data(&self) -> &'a [u8; 64] {
-        self.raw[0x50..0x90].try_into().unwrap()
+        field::<0x50, 64>(self.raw)
     }
 
     /// Workload Ed25519 public key bound in report data (0x050..0x070).
@@ -138,7 +150,7 @@ impl<'a> SnpReportView<'a> {
     /// Solana slot blockhash nonce bound in report data (0x070..0x090).
     #[inline]
     pub fn nonce(&self) -> [u8; 32] {
-        self.raw[0x70..0x90].try_into().unwrap()
+        *field::<0x70, 32>(self.raw)
     }
 
     /// 48-byte SHA-384 launch digest / binary measurement (0x090..0x0C0).
@@ -152,19 +164,19 @@ impl<'a> SnpReportView<'a> {
     /// Host-provided data (0x0C0..0x0E0).
     #[inline]
     pub fn host_data(&self) -> &'a [u8; 32] {
-        self.raw[0x0C0..0x0E0].try_into().unwrap()
+        field::<0x0C0, 32>(self.raw)
     }
 
     /// Unique 32-byte report identifier (0x140..0x160).
     #[inline]
     pub fn report_id(&self) -> &'a [u8; 32] {
-        self.raw[0x140..0x160].try_into().unwrap()
+        field::<0x140, 32>(self.raw)
     }
 
     /// Reported TCB version integer (0x180..0x188).
     #[inline]
     pub fn reported_tcb(&self) -> u64 {
-        u64::from_le_bytes(self.raw[0x180..0x188].try_into().unwrap())
+        u64::from_le_bytes(*field::<0x180, 8>(self.raw))
     }
 
     /// Reported TCB component bytes (0x180..0x188):
@@ -179,7 +191,7 @@ impl<'a> SnpReportView<'a> {
     /// 64-byte physical AMD silicon chip ID (0x1A0..0x1E0).
     #[inline]
     pub fn chip_id(&self) -> &'a [u8; 64] {
-        self.raw[0x1A0..0x1E0].try_into().unwrap()
+        field::<0x1A0, 64>(self.raw)
     }
 
     /// Returns true if `chip_id` is all zeros (hyperscaler VLEK mode).
@@ -205,13 +217,13 @@ impl<'a> SnpReportView<'a> {
     /// The 672-byte body covered by the signature (0x000..0x2A0).
     #[inline]
     pub fn signed_body(&self) -> &'a [u8; SNP_SIGNED_BODY_SIZE] {
-        self.raw[0x000..0x2A0].try_into().unwrap()
+        field::<0x000, SNP_SIGNED_BODY_SIZE>(self.raw)
     }
 
     /// Full 512-byte raw signature block (0x2A0..0x4A0).
     #[inline]
     pub fn signature_raw(&self) -> &'a [u8; 512] {
-        self.raw[0x2A0..0x4A0].try_into().unwrap()
+        field::<0x2A0, 512>(self.raw)
     }
 
     /// Parses and verifies the 72-byte LE `r` field (0x2A0..0x2E8),
@@ -219,14 +231,14 @@ impl<'a> SnpReportView<'a> {
     ///
     /// @spec SCC-SEC-009
     pub fn signature_r_be(&self) -> Result<[u8; 48], ConfidentialComputeError> {
-        let field: &[u8; 72] = self.raw[0x2A0..0x2E8].try_into().unwrap();
+        let le_field = field::<0x2A0, 72>(self.raw);
         // Assert upper 24 bytes are strictly zero
-        if field[48..72].iter().any(|&b| b != 0) {
+        if le_field[48..72].iter().any(|&b| b != 0) {
             return Err(ConfidentialComputeError::InvalidSignaturePadding);
         }
         let mut scalar_be = [0u8; 48];
-        for i in 0..48 {
-            scalar_be[i] = field[47 - i];
+        for (be, le) in scalar_be.iter_mut().zip(le_field[..48].iter().rev()) {
+            *be = *le;
         }
         Ok(scalar_be)
     }
@@ -236,14 +248,14 @@ impl<'a> SnpReportView<'a> {
     ///
     /// @spec SCC-SEC-009
     pub fn signature_s_be(&self) -> Result<[u8; 48], ConfidentialComputeError> {
-        let field: &[u8; 72] = self.raw[0x2E8..0x330].try_into().unwrap();
+        let le_field = field::<0x2E8, 72>(self.raw);
         // Assert upper 24 bytes are strictly zero
-        if field[48..72].iter().any(|&b| b != 0) {
+        if le_field[48..72].iter().any(|&b| b != 0) {
             return Err(ConfidentialComputeError::InvalidSignaturePadding);
         }
         let mut scalar_be = [0u8; 48];
-        for i in 0..48 {
-            scalar_be[i] = field[47 - i];
+        for (be, le) in scalar_be.iter_mut().zip(le_field[..48].iter().rev()) {
+            *be = *le;
         }
         Ok(scalar_be)
     }
