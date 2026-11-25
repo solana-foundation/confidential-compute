@@ -99,17 +99,17 @@ pub async fn attest_current_key(state: &SidecarAppState) -> Result<u64, SidecarE
 
 async fn attest_current_key_locked(state: &SidecarAppState) -> Result<u64, SidecarError> {
     let keys = state.keys.read().await;
-    let status = enroll_key(state, &keys).await?;
-    let expires_slot = status.expires_slot.expect("successful enrollment has expiry");
+    let (status, expires_slot) = enroll_key(state, &keys).await?;
     *state.status.write().await = status;
     Ok(expires_slot)
 }
 
-/// Enroll a candidate without publishing it as the active signer.
+/// Enroll a candidate without publishing it as the active signer. Returns the
+/// new status and its expiry slot.
 async fn enroll_key(
     state: &SidecarAppState,
     keys: &EphemeralKeyManager,
-) -> Result<AttestationSessionStatus, SidecarError> {
+) -> Result<(AttestationSessionStatus, u64), SidecarError> {
     let (target_slot, slot_hash) = state.onchain.get_recent_slot_challenge().await?;
     let pubkey = keys.pubkey();
     let report = crate::attestation::request_for_submission(
@@ -129,12 +129,14 @@ async fn enroll_key(
         }
         Some(session)
     };
-    Ok(AttestationSessionStatus {
+    let expires_slot = confirmed.map_or(expires_slot, |s| s.expires_slot);
+    let status = AttestationSessionStatus {
         registered_slot: Some(confirmed.map_or(target_slot, |s| s.registered_slot)),
         expires_unix_timestamp: confirmed.map(|s| s.expires_unix_timestamp),
-        expires_slot: Some(confirmed.map_or(expires_slot, |s| s.expires_slot)),
+        expires_slot: Some(expires_slot),
         last_nonce_slot: Some(target_slot),
-    })
+    };
+    Ok((status, expires_slot))
 }
 
 /// Attest a candidate, then atomically replace the key and deadlines. Dropping
@@ -147,8 +149,7 @@ pub async fn rotate_zeroize_and_attest(state: &SidecarAppState) -> Result<(Pubke
 
 async fn rotate_locked(state: &SidecarAppState) -> Result<(Pubkey, Pubkey, u64), SidecarError> {
     let candidate = EphemeralKeyManager::new();
-    let status = enroll_key(state, &candidate).await?;
-    let expires_slot = status.expires_slot.expect("successful enrollment has expiry");
+    let (status, expires_slot) = enroll_key(state, &candidate).await?;
     let new_key = candidate.pubkey();
     let mut keys = state.keys.write().await;
     let mut current_status = state.status.write().await;

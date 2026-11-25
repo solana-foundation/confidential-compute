@@ -19,9 +19,13 @@ pub struct EnrollmentControl {
     attempts: Mutex<Option<Instant>>,
 }
 
+/// Default minimum interval between enrollment attempts. `new` accepts 60 to 86400.
+const DEFAULT_MIN_INTERVAL_SECS: u64 = 300;
+
 impl Default for EnrollmentControl {
+    /// Enrollment over HTTP is off (no token) and the interval is the default.
     fn default() -> Self {
-        Self::new(None, 300).expect("valid default enrollment controls")
+        Self { token: None, min_interval: Duration::from_secs(DEFAULT_MIN_INTERVAL_SECS), attempts: Mutex::new(None) }
     }
 }
 

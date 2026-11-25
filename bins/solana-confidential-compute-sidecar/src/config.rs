@@ -4,7 +4,7 @@
 
 use clap::{Parser, ValueEnum};
 use solana_sdk::pubkey::Pubkey;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 
 use crate::error::SidecarError;
 
@@ -125,7 +125,7 @@ impl SidecarConfig {
 impl Default for SidecarConfig {
     fn default() -> Self {
         Self {
-            bind_addr: "127.0.0.1:8080".parse().expect("valid loopback"),
+            bind_addr: SocketAddr::from((Ipv4Addr::LOCALHOST, 8080)),
             enrollment_token_file: None,
             enrollment_min_interval_secs: 300,
             solana_rpc_url: "https://api.devnet.solana.com".to_string(),

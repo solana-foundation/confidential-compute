@@ -141,16 +141,22 @@ fn parse_payer_material(raw: &str) -> Result<Keypair, SidecarError> {
 }
 
 async fn shutdown_signal() {
+    // A handler that cannot be installed shuts the sidecar down, as the
+    // former panic did, but through the graceful path.
     let ctrl_c = async {
-        tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+        if let Err(err) = tokio::signal::ctrl_c().await {
+            tracing::error!(%err, "Failed to install Ctrl+C handler; shutting down");
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(err) => tracing::error!(%err, "Failed to install SIGTERM handler; shutting down"),
+        }
     };
 
     #[cfg(not(unix))]
