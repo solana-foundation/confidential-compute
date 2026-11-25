@@ -1,17 +1,9 @@
-//! Compute-unit (CU) tracking for the CU benchmark (SDLC section 3.3).
-//!
-//! When `CU_REPORT` is set, `record_cu` keeps each `(instruction, CU)` pair and
-//! rewrites `cu_report.md` at the repo root as a markdown table. When `CU_REPORT`
-//! is not set, `record_cu` does nothing and writes no file.
-
 use std::sync::Mutex;
 
 const REPORT_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../cu_report.md");
 
 static RECORDS: Mutex<Vec<(String, u64)>> = Mutex::new(Vec::new());
 
-/// Record a CU measurement for a named instruction and rewrite the report.
-/// No-op unless the `CU_REPORT` environment variable is set.
 pub fn record_cu(name: &str, cus: u64) {
     if std::env::var_os("CU_REPORT").is_none() {
         return;
