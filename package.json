@@ -1,0 +1,19 @@
+{
+    "private": true,
+    "packageManager": "bun@1.4.4",
+    "workspaces": [
+        "sdks/typescript",
+        "docs-site"
+    ],
+    "scripts": {
+        "lint": "oxlint --deny-warnings",
+        "format": "oxfmt --ignore-path=.oxfmtignore '**/*.{ts,tsx,mts,cts,js,mjs,cjs}'",
+        "format:check": "oxfmt --check --ignore-path=.oxfmtignore '**/*.{ts,tsx,mts,cts,js,mjs,cjs}'"
+    },
+    "devDependencies": {
+        "@solana-config/oxc": "0.1.1",
+        "oxfmt": "0.80.0",
+        "oxlint": "1.95.0",
+        "oxlint-tsgolint": "7.0.2008"
+    }
+}
