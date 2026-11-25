@@ -1,8 +1,9 @@
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 /** Source-aware addresses and explicit pre-upgrade replay guards. */
 import { PublicKey } from '@solana/web3.js';
 
 import { SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID } from './index';
+import { findProgramAddress } from './internal/pda';
 
 function requireNonce(nonce: Uint8Array): void {
     if (nonce.length !== 32) throw new Error('nonce must be 32 bytes');
@@ -19,10 +20,7 @@ export function deriveUsedNoncePdaForSource(
         throw new Error('workload nonce source must be AMD1 or Nitro2; Google uses binding helpers');
     }
     requireNonce(nonce);
-    return PublicKey.findProgramAddressSync(
-        [Buffer.from('nonce'), Buffer.from([source]), signer.toBytes(), nonce],
-        programId,
-    );
+    return findProgramAddress([Buffer.from('nonce'), Buffer.from([source]), signer.toBytes(), nonce], programId);
 }
 
 /** Canonical pre-upgrade account, required as a readonly migration guard. */
@@ -32,7 +30,7 @@ export function deriveLegacyUsedNoncePda(
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): [PublicKey, number] {
     requireNonce(nonce);
-    return PublicKey.findProgramAddressSync([Buffer.from('nonce'), signer.toBytes(), nonce], programId);
+    return findProgramAddress([Buffer.from('nonce'), signer.toBytes(), nonce], programId);
 }
 
 function bindingHash(binding: Uint8Array): Uint8Array {
@@ -49,12 +47,12 @@ export function deriveGoogleUsedNoncePda(
     binding: Uint8Array,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync([Buffer.from('nonce'), Buffer.from([3]), bindingHash(binding)], programId);
+    return findProgramAddress([Buffer.from('nonce'), Buffer.from([3]), bindingHash(binding)], programId);
 }
 
 export function deriveLegacyGoogleUsedNoncePda(
     binding: Uint8Array,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync([Buffer.from('nonce'), bindingHash(binding)], programId);
+    return findProgramAddress([Buffer.from('nonce'), bindingHash(binding)], programId);
 }

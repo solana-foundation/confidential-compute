@@ -5,10 +5,8 @@
  */
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { sha256 } = require('@noble/hashes/sha256');
+const { sha256 } = require('@noble/hashes/sha2.js');
 const {
-    Keypair,
-    PublicKey,
     SystemProgram,
     SYSVAR_CLOCK_PUBKEY,
     SYSVAR_INSTRUCTIONS_PUBKEY,
@@ -38,6 +36,7 @@ const {
     buildVerifyNitroAttestationIxOversized,
     buildVerifyNitroAttestationTxOversized,
 } = require('../dist/internal/oversized.js');
+const { randomKey } = require('./helpers.cjs');
 
 function sampleDoc(len) {
     const document = new Uint8Array(len);
@@ -61,11 +60,11 @@ function consumerIx(payer) {
     return new TransactionInstruction({
         data: Buffer.from([1, 2, 3]),
         keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
-        programId: PublicKey.unique(),
+        programId: randomKey(),
     });
 }
 
-test('nitro discriminator matches sha256(global:verify_nitro_attestation)[..8]', () => {
+void test('nitro discriminator matches sha256(global:verify_nitro_attestation)[..8]', () => {
     const preimage = new TextEncoder().encode('global:verify_nitro_attestation');
     const disc = sha256(preimage).slice(0, 8);
     assert.deepEqual(Array.from(VERIFY_NITRO_ATTESTATION_DISCRIMINATOR), Array.from(disc));
@@ -74,9 +73,9 @@ test('nitro discriminator matches sha256(global:verify_nitro_attestation)[..8]',
     assert.equal(VERIFY_NITRO_MODE_B, 1);
 });
 
-test('Mode A instruction packs the on-chain header and account order', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('Mode A instruction packs the on-chain header and account order', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const nonce = new Uint8Array(32).fill(0x55);
     const actionHash = new Uint8Array(32).fill(0x11);
     const document = sampleDoc(64);
@@ -121,12 +120,12 @@ test('Mode A instruction packs the on-chain header and account order', () => {
     assert.ok(ix.keys[8].pubkey.equals(deriveBackendPolicyPda(2)[0]) && !ix.keys[8].isSigner && !ix.keys[8].isWritable);
 });
 
-test('Mode B instruction adds the instructions sysvar and uses the dummy signer', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('Mode B instruction adds the instructions sysvar and uses the dummy signer', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const slotHash = new Uint8Array(32).fill(0x44);
     const actionHash = new Uint8Array(32).fill(0x22);
-    const consumer = PublicKey.unique();
+    const consumer = randomKey();
     const commitment = computeCommitment(slotHash, actionHash, consumer);
     const document = sampleDoc(80);
     const ix = buildVerifyNitroAttestationIxOversized(payer, workload, 1n, 120, actionHash, document, commitment);
@@ -140,9 +139,9 @@ test('Mode B instruction adds the instructions sysvar and uses the dummy signer'
     assert.ok(ix.keys[3].pubkey.equals(usedNonce));
 });
 
-test('Mode B transaction places verify at index 0 and the consumer at index 1', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('Mode B transaction places verify at index 0 and the consumer at index 1', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const nonce = new Uint8Array(32).fill(0x33);
     const actionHash = new Uint8Array(32).fill(0x22);
     const consumer = consumerIx(payer);
@@ -163,9 +162,9 @@ test('Mode B transaction places verify at index 0 and the consumer at index 1', 
     assert.ok(tx.instructions[1].programId.equals(consumer.programId));
 });
 
-test('Mode A transaction appends consumerIx when provided', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('Mode A transaction appends consumerIx when provided', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const consumer = consumerIx(payer);
     const tx = buildVerifyNitroAttestationTx(
         payer,
@@ -184,9 +183,9 @@ test('Mode A transaction appends consumerIx when provided', () => {
     assert.deepEqual(Array.from(tx.instructions[1].data), [1, 2, 3]);
 });
 
-test('Mode A oversized transaction keeps consumerIx', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('Mode A oversized transaction keeps consumerIx', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const consumer = consumerIx(payer);
     const tx = buildVerifyNitroAttestationTxOversized(
         payer,
@@ -205,9 +204,9 @@ test('Mode A oversized transaction keeps consumerIx', () => {
     assert.deepEqual(Array.from(tx.instructions[1].data), [1, 2, 3]);
 });
 
-test('Mode A transaction packs a single instruction', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('Mode A transaction packs a single instruction', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const tx = buildVerifyNitroAttestationTxOversized(
         payer,
         workload,
@@ -222,9 +221,9 @@ test('Mode A transaction packs a single instruction', () => {
     assert.equal(tx.instructions[0].data[8], VERIFY_NITRO_MODE_A);
 });
 
-test('standard builders accept a small document that fits PACKET_DATA_SIZE', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('standard builders accept a small document that fits PACKET_DATA_SIZE', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const nonce = new Uint8Array(32).fill(0x21);
     const actionHash = new Uint8Array(32).fill(0x12);
     const document = sampleDoc(8);
@@ -244,9 +243,9 @@ test('standard builders accept a small document that fits PACKET_DATA_SIZE', () 
     assert.equal(tx.instructions.length, 1);
 });
 
-test('standard builders throw PacketTooLargeError for a max-size document', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('standard builders throw PacketTooLargeError for a max-size document', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const nonce = new Uint8Array(32).fill(0x21);
     const actionHash = new Uint8Array(32).fill(0x12);
     const document = sampleDoc(MAX_NITRO_DOCUMENT_LEN);
@@ -279,9 +278,9 @@ test('standard builders throw PacketTooLargeError for a max-size document', () =
     }
 });
 
-test('empty and oversized documents fail before the packet check', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('empty and oversized documents fail before the packet check', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const nonce = new Uint8Array(32).fill(1);
     const actionHash = new Uint8Array(32).fill(2);
     assert.throws(

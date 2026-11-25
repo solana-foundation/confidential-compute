@@ -1,5 +1,6 @@
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 import {
+    Blockhash,
     PublicKey,
     SystemProgram,
     SYSVAR_CLOCK_PUBKEY,
@@ -214,7 +215,7 @@ export function buildAtomicAttestationTxOversized(
     measurement: Uint8Array,
     report: Uint8Array,
     consumerIx: TransactionInstruction,
-    recentBlockhash: string,
+    recentBlockhash: Blockhash,
     nonceSlot: bigint | number = 0,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
     endorsementXy?: Uint8Array,
@@ -403,7 +404,7 @@ export function buildVerifyNitroAttestationTxOversized(
     expectedActionHash: Uint8Array,
     document: Uint8Array,
     nonce: Uint8Array,
-    recentBlockhash: string,
+    recentBlockhash: Blockhash,
     consumerIx: TransactionInstruction | null = null,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): Transaction {

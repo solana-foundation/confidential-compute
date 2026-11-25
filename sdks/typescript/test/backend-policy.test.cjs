@@ -2,11 +2,11 @@ const test = require('node:test'),
     assert = require('node:assert/strict');
 const fs = require('node:fs'),
     path = require('node:path');
-const { PublicKey, Keypair } = require('@solana/web3.js');
+const { dataOf, findPda, randomKey } = require('./helpers.cjs');
 const sdk = require('../dist/index.js'),
     raw = require('../dist/internal/oversized.js');
-const key = () => Keypair.generate().publicKey;
-test('governed source setter matches verifier discriminator, Borsh and canonical accounts', () => {
+const key = randomKey;
+void test('governed source setter matches verifier discriminator, Borsh and canonical accounts', async () => {
     const source = fs.readFileSync(
         path.resolve(__dirname, '../../../programs/solana-confidential-compute-verifier/src/payload.rs'),
         'utf8',
@@ -28,7 +28,7 @@ test('governed source setter matches verifier discriminator, Borsh and canonical
         data[8] = tag;
         data.writeUInt32LE(1, 9);
         data.fill(7, 13, 61);
-        assert.deepEqual(ix.data, data);
+        assert.deepEqual(dataOf(ix), data);
         assert.deepEqual(
             ix.keys.map(m => [m.isSigner, m.isWritable]),
             [
@@ -40,24 +40,22 @@ test('governed source setter matches verifier discriminator, Borsh and canonical
             ],
         );
         assert.ok(
-            ix.keys[2].pubkey.equals(
-                PublicKey.findProgramAddressSync([Buffer.from('backend_policy'), Buffer.from([tag])], pid)[0],
-            ),
+            ix.keys[2].pubkey.equals((await findPda([Buffer.from('backend_policy'), Buffer.from([tag])], pid))[0]),
         );
-        assert.equal(sdk.buildSetBackendPolicyIx(authority, payer, tag, [], pid).data.readUInt32LE(9), 0);
+        assert.equal(dataOf(sdk.buildSetBackendPolicyIx(authority, payer, tag, [], pid)).readUInt32LE(9), 0);
     }
     for (const tag of [0, 6, 255, NaN, 1.1])
         assert.throws(() => sdk.buildSetBackendPolicyIx(authority, payer, tag, [], pid), /source/);
     assert.throws(() => sdk.buildSetBackendPolicyIx(authority, payer, 1, Array(9).fill(new Uint8Array(48))), /eight/);
     assert.throws(() => sdk.buildSetBackendPolicyIx(authority, payer, 1, [new Uint8Array(47)]), /48/);
 });
-test('all inline verification builders append readonly policy with correct backend tag', () => {
+void test('all inline verification builders append readonly policy with correct backend tag', () => {
     const payer = key(),
         signer = key(),
         pid = key(),
         report = Buffer.alloc(1184);
     report.fill(9, 0x1a0, 0x1e0);
-    signer.toBuffer().copy(report, 0x50);
+    report.set(signer.toBytes(), 0x50);
     const ixs = [
         [raw.buildRegisterSignerIxOversized(payer, signer, report, 0, 95, pid), 1],
         [

@@ -8,7 +8,7 @@ const ix = (program, keys) =>
     new TransactionInstruction({ data: Buffer.from([7, 8, 9]), keys, programId: pk(program) });
 const compile = (instructions, payer = pk(1)) =>
     new Transaction({ feePayer: payer, recentBlockhash: pk(9).toBase58() }).add(...instructions).compileMessage();
-test('V3 complete-message elevation and cross-language compiled vector', () => {
+void test('V3 complete-message elevation and cross-language compiled vector', () => {
     const action = ix(2, [meta(pk(1)), meta(pk(3)), meta(pk(3))]);
     const normal = compile([action]);
     const writable = compile([action, ix(4, [meta(pk(3), false, true)])]);
@@ -21,7 +21,7 @@ test('V3 complete-message elevation and cross-language compiled vector', () => {
     assert.throws(() => sdk.validateCompiledAction(writable, 0, hash(normal)), /V3/);
     assert.throws(() => sdk.hashAction(Uint8Array.of(7), [pk(1)], new Uint8Array()), /legacy/);
 });
-test('runtime program demotion and reserved writes fail closed', () => {
+void test('runtime program demotion and reserved writes fail closed', () => {
     const action = ix(2, [meta(pk(2), false, true)]);
     assert.deepEqual(
         sdk.hashCompiledAction(compile([action]), 0),
@@ -30,7 +30,7 @@ test('runtime program demotion and reserved writes fail closed', () => {
     const clock = new PublicKey('SysvarC1ock11111111111111111111111111111111');
     assert.throws(() => sdk.hashCompiledAction(compile([ix(2, [meta(clock, false, true)])]), 0), /reserved/);
 });
-test('normal Nitro builder validates complete metadata before returning', () => {
+void test('normal Nitro builder validates complete metadata before returning', () => {
     const payer = pk(1),
         workload = pk(6),
         nonce = new Uint8Array(32).fill(6),

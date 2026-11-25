@@ -1,12 +1,13 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createHash } = require('node:crypto');
-const { Keypair, SYSVAR_INSTRUCTIONS_PUBKEY } = require('@solana/web3.js');
+const { SYSVAR_INSTRUCTIONS_PUBKEY } = require('@solana/web3.js');
 const sdk = require('../dist/index.js');
 const raw = require('../dist/internal/oversized.js');
-test('AMD Mode B supplies readonly Instructions without shifting policy/replay suffix', () => {
-    const payer = Keypair.generate().publicKey,
-        consumer = Keypair.generate().publicKey;
+const { randomKey } = require('./helpers.cjs');
+void test('AMD Mode B supplies readonly Instructions without shifting policy/replay suffix', () => {
+    const payer = randomKey(),
+        consumer = randomKey();
     const report = new Uint8Array(sdk.SNP_REPORT_SIZE);
     // Explicit VCEK identity, matching the Rust Instructions-sysvar fixture.
     report.fill(9, 0x1a0, 0x1e0);

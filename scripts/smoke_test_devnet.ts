@@ -45,9 +45,9 @@ const CONSUMER_PROGRAM_ID = new PublicKey(
 const EXPECTED_MEASUREMENT = new Uint8Array(48).fill(0x42);
 const ACTION_HASH = new Uint8Array(32).fill(0x11);
 
-function loadKeypair(path: string): Keypair {
+async function loadKeypair(path: string): Promise<Keypair> {
   const secretKey = Uint8Array.from(JSON.parse(fs.readFileSync(path, "utf-8")));
-  return Keypair.fromSecretKey(secretKey);
+  return await Keypair.fromSecretKey(secretKey);
 }
 
 function buildMockReport(
@@ -86,9 +86,9 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-function unitsFromLogs(logs: string[], reported?: number | null): number {
-  if (typeof reported === "number") {
-    return reported;
+function unitsFromLogs(logs: readonly string[], reported?: bigint | number | null): number {
+  if (typeof reported === "number" || typeof reported === "bigint") {
+    return Number(reported);
   }
   for (let i = logs.length - 1; i >= 0; i--) {
     const match = logs[i].match(/consumed (\d+) of (\d+) compute units/);
@@ -224,11 +224,11 @@ async function main() {
     process.env.PAYER_KEYPAIR_PATH ||
     process.env.SOLANA_KEYPAIR_PATH ||
     path.join(os.homedir(), ".config/solana/id.json");
-  const payer = loadKeypair(payerPath);
+  const payer = await loadKeypair(payerPath);
 
   console.log(`Payer:             ${payer.publicKey.toBase58()}`);
   const balance = await connection.getBalance(payer.publicKey);
-  console.log(`Payer Devnet SOL:  ${balance / 1e9} SOL`);
+  console.log(`Payer Devnet SOL:  ${Number(balance) / 1e9} SOL`);
   console.log(`Solana Confidential Compute Verifier:    ${SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID.toBase58()}`);
   console.log(`Consumer Ref:      ${CONSUMER_PROGRAM_ID.toBase58()}`);
 
@@ -251,12 +251,12 @@ async function main() {
   const registryInfo = await connection.getAccountInfo(policyRegistryPda);
 
   if (!registryInfo || registryInfo.data.length === 0) {
-    const [programDataPda] = PublicKey.findProgramAddressSync(
-      [SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID.toBuffer()], UPGRADEABLE_LOADER_ID
+    const [programDataPda] = await PublicKey.findProgramAddress(
+      [SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID.toBytes()], UPGRADEABLE_LOADER_ID
     );
     const programData = await connection.getAccountInfo(programDataPda);
     if (!programData || !programData.owner.equals(UPGRADEABLE_LOADER_ID)
-        || programData.data.length < 45 || programData.data.readUInt32LE(0) !== 3
+        || programData.data.length < 45 || Buffer.from(programData.data).readUInt32LE(0) !== 3
         || programData.data[12] !== 1
         || !new PublicKey(programData.data.subarray(13, 45)).equals(payer.publicKey)) {
       throw new Error("Initialization requires the program's current upgrade authority; initialize before finalization");
@@ -310,7 +310,7 @@ async function main() {
   console.log("--------------------------------------------------------------------------------");
 
   const nonce = new Uint8Array(32).fill(0x99);
-  const mockSigner = Keypair.generate();
+  const mockSigner = await Keypair.generate();
   const mockReport = buildMockReport(mockSigner.publicKey, EXPECTED_MEASUREMENT, nonce);
 
   // Consumer instruction: IX_EXECUTE_ATOMIC_ACTION (1) + payload.
@@ -355,7 +355,7 @@ async function main() {
   console.log("TEST: Nitro verify_nitro_attestation Mode A (SCC-NITRO-008)");
   console.log("--------------------------------------------------------------------------------");
 
-  const nitroSigner = Keypair.generate();
+  const nitroSigner = await Keypair.generate();
   const nitroNonce = new Uint8Array(32).fill(0x55);
   const nitroActionHash = new Uint8Array(32);
   const nitroDocument = buildSyntheticNitroDocument(

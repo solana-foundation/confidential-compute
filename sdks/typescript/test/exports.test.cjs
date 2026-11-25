@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { createRequire } = require('node:module');
-test('supported package root loads; internal subpaths are blocked', () => {
+void test('supported package root loads; internal subpaths are blocked', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'solana-cc-exports-'));
     try {
         fs.mkdirSync(path.join(dir, 'node_modules/@solana'), { recursive: true });

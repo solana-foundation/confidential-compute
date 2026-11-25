@@ -4,11 +4,12 @@
  * @spec SCC-SDK-002 SCC-SEC-005 SCC-NITRO-008
  */
 
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 import {
     Keypair,
     PublicKey,
     AccountMeta,
+    Blockhash,
     Message,
     MessageV0,
     Transaction,
@@ -22,6 +23,7 @@ import {
     buildVerifyNitroAttestationIxOversized,
     buildVerifyNitroAttestationTxOversized,
 } from './internal/oversized';
+import { findProgramAddress } from './internal/pda';
 
 /** Canonical solana-confidential-compute-verifier program id. */
 export const SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID = new PublicKey('EKfHCTnsbRQfURsdmzkmuoxUx7DVt8WsQ5X7t49ZZZh');
@@ -155,8 +157,8 @@ function bytesEq(a: Uint8Array, b: Uint8Array): boolean {
     return true;
 }
 
-/** Blockhash bytes do not change the serialized length. */
-const PACKET_PROBE_BLOCKHASH = PublicKey.default.toBase58();
+/** Blockhash bytes do not change the serialized length. web3.js 3 types blockhashes as a branded string. */
+const PACKET_PROBE_BLOCKHASH = PublicKey.default.toString() as Blockhash;
 
 function shortvecLen(len: number): number {
     if (len < 128) {
@@ -220,7 +222,7 @@ export function deriveSignerPda(
     signer: PublicKey,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync([seed('attested_signer_v2'), signer.toBytes()], programId);
+    return findProgramAddress([seed('attested_signer_v2'), signer.toBytes()], programId);
 }
 
 /**
@@ -231,7 +233,7 @@ export function deriveSignerPda(
 export function derivePolicyRegistryPda(
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync([seed('policy_registry')], programId);
+    return findProgramAddress([seed('policy_registry')], programId);
 }
 
 /**
@@ -247,7 +249,7 @@ export function deriveVcekPda(
     if (chipIdHash.length !== 32) {
         throw new Error('chipIdHash must be 32 bytes');
     }
-    return PublicKey.findProgramAddressSync([seed(VCEK_SEED), chipIdHash, u64Le(tcbVersion)], programId);
+    return findProgramAddress([seed(VCEK_SEED), chipIdHash, u64Le(tcbVersion)], programId);
 }
 
 /** Zero-copy decode of a 154-byte V2 `AttestedSignerAccount`. */
@@ -445,12 +447,12 @@ export function buildRegisterSignerIx(
  *
  * @spec SCC-SDK-002
  */
-export function buildSessionActionTx(
+export async function buildSessionActionTx(
     payer: PublicKey,
     signerKeypair: Keypair,
     consumerIx: TransactionInstruction,
-    recentBlockhash: string,
-): Transaction {
+    recentBlockhash: Blockhash,
+): Promise<Transaction> {
     if (consumerIx.programId.equals(PublicKey.default)) {
         throw new Error('workload keys must not sign System Program instructions');
     }
@@ -484,7 +486,7 @@ export function buildSessionActionTx(
         recentBlockhash,
     });
     tx.add(ix);
-    tx.partialSign(signerKeypair);
+    await tx.partialSign(signerKeypair);
     assertPacketFits(tx);
     return tx;
 }
@@ -505,7 +507,7 @@ export function buildAtomicAttestationTx(
     measurement: Uint8Array,
     report: Uint8Array,
     consumerIx: TransactionInstruction,
-    recentBlockhash: string,
+    recentBlockhash: Blockhash,
     nonceSlot: bigint | number = 0,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
     endorsementXy?: Uint8Array,
@@ -619,7 +621,7 @@ export function buildVerifyNitroAttestationTx(
     expectedActionHash: Uint8Array,
     document: Uint8Array,
     nonce: Uint8Array,
-    recentBlockhash: string,
+    recentBlockhash: Blockhash,
     consumerIx: TransactionInstruction | null = null,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): Transaction {

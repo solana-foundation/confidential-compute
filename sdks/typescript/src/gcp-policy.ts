@@ -2,6 +2,7 @@
 import { PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
 
 import { SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, derivePolicyRegistryPda } from './index';
+import { findProgramAddress } from './internal/pda';
 export const SET_GCP_TENANT_POLICY_DISCRIMINATOR = new Uint8Array([253, 197, 211, 209, 205, 86, 22, 43]);
 export function buildSetGcpTenantPolicyIx(
     authority: PublicKey,
@@ -27,7 +28,7 @@ export function buildSetGcpTenantPolicyIx(
             {
                 isSigner: false,
                 isWritable: true,
-                pubkey: PublicKey.findProgramAddressSync([Buffer.from('gcp_tenant_policy')], programId)[0],
+                pubkey: findProgramAddress([Buffer.from('gcp_tenant_policy')], programId)[0],
             },
             { isSigner: true, isWritable: true, pubkey: payer },
             { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },

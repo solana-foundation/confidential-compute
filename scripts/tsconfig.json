@@ -5,11 +5,9 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "moduleResolution": "node",
     "noEmit": true,
-    "baseUrl": "..",
     "paths": {
-      "@solana/web3.js": ["sdks/typescript/node_modules/@solana/web3.js"]
+      "@solana/web3.js": ["../sdks/typescript/node_modules/@solana/web3.js"]
     },
     "typeRoots": ["../sdks/typescript/node_modules/@types"],
     "types": ["node"]
