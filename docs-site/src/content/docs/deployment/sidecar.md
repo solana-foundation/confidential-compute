@@ -87,6 +87,23 @@ Prebuilt container images are published to the GitHub Container Registry:
 docker pull ghcr.io/solana-foundation/solana-confidential-compute-sidecar:latest
 ```
 
+| Tag | Source |
+| :--- | :--- |
+| `latest` | The most recent release tag `vX.Y.Z`. A pre-release tag (for example `v1.1.0-rc.1`) does not move `latest`. |
+| `X.Y.Z`, `X.Y` | The release tag `vX.Y.Z`. |
+| `sha-<short sha>` | Each push to `main` and each release tag. |
+
+A push to `main` does not move `latest`.
+
+Each published image has a GitHub build provenance attestation. Verify the
+attestation before you use the image:
+
+```bash
+gh attestation verify \
+  oci://ghcr.io/solana-foundation/solana-confidential-compute-sidecar:latest \
+  --repo solana-foundation/confidential-compute
+```
+
 ## Docker build
 
 `bins/solana-confidential-compute-sidecar/Dockerfile` is a two-stage image:
