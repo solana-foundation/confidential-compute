@@ -18,7 +18,6 @@
 //! any cluster, so the bank gets a stand-in at the same address running the
 //! same software P-384 check. The signature is still genuinely verified; what
 //! changed is which program performs the scalar arithmetic.
-#![allow(deprecated)]
 use p384::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey};
 use sha2::{Digest, Sha384};
 use solana_confidential_compute_verifier::{
@@ -175,7 +174,7 @@ async fn full_snp_bank_staging_preserves_real_crypto_consent_and_nonce_one_shot(
     packets.push(make(SEAL, vec![], pair.clone()));
     for ix in packets.clone() {
         let tx = Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer], ctx.last_blockhash);
-        assert!(solana_packet::Packet::from_data(None, &tx).unwrap().meta().size <= 1232);
+        assert!(bincode::serialize(&tx).unwrap().len() <= 1232);
         ctx.banks_client.process_transaction(tx).await.unwrap();
     }
     let mut accounts = pair.clone();
@@ -221,7 +220,7 @@ async fn full_snp_bank_staging_preserves_real_crypto_consent_and_nonce_one_shot(
         &[&payer, &workload],
         ctx.last_blockhash,
     );
-    assert!(solana_packet::Packet::from_data(None, &tx).unwrap().meta().size <= 1232);
+    assert!(bincode::serialize(&tx).unwrap().len() <= 1232);
     ctx.banks_client.process_transaction(tx).await.unwrap();
     let saved = ctx.banks_client.get_account(used).await.unwrap().unwrap();
     assert_eq!(saved.data.len(), UsedNonceAccount::SIZE);
