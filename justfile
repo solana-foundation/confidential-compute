@@ -182,13 +182,16 @@ test-and-benchmark:
 
 # Deterministic solana-verify build in the pinned image. Prints the executable
 # hash as the last line. Callers clean target/deploy before each run.
+# The mount path must be absolute: solana-verify 0.5.2 strips the mount path
+# from the manifest path with replace(), so a relative "." removes every dot
+# and turns Cargo.toml into Cargotoml.
 verified-build:
     #!/usr/bin/env bash
     set -euo pipefail
     solana-verify build \
         --base-image "{{ verified_build_image }}" \
         --library-name solana_confidential_compute_verifier \
-        .
+        "{{ justfile_directory() }}"
     solana-verify get-executable-hash target/deploy/solana_confidential_compute_verifier.so
 
 compute-regression:
