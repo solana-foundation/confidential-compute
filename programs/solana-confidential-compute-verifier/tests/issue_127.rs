@@ -1,5 +1,5 @@
 // Test code: unwrap, expect and panic! report a failed test (SDLC 3.2.8 covers production code).
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unreachable)]
 //! Cache lookup seed contract for VCEK and VLEK report resolution.
 //! Synthetic P384 AMD chains are rejected; cached keys below are native test fixtures,
 //! not a claim that synthetic certificates can register or represent hardware.

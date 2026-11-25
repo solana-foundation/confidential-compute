@@ -32,6 +32,11 @@ all = { level = "deny", priority = -1 }
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
+# A function that returns Result reports failure as Err. These macros panic.
+panic_in_result_fn = "deny"
+unreachable = "deny"
+todo = "deny"
+unimplemented = "deny"
 
 [profile.release]
 opt-level = 3
