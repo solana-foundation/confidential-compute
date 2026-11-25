@@ -1,0 +1,5 @@
+# SDLC 3.2.8: tests may unwrap, expect and panic. Production code may not
+# (see [workspace.lints.clippy] in Cargo.toml).
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

@@ -2,6 +2,8 @@
 //!
 //! @spec SCC-CONSUMER-001 SCC-CONSUMER-002
 #![allow(unexpected_cfgs, deprecated)]
+// SDLC 3.2.1: this crate runs on chain, so all arithmetic is checked.
+#![deny(clippy::arithmetic_side_effects)]
 
 use solana_confidential_compute_cpi::anchor::assert_attestation_atomic_ctx;
 use solana_confidential_compute_cpi::{AtomicAttestationExpectation, AttestationPlatform};

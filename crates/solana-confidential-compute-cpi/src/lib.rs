@@ -1,6 +1,8 @@
 //! On-chain CPI helpers for Solana Confidential Compute consumer programs.
 //!
 //! This crate depends on `solana-program`, `solana-confidential-compute-core`, and `bytemuck`. It does not depend on `solana-sdk`.
+// SDLC 3.2.1: this crate runs on chain, so all arithmetic is checked.
+#![deny(clippy::arithmetic_side_effects)]
 
 pub mod anchor;
 pub mod error;

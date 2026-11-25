@@ -4,6 +4,8 @@
 //! cross-checks binary code measurements against an on-chain allowlist, and registers
 //! verified Ed25519 signer keys.
 #![allow(unexpected_cfgs, deprecated)]
+// SDLC 3.2.1: this crate runs on chain, so all arithmetic is checked.
+#![deny(clippy::arithmetic_side_effects)]
 
 // Mock features must never produce an on-chain artifact, even with no-entrypoint.
 #[cfg(all(feature = "mock-crypto", target_os = "solana"))]
