@@ -1,14 +1,14 @@
 const assert = require('node:assert/strict'),
     test = require('node:test'),
     { createHash } = require('node:crypto');
-const { Keypair } = require('@solana/web3.js');
+const { randomKey } = require('./helpers.cjs');
 const sdk = require(process.env.SOLANA_CC_SDK_PATH || '../dist');
 const raw = require(process.env.SOLANA_CC_RAW_PATH || '../dist/internal/oversized');
 const hash = x => createHash('sha256').update(x).digest();
-test('VLEK AMD A/B derive from explicit endorsement XY for flag and zero-chip paths', () => {
-    const payer = Keypair.generate().publicKey,
-        signer = Keypair.generate().publicKey,
-        pid = Keypair.generate().publicKey,
+void test('VLEK AMD A/B derive from explicit endorsement XY for flag and zero-chip paths', () => {
+    const payer = randomKey(),
+        signer = randomKey(),
+        pid = randomKey(),
         xy = Buffer.alloc(96, 17);
     for (const [flags, chip] of [
         [4, 9],
@@ -17,7 +17,7 @@ test('VLEK AMD A/B derive from explicit endorsement XY for flag and zero-chip pa
     ]) {
         const report = Buffer.alloc(1184);
         report.writeUInt32LE(flags, 0x48);
-        signer.toBuffer().copy(report, 0x50);
+        report.set(signer.toBytes(), 0x50);
         report.fill(chip, 0x1a0, 0x1e0);
         const identity = hash(flags === 4 || chip === 0 ? xy : report.subarray(0x1a0, 0x1e0));
         const expected = sdk.deriveVcekPda(identity, 0n, pid)[0];

@@ -139,7 +139,7 @@ PDA helpers:
 | `deriveUsedNoncePdaForSource` | `["nonce", [source], signer, nonce]` (AMD=1, Nitro=2) |
 | `deriveLegacyUsedNoncePda`    | `["nonce", signer, nonce]` (readonly migration guard) |
 
-`@spec SCC-ARCH-001` is the on-chain create path. These helpers call `PublicKey.findProgramAddressSync`.
+`@spec SCC-ARCH-001` is the on-chain create path. These helpers are synchronous. They call `findProgramAddress` in `src/internal/pda.ts`, because `@solana/web3.js` 3 removed `PublicKey.findProgramAddressSync`. `test/pda.test.cjs` checks that function against `PublicKey.findProgramAddress`.
 
 `defaultAtomicAttestationExpectation` sets `requireNonce: true`. Builders pack `VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR`. `@spec SCC-SEC-001` is the guest-policy rule inside the verifier. This client does not re-check policy bits.
 
@@ -187,7 +187,7 @@ const commitment = computeCommitment(
 
 Blockhash/signatures/other instructions' data are not hashed. Changes to payer, keys or instruction metadata require final validation. V3 requires fresh attestations and coordinated verifier/consumer/helper/SDK/sidecar migration, with no accepted V1/V2 fallback. The supported Nitro Mode B transaction builder validates its final digest after checking packet size. Oversized packers remain test harnesses; a full SNP report still exceeds live packet size and no staged atomic adapter is introduced.
 
-The local session builder receives a workload `Keypair` and signs locally. Keep that key inside the enclave; the production signing path is the sidecar `POST /v1/sign`, which this SDK does not call automatically. The coordinated upstream issue #186 fix rejects every System Program instruction before workload-key signing in both SDKs. Custom consumer programs, accounts, and data still require caller policy; the SDK does not provide the sidecar's transaction-screening guarantees. Require the #186 implementation in the selected release before relying on its System Program guard.
+The local session builder `buildSessionActionTx` is async and returns `Promise<Transaction>`, because `@solana/web3.js` 3 signs with WebCrypto. It receives a workload `Keypair` (create one with `await Keypair.generate()`) and signs locally. Every `recentBlockhash` parameter takes the web3.js `Blockhash` type. Keep that key inside the enclave; the production signing path is the sidecar `POST /v1/sign`, which this SDK does not call automatically. The coordinated upstream issue #186 fix rejects every System Program instruction before workload-key signing in both SDKs. Custom consumer programs, accounts, and data still require caller policy; the SDK does not provide the sidecar's transaction-screening guarantees. Require the #186 implementation in the selected release before relying on its System Program guard.
 
 ---
 

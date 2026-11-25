@@ -21,7 +21,7 @@ function equal(name, actual, expected) {
     assert.deepEqual([...actual], [...expected], name);
 }
 
-test('all shared exported instruction/account discriminators match the verifier and Anchor hash', () => {
+void test('all shared exported instruction/account discriminators match the verifier and Anchor hash', () => {
     for (const [file, namespace] of [
         ['programs/solana-confidential-compute-verifier/src/payload.rs', 'global'],
         ['programs/solana-confidential-compute-verifier/src/state.rs', 'account'],
@@ -48,7 +48,7 @@ test('all shared exported instruction/account discriminators match the verifier 
         }
     }
 });
-test('wire lengths, account layout, TTL and mode bytes remain aligned', () => {
+void test('wire lengths, account layout, TTL and mode bytes remain aligned', () => {
     assert.equal(sdk.SNP_REPORT_SIZE, 1184);
     assert.equal(sdk.VERIFY_AND_REGISTER_IX_LEN, 8 + 8 + sdk.SNP_REPORT_SIZE + 2);
     assert.equal(sdk.VERIFY_ATOMIC_WITH_NONCE_IX_LEN, 8 + 72 + sdk.SNP_REPORT_SIZE + 1);
@@ -87,7 +87,7 @@ test('wire lengths, account layout, TTL and mode bytes remain aligned', () => {
     assert.equal(parsed.bump, 8);
     assert.equal(parsed.expiresUnixTimestamp, 9n);
 });
-test('sidecar JWT builder/screen consume canonical CPI constant, not handwritten bytes', () => {
+void test('sidecar JWT builder/screen consume canonical CPI constant, not handwritten bytes', () => {
     equal(
         'sidecar Nitro discriminator',
         arrayConstant(
@@ -105,7 +105,7 @@ test('sidecar JWT builder/screen consume canonical CPI constant, not handwritten
         assert.doesNotMatch(read(file), /77,\s*18,\s*140,\s*169,\s*137,\s*219,\s*219,\s*100/);
     }
 });
-test('contract gate rejects a deliberately changed discriminator (negative control)', () => {
+void test('contract gate rejects a deliberately changed discriminator (negative control)', () => {
     const name = 'VERIFY_ATOMIC_WITH_NONCE_DISCRIMINATOR';
     const expected = arrayConstant(read('programs/solana-confidential-compute-verifier/src/payload.rs'), name);
     const changed = [...expected];
@@ -113,7 +113,7 @@ test('contract gate rejects a deliberately changed discriminator (negative contr
     assert.throws(() => equal(name, changed, expected), { code: 'ERR_ASSERTION' });
 });
 
-test('CPI private offsets and parser ceilings agree with wire contracts', () => {
+void test('CPI private offsets and parser ceilings agree with wire contracts', () => {
     const source = read('crates/solana-confidential-compute-cpi/src/lib.rs');
     for (const [name, value] of Object.entries({
         BUMP_OFFSET: 145,

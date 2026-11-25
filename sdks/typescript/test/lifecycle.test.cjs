@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { Keypair, PublicKey } = require('@solana/web3.js');
 const sdk = require('../dist/index.js');
-test('V2 parse and strict Unix boundary; V1 rejects', () => {
+const { findPda, randomKey } = require('./helpers.cjs');
+void test('V2 parse and strict Unix boundary; V1 rejects', async () => {
     const data = Buffer.alloc(154);
     Buffer.from(sdk.ATTESTED_SIGNER_DISCRIMINATOR).copy(data);
     data.writeBigUInt64LE(200n, 137);
@@ -18,10 +18,9 @@ test('V2 parse and strict Unix boundary; V1 rejects', () => {
     const legacy = Buffer.from(data);
     legacy.set([97, 156, 233, 39, 50, 169, 179, 13]);
     assert.throws(() => sdk.parseAttestedSignerAccount(legacy), /discriminator/);
-    const key = Keypair.generate().publicKey;
-    const v1 = PublicKey.findProgramAddressSync(
-        [Buffer.from('attested_signer'), key.toBuffer()],
-        sdk.SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
+    const key = randomKey();
+    const v1 = (
+        await findPda([Buffer.from('attested_signer'), key.toBytes()], sdk.SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID)
     )[0];
     assert.equal(sdk.deriveSignerPda(key)[0].equals(v1), false);
 });

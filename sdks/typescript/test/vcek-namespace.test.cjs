@@ -3,10 +3,11 @@ const test = require('node:test'),
 const fs = require('node:fs'),
     path = require('node:path');
 const { PublicKey } = require('@solana/web3.js');
-const { sha256 } = require('@noble/hashes/sha256');
+const { sha256 } = require('@noble/hashes/sha2.js');
 const sdk = require('../dist/index.js'),
     raw = require('../dist/internal/oversized.js');
-test('VCEK client and both AMD packers match verifier V2 seed; legacy differs', () => {
+const { findPda } = require('./helpers.cjs');
+void test('VCEK client and both AMD packers match verifier V2 seed; legacy differs', async () => {
     const source = fs.readFileSync(
         path.resolve(__dirname, '../../../programs/solana-confidential-compute-verifier/src/state.rs'),
         'utf8',
@@ -15,13 +16,13 @@ test('VCEK client and both AMD packers match verifier V2 seed; legacy differs', 
     const pid = new PublicKey(new Uint8Array(32).fill(9)),
         signer = new PublicKey(new Uint8Array(32).fill(8));
     const report = Buffer.alloc(1184);
-    signer.toBuffer().copy(report, 0x50);
+    report.set(signer.toBytes(), 0x50);
     report.fill(7, 0x1a0, 0x1e0);
     report.writeBigUInt64LE(0x0102030405060708n, 0x180);
     const chip = sha256(report.subarray(0x1a0, 0x1e0)),
         tcb = report.subarray(0x180, 0x188);
-    const expected = PublicKey.findProgramAddressSync([Buffer.from(seed), chip, tcb], pid),
-        legacy = PublicKey.findProgramAddressSync([Buffer.from('vcek'), chip, tcb], pid);
+    const expected = await findPda([Buffer.from(seed), chip, tcb], pid),
+        legacy = await findPda([Buffer.from('vcek'), chip, tcb], pid);
     assert.ok(!expected[0].equals(legacy[0]));
     assert.deepEqual(sdk.deriveVcekPda(chip, 0x0102030405060708n, pid), expected);
     for (const ix of [

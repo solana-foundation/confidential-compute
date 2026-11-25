@@ -1,4 +1,4 @@
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 /** Offline governance wire builders. No network or key custody.
  * Registry authority is trusted for key provenance. Mutable-root rotation is
  * unsupported by the pinned-Milan verifier after #172, even though its legacy
@@ -12,6 +12,7 @@ import {
     deriveSignerPda,
     deriveVcekPda,
 } from './index';
+import { findProgramAddress } from './internal/pda';
 export const UPDATE_POLICY_DISCRIMINATOR = new Uint8Array([227, 150, 114, 217, 142, 172, 100, 228]);
 export const ROTATE_ROOT_CERT_DISCRIMINATOR = new Uint8Array([137, 212, 96, 71, 222, 5, 133, 104]);
 export const REGISTER_JWKS_KEY_DISCRIMINATOR = new Uint8Array([122, 195, 232, 116, 203, 137, 219, 14]);
@@ -72,7 +73,7 @@ export function deriveJwksPda(
     kidHash: Uint8Array,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync([Buffer.from('jwks'), bytes(kidHash, 32, 'kidHash')], programId);
+    return findProgramAddress([Buffer.from('jwks'), bytes(kidHash, 32, 'kidHash')], programId);
 }
 export function buildRegisterJwksKeyIx(
     authority: PublicKey,
@@ -138,7 +139,7 @@ export function buildRevokeAttestedSignerIx(
 ): TransactionInstruction {
     const account = deriveSignerPda(signer, programId)[0];
     return new TransactionInstruction({
-        data: Buffer.concat([Buffer.from(REVOKE_ATTESTED_SIGNER_DISCRIMINATOR), signer.toBuffer()]),
+        data: Buffer.concat([Buffer.from(REVOKE_ATTESTED_SIGNER_DISCRIMINATOR), Buffer.from(signer.toBytes())]),
         keys: [...metas(authority, programId, false), { isSigner: false, isWritable: true, pubkey: account }],
         programId,
     });
@@ -173,8 +174,5 @@ export function deriveAmdRevocationPda(
     identity: Uint8Array,
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-        [Buffer.from('amd_revocation'), bytes(identity, 32, 'identity')],
-        programId,
-    );
+    return findProgramAddress([Buffer.from('amd_revocation'), bytes(identity, 32, 'identity')], programId);
 }

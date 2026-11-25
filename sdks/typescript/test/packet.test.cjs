@@ -27,6 +27,7 @@ const {
     buildVerifyNitroAttestationIxOversized,
     buildVerifyNitroAttestationTxOversized,
 } = require('../dist/internal/oversized.js');
+const { randomKey } = require('./helpers.cjs');
 
 function sampleReport(signer) {
     const report = new Uint8Array(SNP_REPORT_SIZE);
@@ -48,9 +49,9 @@ function expectPacketTooLarge(fn) {
     assert.fail('expected PacketTooLargeError');
 }
 
-test('raw report builders fail closed above PACKET_DATA_SIZE', () => {
-    const payer = Keypair.generate().publicKey;
-    const signer = Keypair.generate().publicKey;
+void test('raw report builders fail closed above PACKET_DATA_SIZE', () => {
+    const payer = randomKey();
+    const signer = randomKey();
     const report = sampleReport(signer);
     // Enrollment now requires both payer and workload signatures plus the legacy replay guard.
     assert.equal(
@@ -58,7 +59,7 @@ test('raw report builders fail closed above PACKET_DATA_SIZE', () => {
         1800,
     );
 
-    const consumer = Keypair.generate().publicKey;
+    const consumer = randomKey();
     const consumerIx = new TransactionInstruction({
         data: Buffer.from([1, 2]),
         keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
@@ -79,9 +80,9 @@ test('raw report builders fail closed above PACKET_DATA_SIZE', () => {
     assert.ok(atomicLen > 1602);
 });
 
-test('oversized packers still emit the raw report layout', () => {
-    const payer = Keypair.generate().publicKey;
-    const signer = Keypair.generate().publicKey;
+void test('oversized packers still emit the raw report layout', () => {
+    const payer = randomKey();
+    const signer = randomKey();
     const report = sampleReport(signer);
     const ix = buildRegisterSignerIxOversized(payer, signer, report, 1);
     assert.equal(ix.data.length, VERIFY_AND_REGISTER_IX_LEN);
@@ -92,7 +93,7 @@ test('oversized packers still emit the raw report layout', () => {
     assert.equal(ix.data[8 + 8 + SNP_REPORT_SIZE], nonceBump);
     assert.equal(ix.data[8 + 8 + SNP_REPORT_SIZE + 1], signerBump);
 
-    const consumer = PublicKey.unique();
+    const consumer = randomKey();
     const consumerIx = new TransactionInstruction({
         data: Buffer.from([1, 2]),
         keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
@@ -112,23 +113,23 @@ test('oversized packers still emit the raw report layout', () => {
     assert.equal(tx.instructions[0].data[8 + 72 + SNP_REPORT_SIZE], nonceBump);
 });
 
-test('buildSessionActionTx marks an existing workload account as signer', () => {
-    const payer = Keypair.generate().publicKey;
-    const signer = Keypair.generate();
+void test('buildSessionActionTx marks an existing workload account as signer', async () => {
+    const payer = randomKey();
+    const signer = await Keypair.generate();
     const consumerIx = new TransactionInstruction({
         data: Buffer.from([0x11]),
         keys: [{ isSigner: false, isWritable: true, pubkey: signer.publicKey }],
-        programId: PublicKey.unique(),
+        programId: randomKey(),
     });
-    const tx = buildSessionActionTx(payer, signer, consumerIx, payer.toBase58());
+    const tx = await buildSessionActionTx(payer, signer, consumerIx, payer.toBase58());
     const message = tx.compileMessage();
     const index = message.accountKeys.findIndex(key => key.equals(signer.publicKey));
     assert.ok(index >= 0 && index < message.header.numRequiredSignatures);
 });
 
-test('short reports still fail before the packet check', () => {
-    const payer = Keypair.generate().publicKey;
-    const signer = Keypair.generate().publicKey;
+void test('short reports still fail before the packet check', () => {
+    const payer = randomKey();
+    const signer = randomKey();
     assert.throws(
         () => buildRegisterSignerIx(payer, signer, new Uint8Array(16), 1),
         err => err instanceof Error && !(err instanceof PacketTooLargeError),
@@ -136,9 +137,9 @@ test('short reports still fail before the packet check', () => {
 });
 
 // @spec SCC-NITRO-008 SCC-SDK-002 SCC-SEC-005
-test('raw nitro documents fail closed above PACKET_DATA_SIZE', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('raw nitro documents fail closed above PACKET_DATA_SIZE', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const nonce = new Uint8Array(32).fill(0x55);
     const actionHash = new Uint8Array(32).fill(0x11);
     const document = new Uint8Array(MAX_NITRO_DOCUMENT_LEN);
@@ -150,7 +151,7 @@ test('raw nitro documents fail closed above PACKET_DATA_SIZE', () => {
     const consumerIx = new TransactionInstruction({
         data: Buffer.from([1, 2]),
         keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
-        programId: PublicKey.unique(),
+        programId: randomKey(),
     });
     const txLen = expectPacketTooLarge(() =>
         buildVerifyNitroAttestationTx(
@@ -168,9 +169,9 @@ test('raw nitro documents fail closed above PACKET_DATA_SIZE', () => {
     assert.ok(txLen > PACKET_DATA_SIZE); // Mode A now carries a second workload signature.
 });
 
-test('oversized nitro packers still emit the raw document layout', () => {
-    const payer = Keypair.generate().publicKey;
-    const workload = Keypair.generate().publicKey;
+void test('oversized nitro packers still emit the raw document layout', () => {
+    const payer = randomKey();
+    const workload = randomKey();
     const nonce = new Uint8Array(32).fill(0x55);
     const actionHash = new Uint8Array(32).fill(0x11);
     const document = new Uint8Array(MAX_NITRO_DOCUMENT_LEN);
@@ -188,7 +189,7 @@ test('oversized nitro packers still emit the raw document layout', () => {
     const consumerIx = new TransactionInstruction({
         data: Buffer.from([1, 2]),
         keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
-        programId: PublicKey.unique(),
+        programId: randomKey(),
     });
     const tx = buildVerifyNitroAttestationTxOversized(
         payer,
@@ -206,7 +207,7 @@ test('oversized nitro packers still emit the raw document layout', () => {
 });
 
 // @spec SCC-PERF-001 SCC-CONSUMER-001 SCC-CONSUMER-002 SCC-ANCHOR-001
-test('shared wire test vector for action-hash and commitment calculation', () => {
+void test('shared wire test vector for action-hash and commitment calculation', () => {
     const disc = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
     const acc1 = new PublicKey(new Uint8Array(32).fill(10));
     const acc2 = new PublicKey(new Uint8Array(32).fill(20));

@@ -6,6 +6,7 @@
 import { PublicKey, TransactionInstruction, SystemProgram } from '@solana/web3.js';
 
 import { SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID, derivePolicyRegistryPda } from './index';
+import { findProgramAddress } from './internal/pda';
 export const SET_BACKEND_POLICY_DISCRIMINATOR = new Uint8Array([21, 155, 245, 154, 100, 138, 42, 166]);
 export const BACKEND_POLICY_SEED = 'backend_policy';
 export function deriveBackendPolicyPda(
@@ -14,7 +15,7 @@ export function deriveBackendPolicyPda(
 ): [PublicKey, number] {
     if (![1, 2, 3, 4, 5].includes(source))
         throw new Error('backend source must be AMD1, Nitro2, GCP3, NVIDIA4 or IntelTdx5');
-    return PublicKey.findProgramAddressSync([Buffer.from(BACKEND_POLICY_SEED), Buffer.from([source])], programId);
+    return findProgramAddress([Buffer.from(BACKEND_POLICY_SEED), Buffer.from([source])], programId);
 }
 export function buildSetBackendPolicyIx(
     authority: PublicKey,

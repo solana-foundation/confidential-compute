@@ -1,4 +1,4 @@
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 /**
  * NVIDIA Hopper `verify_nvidia_attestation` builders.
  *
@@ -19,6 +19,7 @@ import {
 
 import { deriveBackendPolicyPda } from './backend-policy';
 import { SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID } from './index';
+import { findProgramAddress } from './internal/pda';
 
 /** `sha256("global:verify_nvidia_attestation")[..8]`. */
 export const VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR = new Uint8Array([31, 2, 40, 104, 69, 155, 234, 120]);
@@ -69,7 +70,7 @@ export function deriveNvidiaNoncePda(
     require32(gpuMeasurement, 'gpu measurement');
     require32(slotHash, 'slot hash');
     const seed = sha256(concat([workloadSigner.toBytes(), gpuMeasurement, slotHash]));
-    return PublicKey.findProgramAddressSync([Buffer.from('nonce'), Buffer.from([4]), Buffer.from(seed)], programId);
+    return findProgramAddress([Buffer.from('nonce'), Buffer.from([4]), Buffer.from(seed)], programId);
 }
 
 /**
@@ -105,12 +106,9 @@ export function buildVerifyNvidiaAttestationIx(
             : modeBNoncePda(slotHash, expectedActionHash, gpuMeasurement, consumerProgramId, programId);
     const attestedSigner =
         mode === VERIFY_NVIDIA_MODE_A
-            ? PublicKey.findProgramAddressSync(
-                  [Buffer.from('attested_signer_v2'), workloadSigner.toBytes()],
-                  programId,
-              )[0]
+            ? findProgramAddress([Buffer.from('attested_signer_v2'), workloadSigner.toBytes()], programId)[0]
             : NVIDIA_MODE_B_ATTESTED_SIGNER_PLACEHOLDER;
-    const registry = PublicKey.findProgramAddressSync([Buffer.from('policy_registry')], programId)[0];
+    const registry = findProgramAddress([Buffer.from('policy_registry')], programId)[0];
     const backend = deriveBackendPolicyPda(4, programId)[0];
     const data = Buffer.concat([
         Buffer.from(VERIFY_NVIDIA_ATTESTATION_DISCRIMINATOR),
@@ -147,5 +145,5 @@ function modeBNoncePda(
     }
     const commitment = sha256(concat([slotHash, actionHash, consumerProgramId.toBytes()]));
     const seed = sha256(concat([commitment, gpuMeasurement, slotHash]));
-    return PublicKey.findProgramAddressSync([Buffer.from('nonce'), Buffer.from([4]), Buffer.from(seed)], programId)[0];
+    return findProgramAddress([Buffer.from('nonce'), Buffer.from([4]), Buffer.from(seed)], programId)[0];
 }
