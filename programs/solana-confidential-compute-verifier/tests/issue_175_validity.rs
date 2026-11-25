@@ -127,7 +127,7 @@ async fn seal(ctx: &mut ProgramTestContext, pid: Pubkey, payload: &[u8]) -> Pubk
 
     for ix in packets {
         let tx = Transaction::new_signed_with_payer(&[ix], Some(&authority), &[&ctx.payer], ctx.last_blockhash);
-        assert!(solana_packet::Packet::from_data(None, &tx).unwrap().meta().size <= 1232);
+        assert!(bincode::serialize(&tx).unwrap().len() <= 1232);
         ctx.banks_client.process_transaction(tx).await.unwrap();
     }
     stage

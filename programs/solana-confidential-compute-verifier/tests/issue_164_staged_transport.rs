@@ -74,7 +74,7 @@ async fn send(
     let mut signers: Vec<&Keypair> = vec![&ctx.payer];
     signers.extend(signer);
     let tx = Transaction::new_signed_with_payer(instructions, Some(&ctx.payer.pubkey()), &signers, ctx.last_blockhash);
-    assert!(solana_packet::Packet::from_data(None, &tx).unwrap().meta().size <= 1232);
+    assert!(bincode::serialize(&tx).unwrap().len() <= 1232);
     ctx.banks_client.process_transaction(tx).await
 }
 

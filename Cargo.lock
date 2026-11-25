@@ -5821,6 +5821,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "base64 0.23.1",
+ "bincode",
  "borsh",
  "p256",
  "p384",

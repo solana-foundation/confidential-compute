@@ -147,10 +147,7 @@ async fn send(
         &[&ctx.payer],
         ctx.last_blockhash,
     );
-    let size = solana_packet::Packet::from_data(None, &tx)
-        .expect("transaction exceeds the 1232-byte packet limit")
-        .meta()
-        .size;
+    let size = bincode::serialize(&tx).expect("transaction serializes").len();
     assert!(size <= 1232, "transaction is {size} bytes");
     let result = ctx.banks_client.process_transaction_with_metadata(tx).await.unwrap();
     let logs = result.metadata.map(|m| m.log_messages).unwrap_or_default();
