@@ -3,6 +3,8 @@ set ignore-comments
 
 cargo_build_sbf_version := "4.2.0"
 sbf_tools_version := "v1.56"
+# solanafoundation/solana-verifiable-build:4.2.0 (amd64 only), pinned by digest.
+verified_build_image := "solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892"
 
 export SOLANA_CC_SBF_TOOLS_VERSION := sbf_tools_version
 
@@ -177,6 +179,17 @@ verify-sbpfv3-integrity:
 
 test-and-benchmark:
     CU_REPORT=1 just compute-regression
+
+# Deterministic solana-verify build in the pinned image. Prints the executable
+# hash as the last line. Callers clean target/deploy before each run.
+verified-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    solana-verify build \
+        --base-image "{{ verified_build_image }}" \
+        --library-name solana_confidential_compute_verifier \
+        .
+    solana-verify get-executable-hash target/deploy/solana_confidential_compute_verifier.so
 
 compute-regression:
     #!/usr/bin/env bash

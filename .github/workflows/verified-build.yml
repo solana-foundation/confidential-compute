@@ -1,0 +1,59 @@
+name: Verified Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verified-build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  verified-build:
+    name: solana-verify build reproducibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - name: Install solana-verify
+        run: cargo install solana-verify --locked --version 0.5.2
+      - name: Verified build, run 1
+        run: |
+          set -euo pipefail
+          rm -rf target/deploy
+          just verified-build 2>&1 | tee verified-build-1.log
+          tail -n 1 verified-build-1.log > verified-build-1.hash
+      - name: Verified build, run 2
+        run: |
+          set -euo pipefail
+          rm -rf target/deploy
+          just verified-build 2>&1 | tee verified-build-2.log
+          tail -n 1 verified-build-2.log > verified-build-2.hash
+      - name: Compare executable hashes
+        run: |
+          set -euo pipefail
+          h1="$(cat verified-build-1.hash)"
+          h2="$(cat verified-build-2.hash)"
+          for h in "$h1" "$h2"; do
+            if [[ ! "$h" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "Malformed executable hash: $h" >&2
+              exit 1
+            fi
+          done
+          if [[ "$h1" != "$h2" ]]; then
+            echo "Verified build is not reproducible: run 1 $h1, run 2 $h2" >&2
+            exit 1
+          fi
+          {
+            echo "## solana-verify executable hash"
+            echo
+            echo "Two clean builds from this commit matched in solanafoundation/solana-verifiable-build (digest pinned in justfile)."
+            echo
+            echo '```'
+            echo "$h1"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
