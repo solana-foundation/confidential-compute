@@ -28,7 +28,7 @@ async function simulate({ existing = null, programData } = {}) {
         equals(other) {
             return this.bytes.equals(other.bytes);
         }
-        static findProgramAddressSync(seeds, owner) {
+        static findProgramAddress(seeds, owner) {
             assert.equal(seeds.length, 1);
             assert.deepEqual(seeds[0], program.toBuffer());
             assert.ok(owner.equals(loader));

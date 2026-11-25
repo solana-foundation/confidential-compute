@@ -121,6 +121,7 @@ test-anchor:
 test-ts: build-ts
     bun run --cwd sdks/typescript typecheck
     node --test sdks/typescript/test/*.test.cjs
+    node --test scripts/*.test.cjs
     sdks/typescript/node_modules/.bin/tsc -p scripts/tsconfig.json --noEmit
 
 test-scripts:
