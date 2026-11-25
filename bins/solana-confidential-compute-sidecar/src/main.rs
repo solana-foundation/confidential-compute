@@ -6,7 +6,7 @@ use clap::Parser;
 use solana_sdk::signature::Keypair;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::RwLock;
+use tokio::sync::{oneshot, RwLock};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -96,21 +96,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         allowed_consumer_program_id: config.allowed_consumer_program_id,
     });
 
-    // 8. Spawn autonomous heartbeat daemon
+    // 8. Install the SIGTERM handler before any background work starts. The
+    // sidecar does not start without it.
+    let terminate = TerminateSignal::install()?;
+
+    // 9. Spawn autonomous heartbeat daemon
     let heartbeat = HeartbeatDaemon::new(Arc::clone(&state), config.poll_interval_secs, config.renewal_buffer_slots);
     let heartbeat_handle = heartbeat.spawn();
 
-    // 9. Bind TCP listener on loopback
+    // 10. Bind TCP listener on loopback
     let listener = TcpListener::bind(config.bind_addr).await?;
     let app = create_router(Arc::clone(&state));
 
     tracing::info!(bind_addr = %config.bind_addr, "Loopback HTTP server listening");
 
-    // 10. Serve with graceful shutdown
-    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
+    // 11. Serve with graceful shutdown. The shutdown future records why it
+    // finished, so that main can fail the process when the cause is a broken
+    // Ctrl+C handler.
+    let (reason_tx, reason_rx) = oneshot::channel();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            // The receiver lives until main reads it, so a send error cannot happen.
+            let _ = reason_tx.send(wait_for_shutdown(tokio::signal::ctrl_c(), terminate.recv()).await);
+        })
+        .await?;
 
-    // 11. Clean shutdown: abort heartbeat and drop state (zeroizes secret key)
+    // 12. Abort heartbeat and drop state (zeroizes secret key)
     heartbeat_handle.abort();
+
+    let reason = reason_rx.await.map_err(|_| SidecarError::ServerError("shutdown reason was not recorded".into()))?;
+    reason.into_result()?;
     tracing::info!("Sidecar shut down cleanly; ephemeral keys zeroized from memory");
 
     Ok(())
@@ -140,30 +155,105 @@ fn parse_payer_material(raw: &str) -> Result<Keypair, SidecarError> {
     parsed
 }
 
-async fn shutdown_signal() {
-    // A handler that cannot be installed shuts the sidecar down, as the
-    // former panic did, but through the graceful path.
-    let ctrl_c = async {
-        if let Err(err) = tokio::signal::ctrl_c().await {
-            tracing::error!(%err, "Failed to install Ctrl+C handler; shutting down");
-        }
-    };
+/// The SIGTERM stream. It is created before the server starts, so a failure
+/// to install it stops the sidecar at startup.
+#[cfg(unix)]
+struct TerminateSignal(tokio::signal::unix::Signal);
 
-    #[cfg(unix)]
-    let terminate = async {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut signal) => {
-                signal.recv().await;
+#[cfg(unix)]
+impl TerminateSignal {
+    fn install() -> std::io::Result<Self> {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).map(Self)
+    }
+
+    async fn recv(mut self) {
+        self.0.recv().await;
+    }
+}
+
+/// Platforms without SIGTERM never receive it.
+#[cfg(not(unix))]
+struct TerminateSignal;
+
+#[cfg(not(unix))]
+impl TerminateSignal {
+    fn install() -> std::io::Result<Self> {
+        Ok(Self)
+    }
+
+    async fn recv(self) {
+        std::future::pending::<()>().await;
+    }
+}
+
+/// Why the sidecar stopped waiting for a shutdown signal.
+#[derive(Debug, PartialEq, Eq)]
+enum ShutdownReason {
+    CtrlC,
+    Terminate,
+    /// The Ctrl+C handler could not be installed. The process must exit with a
+    /// non-zero status, so that a supervisor with `Restart=on-failure` restarts it.
+    CtrlCHandlerFailed(String),
+}
+
+impl ShutdownReason {
+    fn into_result(self) -> Result<(), SidecarError> {
+        match self {
+            Self::CtrlC | Self::Terminate => Ok(()),
+            Self::CtrlCHandlerFailed(err) => {
+                Err(SidecarError::ServerError(format!("Failed to install Ctrl+C handler: {err}")))
             }
-            Err(err) => tracing::error!(%err, "Failed to install SIGTERM handler; shutting down"),
         }
+    }
+}
+
+/// Waits for the first of Ctrl+C, SIGTERM or a Ctrl+C handler failure.
+async fn wait_for_shutdown(
+    ctrl_c: impl std::future::Future<Output = std::io::Result<()>>,
+    terminate: impl std::future::Future<Output = ()>,
+) -> ShutdownReason {
+    let reason = tokio::select! {
+        result = ctrl_c => match result {
+            Ok(()) => ShutdownReason::CtrlC,
+            Err(err) => ShutdownReason::CtrlCHandlerFailed(err.to_string()),
+        },
+        () = terminate => ShutdownReason::Terminate,
     };
+    match &reason {
+        ShutdownReason::CtrlC => tracing::info!("Received Ctrl+C; shutting down"),
+        ShutdownReason::Terminate => tracing::info!("Received SIGTERM; shutting down"),
+        ShutdownReason::CtrlCHandlerFailed(err) => {
+            tracing::error!(%err, "Failed to install Ctrl+C handler; exiting with an error");
+        }
+    }
+    reason
+}
 
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::future::{pending, ready};
 
-    tokio::select! {
-        _ = ctrl_c => tracing::info!("Received Ctrl+C; shutting down"),
-        _ = terminate => tracing::info!("Received SIGTERM; shutting down"),
+    #[tokio::test]
+    async fn ctrl_c_is_a_clean_shutdown() {
+        let reason = wait_for_shutdown(ready(Ok(())), pending()).await;
+        assert_eq!(reason, ShutdownReason::CtrlC);
+        assert!(reason.into_result().is_ok());
+    }
+
+    #[tokio::test]
+    async fn sigterm_is_a_clean_shutdown() {
+        let reason = wait_for_shutdown(pending(), ready(())).await;
+        assert_eq!(reason, ShutdownReason::Terminate);
+        assert!(reason.into_result().is_ok());
+    }
+
+    #[tokio::test]
+    async fn ctrl_c_handler_failure_is_an_error_exit() {
+        let failure = std::io::Error::other("no signal support");
+        let reason = wait_for_shutdown(ready(Err(failure)), pending()).await;
+        assert_eq!(reason, ShutdownReason::CtrlCHandlerFailed("no signal support".into()));
+        let err = reason.into_result().expect_err("a handler failure must not be a clean shutdown");
+        assert!(matches!(err, SidecarError::ServerError(ref msg) if msg.contains("no signal support")));
     }
 }
