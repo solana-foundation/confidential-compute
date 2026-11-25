@@ -22,8 +22,7 @@ install-sbf:
     fi
 
 install-ts:
-    bun install --cwd sdks/typescript --frozen-lockfile
-    bun install --cwd docs-site --frozen-lockfile
+    bun install --frozen-lockfile
 
 fmt:
     cargo fmt --all
@@ -37,13 +36,13 @@ lint:
 check: fmt-check lint
 
 fmt-ts:
-    bun run --cwd sdks/typescript format
+    bun run format
 
 fmt-check-ts:
-    bun run --cwd sdks/typescript format:check
+    bun run format:check
 
 lint-ts:
-    bun run --cwd sdks/typescript lint
+    bun run lint
 
 check-bins:
     cargo check --locked -p solana-confidential-compute-sidecar --all-targets

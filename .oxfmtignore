@@ -1,0 +1,5 @@
+# Installed packages and build output. Oxfmt formats the JavaScript and TypeScript files that remain.
+**/node_modules/
+**/dist/
+docs-site/.astro/
+**/target/
