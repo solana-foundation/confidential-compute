@@ -499,7 +499,7 @@ fn parse_nitro_payload(payload: &[u8]) -> Result<NitroDocumentView, ProgramError
     loop {
         match remaining {
             Some(0) => break,
-            Some(left) => remaining = Some(left - 1),
+            Some(left) => remaining = Some(left.checked_sub(1).ok_or(ProgramError::InvalidInstructionData)?),
             None if cur.is_break() => {
                 cur.read_break()?;
                 break;
@@ -580,8 +580,7 @@ impl<'a> CborCursor<'a> {
     /// Consumes one CBOR break stop (`0xff`).
     fn read_break(&mut self) -> Result<(), ProgramError> {
         if self.is_break() {
-            self.pos += 1;
-            Ok(())
+            self.skip(1)
         } else {
             Err(ProgramError::InvalidInstructionData)
         }
@@ -649,8 +648,9 @@ impl<'a> CborCursor<'a> {
     }
 
     fn read_initial(&mut self) -> Result<(u8, u8), ProgramError> {
-        let b = self.buf.get(self.pos).ok_or(ProgramError::InvalidInstructionData)?;
-        self.pos += 1;
+        let &[b] = self.read_exact(1)? else {
+            return Err(ProgramError::InvalidInstructionData);
+        };
         Ok((b >> 5, b & 0x1f))
     }
 
@@ -860,6 +860,8 @@ fn assert_attestation_signer_inner(
 }
 
 #[cfg(test)]
+// Test-only fixture builders. SDLC 3.2.1 covers program code, not tests.
+#[allow(clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
 
