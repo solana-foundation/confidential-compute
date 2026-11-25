@@ -46,3 +46,41 @@ CI attestation issuance/verification remains unproven until that workflow runs.
 Official references: [GitHub attestation setup](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations),
 [CLI verification policy](https://cli.github.com/manual/gh_attestation_verify),
 [pinned action](https://github.com/actions/attest-build-provenance/tree/977bb373ede98d70efdf65b84cb5f73e068dcc2a).
+
+## Verified build (solana-verify)
+
+This is a separate check. It is not the SBPFv3 integrity flow above. The two
+hashes are not expected to match. The verified build check runs `solana-verify
+build` in a pinned Docker image and prints the SHA-256 of the executable.
+
+Run the check with Docker running:
+
+```bash
+just verified-build
+```
+
+The recipe passes the image to `solana-verify` by digest. The image is
+`solanafoundation/solana-verifiable-build:4.2.0`, pinned as
+`sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892`.
+The image runs on amd64 only. The last line of the output is the executable hash.
+
+The build uses the Rust toolchain and platform tools inside the pinned image
+(Rust 1.96.1). It does not use the `SOLANA_CC_SBF_TOOLS_VERSION` pin in the justfile.
+
+The workflow `.github/workflows/verified-build.yml` runs the build twice. It
+cleans `target/deploy` before each run. It fails if the two hashes differ.
+
+CI uses the official `solana-developers/github-actions` actions `setup-all` and
+`build-verified`, version v0.2.15. Each action is pinned by commit. `setup-all`
+installs `solana-verify` 0.5.2. `just verified-build` is the local command.
+
+To compare a deployed program with this build, run:
+
+```bash
+solana-verify get-program-hash <PROGRAM_ID> -u <RPC_URL>
+```
+
+Compare the printed hash with the hash from `just verified-build`. A match means
+that the deployed executable has the same bytes as this build. A mismatch means
+that the deployed program was built differently, or from other source. The
+command reads from an RPC endpoint. It changes nothing on chain.

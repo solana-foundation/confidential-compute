@@ -1,0 +1,73 @@
+name: Verified Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verified-build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  verified-build:
+    name: solana-verify build reproducibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install solana-verify
+        uses: solana-developers/github-actions/setup-all@e6ed2eb93c55eca911dbc711fb08683b42926a28 # v0.2.15
+        with:
+          verify_version: 0.5.2
+      - name: Remove old build output, run 1
+        # The build container runs as root, so its output must be removed with sudo.
+        run: sudo rm -rf target/deploy
+      - name: Verified build, run 1
+        uses: solana-developers/github-actions/build-verified@e6ed2eb93c55eca911dbc711fb08683b42926a28 # v0.2.15
+        with:
+          program: solana_confidential_compute_verifier
+          base-image: solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892
+      - name: Hash the executable, run 1
+        run: |
+          set -euo pipefail
+          solana-verify get-executable-hash target/deploy/solana_confidential_compute_verifier.so | tee verified-build-1.log
+          tail -n 1 verified-build-1.log > verified-build-1.hash
+      - name: Remove old build output, run 2
+        run: sudo rm -rf target/deploy
+      - name: Verified build, run 2
+        uses: solana-developers/github-actions/build-verified@e6ed2eb93c55eca911dbc711fb08683b42926a28 # v0.2.15
+        with:
+          program: solana_confidential_compute_verifier
+          base-image: solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892
+      - name: Hash the executable, run 2
+        run: |
+          set -euo pipefail
+          solana-verify get-executable-hash target/deploy/solana_confidential_compute_verifier.so | tee verified-build-2.log
+          tail -n 1 verified-build-2.log > verified-build-2.hash
+      - name: Compare executable hashes
+        run: |
+          set -euo pipefail
+          h1="$(cat verified-build-1.hash)"
+          h2="$(cat verified-build-2.hash)"
+          for h in "$h1" "$h2"; do
+            if [[ ! "$h" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "Malformed executable hash: $h" >&2
+              exit 1
+            fi
+          done
+          if [[ "$h1" != "$h2" ]]; then
+            echo "Verified build is not reproducible: run 1 $h1, run 2 $h2" >&2
+            exit 1
+          fi
+          {
+            echo "## solana-verify executable hash"
+            echo
+            echo "Two builds from this commit matched. Each started with an empty target/deploy. Both used solana-developers/github-actions build-verified v0.2.15 with solanafoundation/solana-verifiable-build@sha256:ab0006cccc5bff403fcf5bfb29763c969bfdf7b0cf4b25b9a5a2db1be795e892."
+            echo
+            echo '```'
+            echo "$h1"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
