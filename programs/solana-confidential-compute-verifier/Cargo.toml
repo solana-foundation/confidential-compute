@@ -50,7 +50,7 @@ solana-program = "4.1"
 solana-program-test = { version = "4.3", features = ["agave-unstable-api"] }
 solana-sdk = "4.1"
 solana-compute-budget-interface = "3.1"
-solana-message = "4.6"
+solana-message = "5.1"
 solana-packet = "4.4"
 solana-confidential-compute-core = { workspace = true, features = ["std"] }
 # Client-side instruction builders and PDA derivations, so the SBF harnesses
