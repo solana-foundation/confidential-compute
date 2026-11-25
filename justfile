@@ -36,6 +36,15 @@ lint:
 
 check: fmt-check lint
 
+fmt-ts:
+    bun run --cwd sdks/typescript format
+
+fmt-check-ts:
+    bun run --cwd sdks/typescript format:check
+
+lint-ts:
+    bun run --cwd sdks/typescript lint
+
 check-bins:
     cargo check --locked -p solana-confidential-compute-sidecar --all-targets
     cargo check --locked -p solana-confidential-compute-cli --all-targets
