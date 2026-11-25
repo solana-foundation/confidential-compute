@@ -233,6 +233,8 @@ cargo clippy --workspace --all-targets -- -D warnings
 ```
 *Expected result:* 0 warnings, clean compilation.
 
+The workspace denies `clippy::unwrap_used`, `clippy::expect_used` and `clippy::panic` (SDLC 3.2.8). `clippy.toml` allows them in `#[cfg(test)]` code, and integration test files allow them at file level. The crates on the onchain path (the verifier, the consumer reference, core, crypto and cpi) also deny `clippy::arithmetic_side_effects` at the crate root (SDLC 3.2.1). A unit test module that builds fixtures with unchecked arithmetic allows it.
+
 ### 5.3 TypeScript Client SDK Suite
 
 ```bash
