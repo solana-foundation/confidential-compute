@@ -64,7 +64,7 @@ const ix = buildRegisterSignerIx(
 
 // Local example: workloadKeypair must remain inside the enclave.
 // Production callers request sidecar POST /v1/sign instead.
-const tx = buildSessionActionTx(
+const tx = await buildSessionActionTx(
   payer,
   workloadKeypair,
   consumerIx,
@@ -74,7 +74,7 @@ const tx = buildSessionActionTx(
 
 The caller supplies `nonceSlot`. It is the slot whose hash the enclave wrote into the report. This package does not read `SlotHashes`.
 
-PDA helpers: `deriveSignerPda`, `deriveUsedNoncePdaForSource`, `deriveLegacyUsedNoncePda`, `derivePolicyRegistryPda`, `deriveVcekPda`. All use `PublicKey.findProgramAddressSync`.
+PDA helpers: `deriveSignerPda`, `deriveUsedNoncePdaForSource`, `deriveLegacyUsedNoncePda`, `derivePolicyRegistryPda`, `deriveVcekPda`. All of them call the SDK's synchronous `findProgramAddress` in `src/internal/pda.ts`. `@solana/web3.js` 3 removed `PublicKey.findProgramAddressSync`. The derive helpers stay synchronous.
 
 ## Mode B
 
