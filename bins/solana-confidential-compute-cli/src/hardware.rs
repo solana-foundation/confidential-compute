@@ -91,7 +91,7 @@ pub fn fetch_snp_report(
     device: Option<&str>,
 ) -> Result<[u8; SNP_REPORT_SIZE], CliError> {
     if mock {
-        return Ok(mock::generate_mock_report(user_data));
+        return mock::generate_mock_report(user_data);
     }
     fetch_hardware_report(user_data, device.unwrap_or(DEFAULT_SEV_GUEST_DEVICE))
 }

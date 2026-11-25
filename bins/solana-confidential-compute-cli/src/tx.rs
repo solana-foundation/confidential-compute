@@ -154,14 +154,17 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
     let (policy_registry, _) = client.derive_policy_registry_pda();
     let chip_id_hash = derive_chip_id_hash(&view, params.vcek_pubkey_xy);
     let (vcek_pda, _) = client.derive_vcek_pda(&chip_id_hash, view.reported_tcb());
+    let (amd_backend_policy, _) = solana_confidential_compute_sdk::derive_backend_policy_pda(&params.program_id, 1)
+        .map_err(|err| CliError::InvalidArgument(err.to_string()))?;
 
     match &params.mode {
         AttestationMode::Stateful => {
             let signer_pubkey = view.pubkey();
             let nonce = view.nonce();
             let (attested_signer, _) = client.derive_signer_pda(&signer_pubkey);
-            let (used_nonce, _) =
-                client.derive_used_nonce_pda_for_source(1, &signer_pubkey, &nonce).expect("fixed AMD source");
+            let (used_nonce, _) = client
+                .derive_used_nonce_pda_for_source(1, &signer_pubkey, &nonce)
+                .map_err(|err| CliError::InvalidArgument(err.to_string()))?;
             let mut data = Vec::with_capacity(8 + 8 + SNP_REPORT_SIZE);
             data.extend_from_slice(&VERIFY_AND_REGISTER_DISCRIMINATOR);
             data.extend_from_slice(&params.nonce_slot.to_le_bytes());
@@ -178,12 +181,7 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
                     AccountMeta::new_readonly(solana_sdk::sysvar::clock::ID, false),
                     AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
                     AccountMeta::new_readonly(Pubkey::new_from_array(signer_pubkey), true),
-                    AccountMeta::new_readonly(
-                        solana_confidential_compute_sdk::derive_backend_policy_pda(&params.program_id, 1)
-                            .expect("fixed AMD backend")
-                            .0,
-                        false,
-                    ),
+                    AccountMeta::new_readonly(amd_backend_policy, false),
                     AccountMeta::new_readonly(
                         client.derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce()).0,
                         false,
@@ -207,8 +205,9 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
 
             if *require_nonce {
                 let commitment = compute_commitment_from_report(&view);
-                let (used_nonce, _) =
-                    client.derive_used_nonce_pda_for_source(1, &view.pubkey(), &commitment).expect("fixed AMD source");
+                let (used_nonce, _) = client
+                    .derive_used_nonce_pda_for_source(1, &view.pubkey(), &commitment)
+                    .map_err(|err| CliError::InvalidArgument(err.to_string()))?;
                 Ok(Instruction {
                     program_id: params.program_id,
                     accounts: vec![
@@ -219,12 +218,7 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
                         AccountMeta::new_readonly(solana_sdk::sysvar::slot_hashes::ID, false),
                         AccountMeta::new_readonly(solana_sdk::sysvar::clock::ID, false),
                         AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
-                        AccountMeta::new_readonly(
-                            solana_confidential_compute_sdk::derive_backend_policy_pda(&params.program_id, 1)
-                                .expect("fixed AMD backend")
-                                .0,
-                            false,
-                        ),
+                        AccountMeta::new_readonly(amd_backend_policy, false),
                         AccountMeta::new_readonly(
                             client.derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce()).0,
                             false,
@@ -240,12 +234,7 @@ fn build_attestation_instruction(params: &TxBuildParams<'_>) -> Result<Instructi
                         AccountMeta::new_readonly(vcek_pda, false),
                         AccountMeta::new_readonly(solana_sdk::sysvar::slot_hashes::ID, false),
                         AccountMeta::new_readonly(solana_sdk::sysvar::clock::ID, false),
-                        AccountMeta::new_readonly(
-                            solana_confidential_compute_sdk::derive_backend_policy_pda(&params.program_id, 1)
-                                .expect("fixed AMD backend")
-                                .0,
-                            false,
-                        ),
+                        AccountMeta::new_readonly(amd_backend_policy, false),
                         AccountMeta::new_readonly(
                             client.derive_legacy_used_nonce_pda(&view.pubkey(), &view.nonce()).0,
                             false,
@@ -360,7 +349,7 @@ mod tests {
     #[test]
     fn test_low_s_vs_high_s_detection() {
         let user_data = ReportData::new(&[0x07u8; 32], &[0x55u8; 32]).raw;
-        let mut report = generate_mock_report(&user_data);
+        let mut report = generate_mock_report(&user_data).unwrap();
         let vcek = mock_vcek_public_key_xy();
         let view = SnpReportView::from_array(&report);
         let s = view.signature_s_be().expect("valid s padding");
@@ -390,7 +379,7 @@ mod tests {
         let workload = [0x07u8; 32];
         let slot_hash = [0x55u8; 32];
         let user_data = ReportData::new(&workload, &slot_hash).raw;
-        let report = generate_mock_report(&user_data);
+        let report = generate_mock_report(&user_data).unwrap();
         let vcek = mock_vcek_public_key_xy();
         verify_report_locally(&report, &vcek).expect("local verify");
 
@@ -425,7 +414,7 @@ mod tests {
 
         let mut user_data = [0u8; 64];
         user_data[32..].copy_from_slice(&commitment);
-        let report = generate_mock_report(&user_data);
+        let report = generate_mock_report(&user_data).unwrap();
         let vcek = mock_vcek_public_key_xy();
         verify_report_locally(&report, &vcek).expect("local verify");
 
@@ -463,7 +452,7 @@ mod tests {
         let commitment = compute_action_commitment(&slot_hash, &action_hash, &consumer.to_bytes());
         let mut user_data = [0u8; 64];
         user_data[32..].copy_from_slice(&commitment);
-        let report = generate_mock_report(&user_data);
+        let report = generate_mock_report(&user_data).unwrap();
         let vcek = mock_vcek_public_key_xy();
 
         let params = TxBuildParams {
