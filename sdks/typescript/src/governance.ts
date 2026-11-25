@@ -30,8 +30,8 @@ function bytes(value: Uint8Array, length: number, label: string): Buffer {
 }
 function metas(authority: PublicKey, programId: PublicKey, writable = true) {
     return [
-        { pubkey: authority, isSigner: true, isWritable: false },
-        { pubkey: derivePolicyRegistryPda(programId)[0], isSigner: false, isWritable: writable },
+        { isSigner: true, isWritable: false, pubkey: authority },
+        { isSigner: false, isWritable: writable, pubkey: derivePolicyRegistryPda(programId)[0] },
     ];
 }
 /** Updates the retained global registry ABI; minTcb may only increase.
@@ -54,7 +54,7 @@ export function buildUpdatePolicyIx(
         ...measurements.map(m => bytes(m, 48, 'measurement')),
         Buffer.alloc((8 - measurements.length) * 48),
     ]);
-    return new TransactionInstruction({ programId, keys: metas(authority, programId), data });
+    return new TransactionInstruction({ data, keys: metas(authority, programId), programId });
 }
 /** Legacy ABI only: pinned-Milan verifier rejects mutable root rotation. */
 export function buildRotateRootCertIx(
@@ -63,9 +63,9 @@ export function buildRotateRootCertIx(
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): TransactionInstruction {
     return new TransactionInstruction({
-        programId,
-        keys: metas(authority, programId),
         data: Buffer.concat([Buffer.from(ROTATE_ROOT_CERT_DISCRIMINATOR), bytes(newArkPubkeyXy, 96, 'root')]),
+        keys: metas(authority, programId),
+        programId,
     });
 }
 export function deriveJwksPda(
@@ -87,13 +87,11 @@ export function buildRegisterJwksKeyIx(
     if (exponent !== 65537 || (n[0] & 128) === 0 || (n[255] & 1) === 0) throw new Error('invalid RSA key');
     const keys = [
         ...metas(authority, programId, false),
-        { pubkey: deriveJwksPda(sha256(kid), programId)[0], isSigner: false, isWritable: true },
-        { pubkey: payer, isSigner: true, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { isSigner: false, isWritable: true, pubkey: deriveJwksPda(sha256(kid), programId)[0] },
+        { isSigner: true, isWritable: true, pubkey: payer },
+        { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
     ];
     return new TransactionInstruction({
-        programId,
-        keys,
         data: Buffer.concat([
             Buffer.from(REGISTER_JWKS_KEY_DISCRIMINATOR),
             u32(kid.length),
@@ -101,6 +99,8 @@ export function buildRegisterJwksKeyIx(
             n,
             u32(exponent),
         ]),
+        keys,
+        programId,
     });
 }
 export function buildRevokeJwksKeyIx(
@@ -109,12 +109,12 @@ export function buildRevokeJwksKeyIx(
     programId: PublicKey = SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
 ): TransactionInstruction {
     return new TransactionInstruction({
-        programId,
+        data: Buffer.concat([Buffer.from(REVOKE_JWKS_KEY_DISCRIMINATOR), bytes(kidHash, 32, 'kidHash')]),
         keys: [
             ...metas(authority, programId, false),
-            { pubkey: deriveJwksPda(kidHash, programId)[0], isSigner: false, isWritable: true },
+            { isSigner: false, isWritable: true, pubkey: deriveJwksPda(kidHash, programId)[0] },
         ],
-        data: Buffer.concat([Buffer.from(REVOKE_JWKS_KEY_DISCRIMINATOR), bytes(kidHash, 32, 'kidHash')]),
+        programId,
     });
 }
 export function buildRotateAuthorityIx(
@@ -125,9 +125,9 @@ export function buildRotateAuthorityIx(
     if (receivingAuthority.equals(authority) || receivingAuthority.equals(PublicKey.default))
         throw new Error('receiving authority must differ and be nonzero');
     return new TransactionInstruction({
-        programId,
-        keys: [...metas(authority, programId), { pubkey: receivingAuthority, isSigner: true, isWritable: false }],
         data: Buffer.from(ROTATE_AUTHORITY_DISCRIMINATOR),
+        keys: [...metas(authority, programId), { isSigner: true, isWritable: false, pubkey: receivingAuthority }],
+        programId,
     });
 }
 /** Uses the SDK signer namespace, migrating alongside enrollment under #182. */
@@ -138,9 +138,9 @@ export function buildRevokeAttestedSignerIx(
 ): TransactionInstruction {
     const account = deriveSignerPda(signer, programId)[0];
     return new TransactionInstruction({
-        programId,
-        keys: [...metas(authority, programId, false), { pubkey: account, isSigner: false, isWritable: true }],
         data: Buffer.concat([Buffer.from(REVOKE_ATTESTED_SIGNER_DISCRIMINATOR), signer.toBuffer()]),
+        keys: [...metas(authority, programId, false), { isSigner: false, isWritable: true, pubkey: account }],
+        programId,
     });
 }
 /** Revoke the cache and permanent AMD identity across TCB versions; payer funds the tombstone. */
@@ -156,15 +156,15 @@ export function buildRevokeVcekIx(
     tcb.writeBigUInt64LE(BigInt(tcbVersion));
     const account = deriveVcekPda(hash, tcbVersion, programId)[0];
     return new TransactionInstruction({
-        programId,
+        data: Buffer.concat([Buffer.from(REVOKE_VCEK_DISCRIMINATOR), hash, tcb]),
         keys: [
             ...metas(authority, programId, false),
-            { pubkey: account, isSigner: false, isWritable: true },
-            { pubkey: deriveAmdRevocationPda(hash, programId)[0], isSigner: false, isWritable: true },
-            { pubkey: payer, isSigner: true, isWritable: true },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            { isSigner: false, isWritable: true, pubkey: account },
+            { isSigner: false, isWritable: true, pubkey: deriveAmdRevocationPda(hash, programId)[0] },
+            { isSigner: true, isWritable: true, pubkey: payer },
+            { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
         ],
-        data: Buffer.concat([Buffer.from(REVOKE_VCEK_DISCRIMINATOR), hash, tcb]),
+        programId,
     });
 }
 

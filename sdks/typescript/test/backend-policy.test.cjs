@@ -89,9 +89,9 @@ test('all inline verification builders append readonly policy with correct backe
         ]);
     for (const [ix, tag] of ixs) {
         assert.deepEqual(ix.keys.at(tag === 1 ? -3 : -2), {
-            pubkey: sdk.deriveBackendPolicyPda(tag, pid)[0],
             isSigner: false,
             isWritable: false,
+            pubkey: sdk.deriveBackendPolicyPda(tag, pid)[0],
         });
         assert.ok(
             !ix.keys.at(tag === 1 ? -3 : -2).pubkey.equals(sdk.deriveBackendPolicyPda(tag === 1 ? 2 : 1, pid)[0]),

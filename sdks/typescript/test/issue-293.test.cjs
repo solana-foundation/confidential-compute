@@ -17,7 +17,7 @@ test('AMD Mode B supplies readonly Instructions without shifting policy/replay s
         new Uint8Array(48),
         report,
     );
-    assert.deepEqual(ix.keys[7], { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false });
+    assert.deepEqual(ix.keys[7], { isSigner: false, isWritable: false, pubkey: SYSVAR_INSTRUCTIONS_PUBKEY });
     assert.ok(ix.keys.at(-3).pubkey.equals(sdk.deriveBackendPolicyPda(1)[0]));
     assert.ok(
         ix.keys
@@ -31,9 +31,9 @@ test('AMD Mode B supplies readonly Instructions without shifting policy/replay s
     );
     const identity = createHash('sha256').update(report.slice(0x1a0, 0x1e0)).digest();
     assert.deepEqual(ix.keys.at(-1), {
-        pubkey: sdk.deriveAmdRevocationPda(identity)[0],
         isSigner: false,
         isWritable: false,
+        pubkey: sdk.deriveAmdRevocationPda(identity)[0],
     });
     assert.throws(
         () => sdk.buildVerifyAtomicWithNonceIx(payer, consumer, new Uint8Array(32), new Uint8Array(48), report),

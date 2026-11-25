@@ -176,26 +176,26 @@ export function buildRegisterSignerIxOversized(
     data.writeUInt8(signerBump, 8 + 8 + SNP_REPORT_SIZE + 1);
 
     return new TransactionInstruction({
-        programId,
+        data,
         keys: [
-            { pubkey: payer, isSigner: true, isWritable: true },
-            { pubkey: policyRegistry, isSigner: false, isWritable: false },
-            { pubkey: vcek, isSigner: false, isWritable: false },
-            { pubkey: signerPda, isSigner: false, isWritable: true },
-            { pubkey: noncePda, isSigner: false, isWritable: true },
-            { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-            { pubkey: signer, isSigner: true, isWritable: false },
-            { pubkey: deriveBackendPolicyPda(1, programId)[0], isSigner: false, isWritable: false },
-            { pubkey: deriveLegacyUsedNoncePda(signer, nonce, programId)[0], isSigner: false, isWritable: false },
+            { isSigner: true, isWritable: true, pubkey: payer },
+            { isSigner: false, isWritable: false, pubkey: policyRegistry },
+            { isSigner: false, isWritable: false, pubkey: vcek },
+            { isSigner: false, isWritable: true, pubkey: signerPda },
+            { isSigner: false, isWritable: true, pubkey: noncePda },
+            { isSigner: false, isWritable: false, pubkey: SYSVAR_SLOT_HASHES_PUBKEY },
+            { isSigner: false, isWritable: false, pubkey: SYSVAR_CLOCK_PUBKEY },
+            { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
+            { isSigner: true, isWritable: false, pubkey: signer },
+            { isSigner: false, isWritable: false, pubkey: deriveBackendPolicyPda(1, programId)[0] },
+            { isSigner: false, isWritable: false, pubkey: deriveLegacyUsedNoncePda(signer, nonce, programId)[0] },
             {
-                pubkey: deriveAmdRevocationPda(reportChipIdHash(report, endorsementXy), programId)[0],
                 isSigner: false,
                 isWritable: false,
+                pubkey: deriveAmdRevocationPda(reportChipIdHash(report, endorsementXy), programId)[0],
             },
         ],
-        data,
+        programId,
     });
 }
 
@@ -284,29 +284,29 @@ export function buildVerifyAtomicWithNonceIxOversized(
     data.writeUInt8(nonceBump, 8 + 72 + SNP_REPORT_SIZE);
 
     return new TransactionInstruction({
-        programId,
+        data,
         keys: [
-            { pubkey: payer, isSigner: true, isWritable: true },
-            { pubkey: policyRegistry, isSigner: false, isWritable: false },
-            { pubkey: vcek, isSigner: false, isWritable: false },
-            { pubkey: noncePda, isSigner: false, isWritable: true },
-            { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-            { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: deriveBackendPolicyPda(1, programId)[0], isSigner: false, isWritable: false },
+            { isSigner: true, isWritable: true, pubkey: payer },
+            { isSigner: false, isWritable: false, pubkey: policyRegistry },
+            { isSigner: false, isWritable: false, pubkey: vcek },
+            { isSigner: false, isWritable: true, pubkey: noncePda },
+            { isSigner: false, isWritable: false, pubkey: SYSVAR_SLOT_HASHES_PUBKEY },
+            { isSigner: false, isWritable: false, pubkey: SYSVAR_CLOCK_PUBKEY },
+            { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
+            { isSigner: false, isWritable: false, pubkey: SYSVAR_INSTRUCTIONS_PUBKEY },
+            { isSigner: false, isWritable: false, pubkey: deriveBackendPolicyPda(1, programId)[0] },
             {
-                pubkey: deriveLegacyUsedNoncePda(signerPubkey, commitment, programId)[0],
                 isSigner: false,
                 isWritable: false,
+                pubkey: deriveLegacyUsedNoncePda(signerPubkey, commitment, programId)[0],
             },
             {
-                pubkey: deriveAmdRevocationPda(reportChipIdHash(report, endorsementXy), programId)[0],
                 isSigner: false,
                 isWritable: false,
+                pubkey: deriveAmdRevocationPda(reportChipIdHash(report, endorsementXy), programId)[0],
             },
         ],
-        data,
+        programId,
     });
 }
 
@@ -352,39 +352,39 @@ export function buildVerifyNitroAttestationIxOversized(
     ]);
 
     const keys = [
-        { pubkey: payer, isSigner: true, isWritable: true },
-        { pubkey: policyRegistry, isSigner: false, isWritable: false },
+        { isSigner: true, isWritable: true, pubkey: payer },
+        { isSigner: false, isWritable: false, pubkey: policyRegistry },
         {
-            pubkey: attestedSigner,
             isSigner: false,
             isWritable: resolvedMode === VERIFY_NITRO_MODE_A,
+            pubkey: attestedSigner,
         },
-        { pubkey: usedNonce, isSigner: false, isWritable: true },
-        { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
-        { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { isSigner: false, isWritable: true, pubkey: usedNonce },
+        { isSigner: false, isWritable: false, pubkey: SYSVAR_SLOT_HASHES_PUBKEY },
+        { isSigner: false, isWritable: false, pubkey: SYSVAR_CLOCK_PUBKEY },
+        { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
     ];
     if (resolvedMode === VERIFY_NITRO_MODE_A) {
-        keys.push({ pubkey: workloadSigner, isSigner: true, isWritable: false });
+        keys.push({ isSigner: true, isWritable: false, pubkey: workloadSigner });
     }
     if (resolvedMode === VERIFY_NITRO_MODE_B) {
         keys.push({
-            pubkey: SYSVAR_INSTRUCTIONS_PUBKEY,
             isSigner: false,
             isWritable: false,
+            pubkey: SYSVAR_INSTRUCTIONS_PUBKEY,
         });
     }
 
-    keys.push({ pubkey: deriveBackendPolicyPda(2, programId)[0], isSigner: false, isWritable: false });
+    keys.push({ isSigner: false, isWritable: false, pubkey: deriveBackendPolicyPda(2, programId)[0] });
     keys.push({
-        pubkey: deriveLegacyUsedNoncePda(workloadSigner, nonceBytes, programId)[0],
         isSigner: false,
         isWritable: false,
+        pubkey: deriveLegacyUsedNoncePda(workloadSigner, nonceBytes, programId)[0],
     });
     return new TransactionInstruction({
-        programId,
-        keys,
         data,
+        keys,
+        programId,
     });
 }
 

@@ -20,18 +20,18 @@ export function buildSetGcpTenantPolicyIx(
         return Buffer.concat([len, b]);
     };
     return new TransactionInstruction({
-        programId,
+        data: Buffer.concat([Buffer.from(SET_GCP_TENANT_POLICY_DISCRIMINATOR), string(a), string(s)]),
         keys: [
-            { pubkey: authority, isSigner: true, isWritable: false },
-            { pubkey: derivePolicyRegistryPda(programId)[0], isSigner: false, isWritable: false },
+            { isSigner: true, isWritable: false, pubkey: authority },
+            { isSigner: false, isWritable: false, pubkey: derivePolicyRegistryPda(programId)[0] },
             {
-                pubkey: PublicKey.findProgramAddressSync([Buffer.from('gcp_tenant_policy')], programId)[0],
                 isSigner: false,
                 isWritable: true,
+                pubkey: PublicKey.findProgramAddressSync([Buffer.from('gcp_tenant_policy')], programId)[0],
             },
-            { pubkey: payer, isSigner: true, isWritable: true },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            { isSigner: true, isWritable: true, pubkey: payer },
+            { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
         ],
-        data: Buffer.concat([Buffer.from(SET_GCP_TENANT_POLICY_DISCRIMINATOR), string(a), string(s)]),
+        programId,
     });
 }

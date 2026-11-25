@@ -100,11 +100,11 @@ export interface AtomicAttestationExpectation {
 export function defaultAtomicAttestationExpectation(): AtomicAttestationExpectation {
     return {
         actionHash: new Uint8Array(32),
+        confidentialComputeIxIndex: null,
         expectedMeasurement: new Uint8Array(48),
         expectedSigner: null,
         requireNonce: MODE_B_REQUIRE_NONCE_DEFAULT,
         verifierIxIndex: null,
-        confidentialComputeIxIndex: null,
     };
 }
 
@@ -260,16 +260,16 @@ export function parseAttestedSignerAccount(data: Uint8Array): AttestedSignerAcco
         throw new Error('invalid AttestedSignerAccount discriminator');
     }
     return {
-        discriminator,
-        signerPubkey: data.slice(8, 40),
-        enclaveType: data[40],
-        measurement: data.slice(41, 89),
-        chipIdHash: data.slice(89, 121),
-        tcbVersion: readU64Le(data, 121),
-        registeredSlot: readU64Le(data, 129),
-        expiresSlot: readU64Le(data, 137),
         bump: data[145],
+        chipIdHash: data.slice(89, 121),
+        discriminator,
+        enclaveType: data[40],
+        expiresSlot: readU64Le(data, 137),
         expiresUnixTimestamp: new DataView(data.buffer, data.byteOffset + 146, 8).getBigInt64(0, true),
+        measurement: data.slice(41, 89),
+        registeredSlot: readU64Le(data, 129),
+        signerPubkey: data.slice(8, 40),
+        tcbVersion: readU64Le(data, 121),
     };
 }
 
@@ -367,9 +367,9 @@ export function hashCompiledAction(message: Message | MessageV0, consumerIndex: 
         if (requestedWritable && RESERVED_ACTION_KEYS.has(pubkey.toBase58()))
             throw new Error('writable reserved account');
         return {
-            pubkey,
             isSigner: message.isAccountSigner(i),
             isWritable: requestedWritable && (upgradeable || !ixs.some(other => other.programIdIndex === i)),
+            pubkey,
         };
     });
     return hashAction(new Uint8Array(), accounts, ix.data);
@@ -459,22 +459,22 @@ export function buildSessionActionTx(
         }
         found = true;
         return {
-            pubkey: meta.pubkey,
             isSigner: true,
             isWritable: meta.isWritable,
+            pubkey: meta.pubkey,
         };
     });
     if (!found && !signerPk.equals(payer)) {
         keys.push({
-            pubkey: signerPk,
             isSigner: true,
             isWritable: false,
+            pubkey: signerPk,
         });
     }
     const ix = new TransactionInstruction({
-        programId: consumerIx.programId,
-        keys,
         data: consumerIx.data,
+        keys,
+        programId: consumerIx.programId,
     });
     const tx = new Transaction({
         feePayer: payer,

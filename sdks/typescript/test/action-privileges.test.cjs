@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 const { PublicKey, Transaction, TransactionInstruction } = require('@solana/web3.js');
 const sdk = require('../dist');
 const pk = n => new PublicKey(new Uint8Array(32).fill(n));
-const meta = (pubkey, isSigner = false, isWritable = false) => ({ pubkey, isSigner, isWritable });
+const meta = (pubkey, isSigner = false, isWritable = false) => ({ isSigner, isWritable, pubkey });
 const ix = (program, keys) =>
-    new TransactionInstruction({ programId: pk(program), keys, data: Buffer.from([7, 8, 9]) });
+    new TransactionInstruction({ data: Buffer.from([7, 8, 9]), keys, programId: pk(program) });
 const compile = (instructions, payer = pk(1)) =>
     new Transaction({ feePayer: payer, recentBlockhash: pk(9).toBase58() }).add(...instructions).compileMessage();
 test('V3 complete-message elevation and cross-language compiled vector', () => {

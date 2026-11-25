@@ -6,10 +6,10 @@ const sdk = require('../dist/index.js');
 const pk = () => Keypair.generate().publicKey;
 test('governance discriminators preserve deployed legacy bytes and new Anchor contracts', () => {
     const legacy = {
-        UPDATE_POLICY_DISCRIMINATOR: [227, 150, 114, 217, 142, 172, 100, 228],
-        ROTATE_ROOT_CERT_DISCRIMINATOR: [137, 212, 96, 71, 222, 5, 133, 104],
         REGISTER_JWKS_KEY_DISCRIMINATOR: [122, 195, 232, 116, 203, 137, 219, 14],
         REVOKE_JWKS_KEY_DISCRIMINATOR: [184, 102, 12, 45, 99, 128, 41, 16],
+        ROTATE_ROOT_CERT_DISCRIMINATOR: [137, 212, 96, 71, 222, 5, 133, 104],
+        UPDATE_POLICY_DISCRIMINATOR: [227, 150, 114, 217, 142, 172, 100, 228],
     };
     for (const [key, value] of Object.entries(legacy)) assert.deepEqual([...sdk[key]], value);
     for (const name of ['rotate_authority', 'revoke_attested_signer', 'revoke_vcek']) {
@@ -28,8 +28,8 @@ test('policy and legacy root builders match fixed Borsh layout', () => {
     expected.fill(7, 16, 64);
     assert.deepEqual(ix.data, expected);
     assert.deepEqual(ix.keys, [
-        { pubkey: authority, isSigner: true, isWritable: false },
-        { pubkey: sdk.derivePolicyRegistryPda(program)[0], isSigner: false, isWritable: true },
+        { isSigner: true, isWritable: false, pubkey: authority },
+        { isSigner: false, isWritable: true, pubkey: sdk.derivePolicyRegistryPda(program)[0] },
     ]);
     assert.equal(sdk.buildUpdatePolicyIx(authority, new Uint8Array(4), [], program).data.readUInt32LE(12), 0);
     assert.throws(() => sdk.buildUpdatePolicyIx(authority, new Uint8Array(3), [], program), /minTcb/);
@@ -59,11 +59,11 @@ test('JWKS builders hash exact kid and reject malformed key identifiers', () => 
     assert.deepEqual(ix.data.subarray(17, 273), modulus);
     assert.equal(ix.data.readUInt32LE(273), 65537);
     assert.deepEqual(ix.keys, [
-        { pubkey: authority, isSigner: true, isWritable: false },
-        { pubkey: sdk.derivePolicyRegistryPda(program)[0], isSigner: false, isWritable: false },
-        { pubkey: jwks, isSigner: false, isWritable: true },
-        { pubkey: payer, isSigner: true, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { isSigner: true, isWritable: false, pubkey: authority },
+        { isSigner: false, isWritable: false, pubkey: sdk.derivePolicyRegistryPda(program)[0] },
+        { isSigner: false, isWritable: true, pubkey: jwks },
+        { isSigner: true, isWritable: true, pubkey: payer },
+        { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
     ]);
     const revoke = sdk.buildRevokeJwksKeyIx(authority, hash, program);
     assert.deepEqual(revoke.keys, ix.keys.slice(0, 3));
@@ -99,12 +99,12 @@ test('VCEK revocation targets the canonical V2 cache', () => {
     assert.equal(ix.data.readBigUInt64LE(40), 77n);
     assert.equal(ix.data.length, 48);
     assert.deepEqual(ix.keys, [
-        { pubkey: authority, isSigner: true, isWritable: false },
-        { pubkey: sdk.derivePolicyRegistryPda(program)[0], isSigner: false, isWritable: false },
-        { pubkey: sdk.deriveVcekPda(hash, 77n, program)[0], isSigner: false, isWritable: true },
-        { pubkey: sdk.deriveAmdRevocationPda(hash, program)[0], isSigner: false, isWritable: true },
-        { pubkey: authority, isSigner: true, isWritable: true },
-        { pubkey: require('@solana/web3.js').SystemProgram.programId, isSigner: false, isWritable: false },
+        { isSigner: true, isWritable: false, pubkey: authority },
+        { isSigner: false, isWritable: false, pubkey: sdk.derivePolicyRegistryPda(program)[0] },
+        { isSigner: false, isWritable: true, pubkey: sdk.deriveVcekPda(hash, 77n, program)[0] },
+        { isSigner: false, isWritable: true, pubkey: sdk.deriveAmdRevocationPda(hash, program)[0] },
+        { isSigner: true, isWritable: true, pubkey: authority },
+        { isSigner: false, isWritable: false, pubkey: require('@solana/web3.js').SystemProgram.programId },
     ]);
     assert.throws(() => sdk.buildRevokeVcekIx(authority, authority, Buffer.alloc(31), 1, program), /chipIdHash/);
 });

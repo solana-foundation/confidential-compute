@@ -17,6 +17,6 @@ test('supported package root loads; internal subpaths are blocked', () => {
             });
         }
     } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
+        fs.rmSync(dir, { force: true, recursive: true });
     }
 });

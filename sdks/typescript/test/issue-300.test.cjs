@@ -4,7 +4,7 @@ const { createHash } = require('node:crypto');
 const { PublicKey, Transaction, TransactionInstruction } = require('@solana/web3.js');
 const sdk = require(process.env.SOLANA_CC_SDK_PATH || '../dist');
 const pk = n => new PublicKey(new Uint8Array(32).fill(n));
-const accounts = [{ pubkey: pk(3), isSigner: false, isWritable: true }];
+const accounts = [{ isSigner: false, isWritable: true, pubkey: pk(3) }];
 const digest = wire =>
     createHash('sha256')
         .update(
@@ -39,7 +39,7 @@ test('V3 binds full wire bytes independently of discriminator split', () => {
 });
 test('compiled action accepts empty and arbitrary instruction data without guessing a schema', () => {
     for (const wire of [[], [7], [7, 8], [7, 8, 9, 10, 11, 12, 13, 14, 15]]) {
-        const ix = new TransactionInstruction({ programId: pk(2), keys: accounts, data: Buffer.from(wire) });
+        const ix = new TransactionInstruction({ data: Buffer.from(wire), keys: accounts, programId: pk(2) });
         const message = new Transaction({ feePayer: pk(1), recentBlockhash: pk(9).toBase58() })
             .add(ix)
             .compileMessage();

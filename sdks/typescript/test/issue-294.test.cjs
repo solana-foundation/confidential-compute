@@ -39,9 +39,9 @@ test('VLEK AMD A/B derive from explicit endorsement XY for flag and zero-chip pa
             const ix = build();
             assert.ok(ix.keys[2].pubkey.equals(expected));
             assert.deepEqual(ix.keys.at(-1), {
-                pubkey: sdk.deriveAmdRevocationPda(identity, pid)[0],
                 isSigner: false,
                 isWritable: false,
+                pubkey: sdk.deriveAmdRevocationPda(identity, pid)[0],
             });
         }
         if (flags === 4 || chip === 0) {

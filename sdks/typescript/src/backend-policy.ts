@@ -30,14 +30,6 @@ export function buildSetBackendPolicyIx(
     const count = Buffer.alloc(4);
     count.writeUInt32LE(measurements.length);
     return new TransactionInstruction({
-        programId,
-        keys: [
-            { pubkey: authority, isSigner: true, isWritable: false },
-            { pubkey: derivePolicyRegistryPda(programId)[0], isSigner: false, isWritable: false },
-            { pubkey: backend, isSigner: false, isWritable: true },
-            { pubkey: payer, isSigner: true, isWritable: true },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        ],
         data: Buffer.concat([
             Buffer.from(SET_BACKEND_POLICY_DISCRIMINATOR),
             Buffer.from([source]),
@@ -45,5 +37,13 @@ export function buildSetBackendPolicyIx(
             ...measurements.map(m => Buffer.from(m)),
             Buffer.alloc((8 - measurements.length) * 48),
         ]),
+        keys: [
+            { isSigner: true, isWritable: false, pubkey: authority },
+            { isSigner: false, isWritable: false, pubkey: derivePolicyRegistryPda(programId)[0] },
+            { isSigner: false, isWritable: true, pubkey: backend },
+            { isSigner: true, isWritable: true, pubkey: payer },
+            { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
+        ],
+        programId,
     });
 }

@@ -120,19 +120,19 @@ export function buildVerifyNvidiaAttestationIx(
         Buffer.from(gpuMeasurement),
     ]);
     const keys = [
-        { pubkey: attestedSigner, isSigner: false, isWritable: mode === VERIFY_NVIDIA_MODE_A },
-        { pubkey: registry, isSigner: false, isWritable: false },
-        { pubkey: noncePda, isSigner: false, isWritable: true },
-        { pubkey: payer, isSigner: true, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-        { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
+        { isSigner: false, isWritable: mode === VERIFY_NVIDIA_MODE_A, pubkey: attestedSigner },
+        { isSigner: false, isWritable: false, pubkey: registry },
+        { isSigner: false, isWritable: true, pubkey: noncePda },
+        { isSigner: true, isWritable: true, pubkey: payer },
+        { isSigner: false, isWritable: false, pubkey: SystemProgram.programId },
+        { isSigner: false, isWritable: false, pubkey: SYSVAR_CLOCK_PUBKEY },
+        { isSigner: false, isWritable: false, pubkey: SYSVAR_SLOT_HASHES_PUBKEY },
         mode === VERIFY_NVIDIA_MODE_A
-            ? { pubkey: workloadSigner, isSigner: true, isWritable: false }
-            : { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
-        { pubkey: backend, isSigner: false, isWritable: false },
+            ? { isSigner: true, isWritable: false, pubkey: workloadSigner }
+            : { isSigner: false, isWritable: false, pubkey: SYSVAR_INSTRUCTIONS_PUBKEY },
+        { isSigner: false, isWritable: false, pubkey: backend },
     ];
-    return new TransactionInstruction({ programId, keys, data });
+    return new TransactionInstruction({ data, keys, programId });
 }
 
 function modeBNoncePda(

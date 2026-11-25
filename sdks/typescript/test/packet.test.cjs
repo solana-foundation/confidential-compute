@@ -41,7 +41,7 @@ function expectPacketTooLarge(fn) {
     try {
         fn();
     } catch (err) {
-        assert.ok(err instanceof PacketTooLargeError, `expected PacketTooLargeError, got ${err}`);
+        assert.ok(err instanceof PacketTooLargeError, `expected PacketTooLargeError, got ${String(err)}`);
         assert.ok(err.len > PACKET_DATA_SIZE, `packet len ${err.len} is within the cap`);
         return err.len;
     }
@@ -60,9 +60,9 @@ test('raw report builders fail closed above PACKET_DATA_SIZE', () => {
 
     const consumer = Keypair.generate().publicKey;
     const consumerIx = new TransactionInstruction({
-        programId: consumer,
-        keys: [{ pubkey: payer, isSigner: true, isWritable: true }],
         data: Buffer.from([1, 2]),
+        keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
+        programId: consumer,
     });
     const measurement = new Uint8Array(48).fill(0x42);
     const atomicLen = expectPacketTooLarge(() =>
@@ -94,9 +94,9 @@ test('oversized packers still emit the raw report layout', () => {
 
     const consumer = PublicKey.unique();
     const consumerIx = new TransactionInstruction({
-        programId: consumer,
-        keys: [{ pubkey: payer, isSigner: true, isWritable: true }],
         data: Buffer.from([1, 2]),
+        keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
+        programId: consumer,
     });
     const tx = buildAtomicAttestationTxOversized(
         payer,
@@ -116,9 +116,9 @@ test('buildSessionActionTx marks an existing workload account as signer', () => 
     const payer = Keypair.generate().publicKey;
     const signer = Keypair.generate();
     const consumerIx = new TransactionInstruction({
-        programId: PublicKey.unique(),
-        keys: [{ pubkey: signer.publicKey, isSigner: false, isWritable: true }],
         data: Buffer.from([0x11]),
+        keys: [{ isSigner: false, isWritable: true, pubkey: signer.publicKey }],
+        programId: PublicKey.unique(),
     });
     const tx = buildSessionActionTx(payer, signer, consumerIx, payer.toBase58());
     const message = tx.compileMessage();
@@ -148,9 +148,9 @@ test('raw nitro documents fail closed above PACKET_DATA_SIZE', () => {
     assert.ok(len > PACKET_DATA_SIZE);
 
     const consumerIx = new TransactionInstruction({
-        programId: PublicKey.unique(),
-        keys: [{ pubkey: payer, isSigner: true, isWritable: true }],
         data: Buffer.from([1, 2]),
+        keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
+        programId: PublicKey.unique(),
     });
     const txLen = expectPacketTooLarge(() =>
         buildVerifyNitroAttestationTx(
@@ -186,9 +186,9 @@ test('oversized nitro packers still emit the raw document layout', () => {
     assert.equal(ix.data.length, VERIFY_NITRO_ATTESTATION_HEADER_LEN + MAX_NITRO_DOCUMENT_LEN);
 
     const consumerIx = new TransactionInstruction({
-        programId: PublicKey.unique(),
-        keys: [{ pubkey: payer, isSigner: true, isWritable: true }],
         data: Buffer.from([1, 2]),
+        keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
+        programId: PublicKey.unique(),
     });
     const tx = buildVerifyNitroAttestationTxOversized(
         payer,
@@ -213,7 +213,7 @@ test('shared wire test vector for action-hash and commitment calculation', () =>
     const data = new Uint8Array([0xaa, 0xbb, 0xcc, 0xdd]);
     const actionHash = hashAction(
         disc,
-        [acc1, acc2].map(pubkey => ({ pubkey, isSigner: false, isWritable: false })),
+        [acc1, acc2].map(pubkey => ({ isSigner: false, isWritable: false, pubkey })),
         data,
     );
 

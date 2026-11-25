@@ -92,9 +92,9 @@ test('AMD and Nitro A/B retain readonly legacy guard last and new active bump', 
         const expected = sdk.deriveUsedNoncePdaForSource(source, signer, nonce, pid);
         assert.ok(ix.keys[index].pubkey.equals(expected[0]));
         assert.deepEqual(ix.keys.at(source === 1 ? -2 : -1), {
-            pubkey: sdk.deriveLegacyUsedNoncePda(signer, nonce, pid)[0],
-            isWritable: false,
             isSigner: false,
+            isWritable: false,
+            pubkey: sdk.deriveLegacyUsedNoncePda(signer, nonce, pid)[0],
         });
         assert.ok(ix.keys.at(source === 1 ? -3 : -2).pubkey.equals(sdk.deriveBackendPolicyPda(source, pid)[0]));
         if (bumpAt !== null) assert.equal(ix.data[bumpAt], expected[1]);

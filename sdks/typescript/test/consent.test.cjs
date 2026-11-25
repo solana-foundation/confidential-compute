@@ -35,12 +35,12 @@ test('SNP and Nitro Mode A require workload signature in addition to payer', () 
             SOLANA_CONFIDENTIAL_COMPUTE_PROGRAM_ID,
         )[0];
         assert.deepEqual(ix.keys.at(source === 1 ? -4 : -3), {
-            pubkey: workload.publicKey,
             isSigner: true,
             isWritable: false,
+            pubkey: workload.publicKey,
         });
-        assert.deepEqual(ix.keys.at(source === 1 ? -3 : -2), { pubkey: policy, isSigner: false, isWritable: false });
-        assert.deepEqual(ix.keys.at(source === 1 ? -2 : -1), { pubkey: legacy, isSigner: false, isWritable: false });
+        assert.deepEqual(ix.keys.at(source === 1 ? -3 : -2), { isSigner: false, isWritable: false, pubkey: policy });
+        assert.deepEqual(ix.keys.at(source === 1 ? -2 : -1), { isSigner: false, isWritable: false, pubkey: legacy });
         const tx = new Transaction({
             feePayer: payer.publicKey,
             recentBlockhash: Keypair.generate().publicKey.toBase58(),

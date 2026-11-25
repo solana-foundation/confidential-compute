@@ -116,24 +116,24 @@ test('contract gate rejects a deliberately changed discriminator (negative contr
 test('CPI private offsets and parser ceilings agree with wire contracts', () => {
     const source = read('crates/solana-confidential-compute-cpi/src/lib.rs');
     for (const [name, value] of Object.entries({
-        SIGNER_PUBKEY_OFFSET: 8,
-        MEASUREMENT_OFFSET: 41,
-        EXPIRES_SLOT_OFFSET: 137,
         BUMP_OFFSET: 145,
-        NITRO_MODE_OFFSET: 8,
-        NITRO_NONCE_SLOT_OFFSET: 9,
-        NITRO_ACTION_HASH_OFFSET: 17,
-        NITRO_DOC_LEN_OFFSET: 49,
-        NITRO_DOCUMENT_OFFSET: sdk.VERIFY_NITRO_ATTESTATION_HEADER_LEN,
-        JWT_MODE_OFFSET: 8,
-        JWT_NONCE_SLOT_OFFSET: 9,
+        COSE_SIGN1_TAG: 18,
+        EXPIRES_SLOT_OFFSET: 137,
         JWT_ACTION_HASH_OFFSET: 17,
         JWT_LEN_OFFSET: 49,
+        JWT_MODE_OFFSET: 8,
+        JWT_NONCE_SLOT_OFFSET: 9,
         JWT_OFFSET: 53,
-        SNP_HEADER_LEN: 80,
-        MAX_JWT_LEN: 4096,
         MAX_CBOR_SKIP_DEPTH: 8,
-        COSE_SIGN1_TAG: 18,
+        MAX_JWT_LEN: 4096,
+        MEASUREMENT_OFFSET: 41,
+        NITRO_ACTION_HASH_OFFSET: 17,
+        NITRO_DOCUMENT_OFFSET: sdk.VERIFY_NITRO_ATTESTATION_HEADER_LEN,
+        NITRO_DOC_LEN_OFFSET: 49,
+        NITRO_MODE_OFFSET: 8,
+        NITRO_NONCE_SLOT_OFFSET: 9,
+        SIGNER_PUBKEY_OFFSET: 8,
+        SNP_HEADER_LEN: 80,
     })) {
         const found = source.match(new RegExp(`const ${name}: (?:usize|u8|u64) = ([0-9_]+);`));
         assert.ok(found, name);

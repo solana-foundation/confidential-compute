@@ -59,9 +59,9 @@ function readU32Le(data, offset) {
 
 function consumerIx(payer) {
     return new TransactionInstruction({
-        programId: PublicKey.unique(),
-        keys: [{ pubkey: payer, isSigner: true, isWritable: true }],
         data: Buffer.from([1, 2, 3]),
+        keys: [{ isSigner: true, isWritable: true, pubkey: payer }],
+        programId: PublicKey.unique(),
     });
 }
 
