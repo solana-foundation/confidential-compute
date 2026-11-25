@@ -316,8 +316,7 @@ fn mont_mul(a: &U2048, b: &U2048, n: &U2048, n0: u64) -> U2048 {
 mod tests {
     use super::*;
 
-    /// Limb 0 is the least significant 8 bytes. The limb conversion now
-    /// uses chunks, not index arithmetic.
+    /// Limb 0 holds the least significant 8 bytes of the big-endian input.
     #[test]
     fn u2048_limb_order_is_little_endian_over_big_endian_bytes() {
         let bytes: [u8; RSA2048_LEN] = core::array::from_fn(|i| i as u8);

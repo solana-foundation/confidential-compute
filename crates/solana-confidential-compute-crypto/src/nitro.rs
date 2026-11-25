@@ -977,8 +977,7 @@ mod tests {
         assert!(parse_x509_time(0x18, b"20000229000000Z").is_ok());
     }
 
-    /// `days_from_civil` and the two-digit parser now use checked arithmetic.
-    /// Known Unix times pin the result.
+    /// Certificate times in both ASN.1 time forms convert to known Unix times.
     #[test]
     fn certificate_times_match_known_unix_times() {
         let cases: [(u8, &[u8], u64); 8] = [

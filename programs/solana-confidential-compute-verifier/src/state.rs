@@ -416,8 +416,8 @@ impl GcpTenantPolicy {
 mod view_reads {
     use super::*;
 
-    /// The view getters used to slice and unwrap. They now read through
-    /// `array_at`, which fails closed on short data.
+    /// `array_at` returns `InvalidAccountData` when the read extends past the
+    /// end of the data, including when the offset overflows.
     #[test]
     fn array_at_rejects_short_data_rather_than_panicking() {
         let data = [1u8, 2, 3, 4, 5];

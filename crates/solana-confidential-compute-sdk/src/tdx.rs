@@ -694,7 +694,8 @@ mod tests {
     use super::*;
     use solana_confidential_compute_verifier::payload as vix;
 
-    /// The precompile message size is a `u16`. A longer message used to panic.
+    /// The precompile message size is a `u16`. A longer message returns
+    /// `PrecompileMessageTooLong`.
     #[test]
     fn secp256r1_builder_rejects_a_message_longer_than_u16() {
         let message = vec![0u8; usize::from(u16::MAX) + 1];

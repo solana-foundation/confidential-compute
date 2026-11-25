@@ -115,8 +115,8 @@ impl IntoResponse for EnrollmentRejection {
 mod tests {
     use super::*;
 
-    /// `Default` no longer calls `new(None, 300).expect(..)`. It must build the
-    /// same disabled control with the same interval.
+    /// `Default` builds the same control as `new(None, DEFAULT_MIN_INTERVAL_SECS)`:
+    /// no token and the default interval.
     #[test]
     fn default_matches_new_with_no_token() {
         let default = EnrollmentControl::default();

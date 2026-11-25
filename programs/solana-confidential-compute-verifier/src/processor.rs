@@ -3077,9 +3077,8 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    /// The SlotHashes walk now uses 40-byte chunks. A partial trailing entry
-    /// is still ignored, and an entry count larger than the data does not
-    /// read past the end.
+    /// The SlotHashes walk reads 40-byte entries. A partial trailing entry is
+    /// ignored, and an entry count larger than the data does not read past the end.
     #[test]
     fn test_slot_hash_walk_ignores_a_partial_trailing_entry() {
         let slot_hashes_key = slot_hashes::ID;

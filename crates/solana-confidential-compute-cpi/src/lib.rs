@@ -994,9 +994,7 @@ mod tests {
         doc
     }
 
-    /// The definite-map countdown and the break read now use checked
-    /// arithmetic. The pair count still bounds the walk, and a truncated
-    /// map still fails closed.
+    /// The pair count bounds the walk, and a truncated map fails closed.
     #[test]
     fn nitro_payload_map_count_bounds_the_walk() {
         let pcrs = cbor_map_int(&[(0, cbor_bstr(&[7u8; 48]))]);

@@ -1287,8 +1287,8 @@ pub(crate) mod tests {
         assert!(!identity.subject_is_vlek);
     }
 
-    /// The DER cursor now consumes bytes through `take`. Each length form
-    /// keeps its old result, and truncated input still fails closed.
+    /// Each DER length form returns the expected value, and truncated input
+    /// fails closed.
     #[test]
     fn der_lengths_keep_their_boundaries() {
         let ok = |der: &[u8]| {

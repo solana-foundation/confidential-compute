@@ -695,8 +695,8 @@ mod tests {
         assert!(!is_low_s(&one_above));
     }
 
-    /// `PRECOMPILE_DATA_START + 33 + 64 + message_len` used to overflow and
-    /// panic for a huge `message_len`. It now fails closed.
+    /// A huge `message_len` overflows `PRECOMPILE_DATA_START + 33 + 64 + message_len`.
+    /// The extraction returns `InvalidInstruction`.
     #[test]
     fn an_overflowing_message_length_is_rejected_rather_than_panicking() {
         let key = instructions::ID;

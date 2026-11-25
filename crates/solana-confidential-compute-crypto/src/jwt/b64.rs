@@ -203,8 +203,8 @@ mod tests {
         Ok(out)
     }
 
-    /// The slice decoder and the streaming decoder were rewritten without
-    /// index arithmetic. Both must round-trip every tail length.
+    /// The slice decoder and the streaming decoder both round-trip every tail
+    /// length, with and without padding.
     #[test]
     fn both_decoders_round_trip_every_length() {
         for len in 0..=40usize {

@@ -193,8 +193,8 @@ impl Processor {
 mod tests {
     use super::*;
 
-    /// The header readers used to slice and unwrap. Short data now fails
-    /// closed with `InvalidInstructionData`.
+    /// A header read that extends past the end of the data returns
+    /// `InvalidInstructionData`.
     #[test]
     fn header_reads_reject_short_data_rather_than_panicking() {
         let args = [7u8; 44];

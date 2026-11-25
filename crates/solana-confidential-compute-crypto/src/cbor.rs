@@ -420,8 +420,8 @@ mod tests {
         assert!(c.is_empty());
     }
 
-    /// Major type 1 now decodes `-1 - n` with `checked_sub`. The range ends
-    /// stay the same.
+    /// Major type 1 decodes to `-1 - n`. `n = i64::MAX` gives `i64::MIN`, and a
+    /// larger `n` is malformed.
     #[test]
     fn negative_integer_range_ends() {
         let mut max = vec![0x3b];
@@ -434,8 +434,7 @@ mod tests {
         assert_eq!(CborCursor::new(&[0x37]).read_int(), Ok(-24));
     }
 
-    /// The skip depth now counts down with `checked_sub`. Eight levels pass
-    /// and nine fail.
+    /// The skip depth limit is eight levels. Eight levels pass and nine fail.
     #[test]
     fn skip_depth_limit_is_eight_levels() {
         let nested = |arrays: usize| {

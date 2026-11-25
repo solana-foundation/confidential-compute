@@ -844,8 +844,8 @@ mod tests {
         parse_json(SliceSrc::new(json), &mut claims)
     }
 
-    /// The container stack pointer now moves with `checked_add` and
-    /// `checked_sub`. The depth limit stays at eight containers.
+    /// The depth limit is eight containers. Unbalanced and malformed containers
+    /// fail closed.
     #[test]
     fn nesting_stops_at_eight_containers() {
         let arrays = |n: usize| format!("{{\"x\":{}0{}}}", "[".repeat(n), "]".repeat(n));
