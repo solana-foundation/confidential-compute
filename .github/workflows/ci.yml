@@ -103,6 +103,10 @@ jobs:
         run: df -h /
       - name: Install TypeScript dependencies (Bun)
         run: just install-ts
+      - name: TypeScript SDK format check (Oxfmt)
+        run: just fmt-check-ts
+      - name: TypeScript SDK lint (Oxlint)
+        run: just lint-ts
       - name: TypeScript SDK Build & Test (Bun)
         run: just test-ts
       - name: Disk usage (end of job)
