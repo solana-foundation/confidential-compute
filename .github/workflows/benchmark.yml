@@ -1,0 +1,31 @@
+name: Benchmark
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  compute-units:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+        with:
+          sbf: 'true'
+
+      - name: Run benchmark
+        run: just test-and-benchmark
+
+      - name: Report compute units
+        uses: solana-developers/github-actions/cu-benchmark@e846103a578b3170a9a14824bcdf38d5dcf59ac0 # between v0.2.10 and v0.2.11; no tag at this SHA

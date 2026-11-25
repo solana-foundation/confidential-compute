@@ -26,6 +26,8 @@ use solana_sdk::{
     transaction::{Transaction, TransactionError},
 };
 
+#[path = "common/cu_tracker.rs"]
+mod cu_tracker;
 #[path = "common/sbf.rs"]
 mod sbf;
 const LIMIT: u32 = 1_400_000;
@@ -218,6 +220,7 @@ async fn run() {
     };
     let (registered, reg_cu) = send(&mut ctx, &[register], Some(&authority)).await;
     eprintln!("REGISTER_JWKS_KEY cu={reg_cu} outcome={registered:?}");
+    cu_tracker::record_cu("REGISTER_JWKS_KEY", reg_cu);
     let verify = |token: &str, payer: Pubkey| {
         let mut data = VERIFY_GOOGLE_JWT_DISCRIMINATOR.to_vec();
         VerifyGoogleJwtArgs {
@@ -251,6 +254,7 @@ async fn run() {
     // Token-derived instruction data stays out of logs; Banks execution is not packet feasibility proof.
     let (verified, verify_cu) = send(&mut ctx, &[good, consumer_ix.clone()], None).await;
     eprintln!("VERIFY_GOOGLE_JWT cu={verify_cu} outcome={verified:?}");
+    cu_tracker::record_cu("VERIFY_GOOGLE_JWT", verify_cu);
     // A fresh context would be needed for replay-independent valid-path repetition;
     // invalid signatures must reject before looking at the consumed nonce.
     let mut tampered = jwt.as_bytes().to_vec();
@@ -259,6 +263,7 @@ async fn run() {
     let bad = verify(std::str::from_utf8(&tampered).unwrap(), ctx.payer.pubkey());
     let (invalid, invalid_cu) = send(&mut ctx, &[bad, consumer_ix], None).await;
     eprintln!("INVALID_SIGNATURE cu={invalid_cu} outcome={invalid:?}");
+    cu_tracker::record_cu("INVALID_SIGNATURE", invalid_cu);
     assert!(invalid.is_err());
     assert_eq!(
         invalid,

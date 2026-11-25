@@ -138,3 +138,6 @@ web-build/
 
 # Python
 __pycache__/
+
+# CU benchmark output
+cu_report.md

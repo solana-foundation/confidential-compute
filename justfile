@@ -175,6 +175,9 @@ verify-sbpfv3-integrity:
         --build-inputs target/deploy/build-inputs.txt
     bash scripts/build-sbpfv3.sh --verify target/deploy/solana_confidential_compute_verifier.so
 
+test-and-benchmark:
+    CU_REPORT=1 just compute-regression
+
 compute-regression:
     #!/usr/bin/env bash
     set -euo pipefail
